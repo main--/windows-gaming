@@ -5,7 +5,7 @@ authors = ["main() <main@ehvag.de>"]
 
 [dependencies]
 systemd = "0.0.10"
-nix = "0.7.0"
+nix = { version = "0.7.0", features = ["signalfd"] }
 users = "0.5.2"
 toml = "0.2.1"
 rustc-serialize = "0.3.21"

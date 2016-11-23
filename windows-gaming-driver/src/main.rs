@@ -18,6 +18,8 @@ use std::fmt::Write as FmtWrite;
 
 use users::get_user_by_name;
 
+use nix::sys::signalfd::{SigSet, SignalFd, SFD_CLOEXEC};
+
 const TMP_FOLDER: &'static str = "/tmp/windows-gaming";
 const DATA_FOLDER: &'static str = "/usr/lib/windows-gaming";
 
@@ -239,6 +241,38 @@ force user={2}
 
     qemu.stdin(Stdio::null());
 
+    struct CatchSigterm {
+        sigfd: SignalFd,
+        monitor: Rc<RefCell<MonitorManager>>,
+    }
+
+    impl CatchSigterm {
+        fn new(monitor: Rc<RefCell<MonitorManager>>) -> CatchSigterm {
+            let mut sigset = SigSet::empty();
+            sigset.add(nix::sys::signal::SIGTERM);
+            sigset.thread_block().unwrap();
+            CatchSigterm {
+                sigfd: SignalFd::with_flags(&sigset, SFD_CLOEXEC).expect("Failed to create signalfd"),
+                monitor: monitor,
+            }
+        }
+    }
+
+    impl Pollable for CatchSigterm {
+        fn fd(&self) -> RawFd {
+            self.sigfd.as_raw_fd()
+        }
+
+        fn run(&mut self) -> PollableResult {
+            self.sigfd.read_signal().expect("Failed to read signalfd").unwrap();
+
+            // sigterm -> shutdown
+            self.monitor.borrow_mut().shutdown();
+
+            PollableResult::Ok
+        }
+    }
+
     let mut qemu = qemu.spawn().expect("Failed to start qemu");
 
     let (monitor_stream, _) = monitor_socket.accept().expect("Failed to get monitor");
@@ -288,6 +322,9 @@ force user={2}
         fn run(&mut self) -> PollableResult {
             drain_stdout(&mut self.borrow_mut().stream)
         }
+        fn is_critical(&self) -> bool {
+            true
+        }
     }
 
     let mman = Rc::new(RefCell::new(MonitorManager {
@@ -319,6 +356,10 @@ force user={2}
             }
             PollableResult::Ok
         }
+
+        fn is_critical(&self) -> bool {
+            true
+        }
     }
 
     struct ControlServerHandler {
@@ -339,10 +380,6 @@ force user={2}
                 clientpipe: self.clientpipe.clone(),
                 client: client,
             }))
-        }
-
-        fn is_critical(&self) -> bool {
-            false // this one will never shut down on its own
         }
     }
 
@@ -382,6 +419,7 @@ force user={2}
                        clientpipe: csr.clone(),
                        controlserver: control_socket,
                    }),
+                   Box::new(CatchSigterm::new(mman.clone())),
                    Box::new(mman)]);
 
     qemu.wait().unwrap();
@@ -398,8 +436,8 @@ trait Pollable {
     fn fd(&self) -> RawFd;
     fn run(&mut self) -> PollableResult;
     fn is_critical(&self) -> bool {
-        true
-    } // eventloop will run until all critical ones are gone
+        false // eventloop will run until all critical ones are gone
+    }
 }
 
 fn read_byte<T: Read>(thing: &mut T) -> std::io::Result<Option<u8>> {
