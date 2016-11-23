@@ -1,0 +1,17 @@
+[machine]
+memory = '8G'
+cores = 4
+threads = 2
+
+[machine.network]
+bridges = ["br0"]
+
+[[machine.storage]]
+path = '/dev/sda3'
+cache = 'none'
+format = 'raw'
+
+[samba]
+user = 'foo'
+path = '/home/foo/windows-shared'
+

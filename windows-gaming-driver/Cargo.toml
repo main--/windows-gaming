@@ -1,0 +1,15 @@
+[package]
+name = "windows-gaming-driver"
+version = "0.1.0"
+authors = ["main() <main@ehvag.de>"]
+
+[dependencies]
+systemd = "0.0.10"
+nix = "0.7.0"
+users = "0.5.2"
+toml = "0.2.1"
+rustc-serialize = "0.3.21"
+
+[replace]
+"systemd:0.0.10" = { git = "https://github.com/main--/rust-systemd.git" }
+
