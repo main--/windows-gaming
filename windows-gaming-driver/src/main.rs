@@ -60,8 +60,6 @@ struct SambaConfig {
 }
 
 fn main() {
-    println!("Hello, world!");
-
     let mut args = std::env::args().skip(1);
     let config_path = args.next();
     if args.next().is_some() {
@@ -95,7 +93,7 @@ fn main() {
         Ok(x) => x,
         Err(e) => panic!("Failed to decode config: {}", e),
     };
-    println!("{:?}", cfg);
+
     let machine = cfg.machine;
 
     let tmp = Path::new(cfg.workdir.as_ref().map(|x| &x[..]).unwrap_or(TMP_FOLDER));
