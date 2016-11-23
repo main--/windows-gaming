@@ -1,0 +1,13 @@
+[Unit]
+Description=Windows VM
+
+[Service]
+Type=notify
+ExecStart=/usr/lib/windows-gaming/windows-gaming-driver
+NotifyAccess=main
+KillMode=mixed
+TimeoutStartSec=infinity
+TimeoutStopSec=infinity
+
+[Install]
+WantedBy=multi-user.target
