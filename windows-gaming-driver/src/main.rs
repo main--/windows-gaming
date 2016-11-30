@@ -67,6 +67,8 @@ fn main() {
     notify_systemd(false, "Starting qemu ...");
     let mut qemu = Command::new("qemu-system-x86_64");
     qemu.args(&["-enable-kvm",
+                "-machine",
+                "q35",
                 "-cpu",
                 "host,kvm=off,hv_time,hv_relaxed,hv_vapic,hv_spinlocks=0x1fff,\
                  hv_vendor_id=NvidiaFuckU",
