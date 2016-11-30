@@ -1,4 +1,4 @@
-﻿namespace VfioService
+namespace VfioService
 {
     partial class MainForm
     {
