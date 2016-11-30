@@ -83,7 +83,7 @@ impl Controller {
 
     pub fn set_io_attached(&mut self, state: bool, force: bool) {
         if self.ga_up || force {
-            match (state, self.io_attached) {
+            match (self.io_attached, state) {
                 (false, true) => {
                     // attach
                     self.writemon("device_add usb-host,vendorid=0x1532,productid=0x0024,id=mouse");
