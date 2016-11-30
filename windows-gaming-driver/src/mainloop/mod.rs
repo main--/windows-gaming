@@ -7,12 +7,15 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::os::unix::net::{UnixListener, UnixStream};
 
-pub mod clientpipe_handler;
-pub mod control_handler;
-pub mod monitor_manager;
-pub mod catch_sigterm;
+use controller::Controller;
 
-pub type MonitorRef = Rc<RefCell<monitor_manager::MonitorManager>>;
+pub mod clientpipe_handler;
+pub mod monitor_handler;
+pub mod control_handler;
+pub mod catch_sigterm;
+pub mod pinger;
+
+pub type ControllerRef = Rc<RefCell<Controller>>;
 
 pub enum PollableResult {
     Child(Box<Pollable>),
@@ -93,12 +96,12 @@ fn poll_core<'a>(mut components: Vec<Box<Pollable>>) {
 }
 
 pub fn run(monitor_stream: UnixStream, clientpipe_stream: UnixStream, control_socket: UnixListener) {
-    let csr = Rc::new(RefCell::new(clientpipe_stream));
+    let ctrl = Rc::new(RefCell::new(Controller::new(&monitor_stream, &clientpipe_stream)));
 
-    let mman = Rc::new(RefCell::new(monitor_manager::MonitorManager::new(monitor_stream)));
-
-    poll_core(vec![Box::new(clientpipe_handler::ClientpipeHandler::new(mman.clone(), csr.clone())),
-                   Box::new(control_handler::ControlServerHandler::new(mman.clone(), csr.clone(), control_socket)),
-                   Box::new(catch_sigterm::CatchSigterm::new(mman.clone())),
-                   Box::new(mman)]);
+    poll_core(vec![
+        Box::new(monitor_handler::MonitorHandler::new(monitor_stream)),
+        Box::new(clientpipe_handler::ClientpipeHandler::new(ctrl.clone(), clientpipe_stream)),
+        Box::new(control_handler::ControlServerHandler::new(ctrl.clone(), control_socket)),
+        Box::new(catch_sigterm::CatchSigterm::new(ctrl.clone())),
+    ]);
 }

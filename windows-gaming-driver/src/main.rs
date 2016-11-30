@@ -3,11 +3,13 @@ extern crate nix;
 extern crate users;
 extern crate toml;
 extern crate rustc_serialize;
+extern crate timerfd;
 
 mod mainloop;
 mod config;
 mod sd_notify;
 mod samba;
+mod controller;
 
 use std::process::{Command, Stdio};
 use std::fs::{copy, create_dir, remove_dir_all, set_permissions, Permissions};

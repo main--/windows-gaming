@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -60,7 +60,7 @@ namespace VfioService
                     switch (m.WParam.ToInt64())
                     {
                         case HkIoExit:
-                            ClientManager.SendCommand(Command.IoExit);
+                            ClientManager.SendCommand(CommandOut.IoExit);
                             break;
                     }
                     break;
@@ -69,7 +69,7 @@ namespace VfioService
                     switch (m.WParam.ToInt64())
                     {
                         case PbtApmSuspend:
-                            ClientManager.SendCommand(Command.Suspending);
+                            ClientManager.SendCommand(CommandOut.Suspending);
                             break;
                     }
                     break;

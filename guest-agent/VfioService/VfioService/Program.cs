@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -16,7 +16,7 @@ namespace VfioService
 
             using (var manager = new ClientManager())
             {
-                manager.SendCommand(Command.ReportBoot);
+                manager.SendCommand(CommandOut.ReportBoot);
 
                 var form = new MainForm(manager);
                 var _ = form.Handle; // create form without showing

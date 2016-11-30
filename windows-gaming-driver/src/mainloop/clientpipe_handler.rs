@@ -1,20 +1,21 @@
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::os::unix::net::UnixStream;
 use std::os::unix::io::{AsRawFd, RawFd};
+use std::time::Duration;
+
+use super::pinger::Pinger;
 
 use mainloop::*;
 
 pub struct ClientpipeHandler {
-    monitor: MonitorRef,
-    clientpipe: Rc<RefCell<UnixStream>>,
+    controller: ControllerRef,
+    clientpipe: UnixStream,
 }
 
 
 impl ClientpipeHandler {
-    pub fn new(monitor: MonitorRef, clientpipe: Rc<RefCell<UnixStream>>) -> ClientpipeHandler {
+    pub fn new(controller: ControllerRef, clientpipe: UnixStream) -> ClientpipeHandler {
         ClientpipeHandler {
-            monitor: monitor,
+            controller: controller,
             clientpipe: clientpipe,
         }
     }
@@ -22,17 +23,28 @@ impl ClientpipeHandler {
 
 impl Pollable for ClientpipeHandler {
     fn fd(&self) -> RawFd {
-        self.clientpipe.borrow().as_raw_fd()
+        self.clientpipe.as_raw_fd()
     }
+
     fn run(&mut self) -> PollableResult {
-        match read_byte(&mut *self.clientpipe.borrow_mut()).expect("clientpipe read failed") {
+        match read_byte(&mut self.clientpipe).expect("clientpipe read failed") {
             Some(1) => {
                 println!("client is now alive!");
-                ::sd_notify::notify_systemd(true, "Ready");
+                if self.controller.borrow_mut().ga_hello() {
+                    let pinger = Pinger::new(Duration::new(1, 0), self.controller.clone());
+                    return PollableResult::Child(Box::new(pinger));
+                }
             }
             Some(2) => {
                 println!("client requests IO exit");
-                self.monitor.borrow_mut().set_io_attached(false);
+                self.controller.borrow_mut().set_io_attached(false, true);
+            }
+            Some(3) => {
+                println!("client says that it's suspending");
+                // TODO: do something here
+            }
+            Some(4) => {
+                self.controller.borrow_mut().ga_pong();
             }
             Some(x) => println!("client sent invalid request {}", x),
             None => return PollableResult::Death,

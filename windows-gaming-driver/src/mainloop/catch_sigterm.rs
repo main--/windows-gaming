@@ -6,17 +6,17 @@ use mainloop::*;
 
 pub struct CatchSigterm {
     sigfd: SignalFd,
-    monitor: MonitorRef,
+    controller: ControllerRef,
 }
 
 impl CatchSigterm {
-    pub fn new(monitor: MonitorRef) -> CatchSigterm {
+    pub fn new(controller: ControllerRef) -> CatchSigterm {
         let mut sigset = SigSet::empty();
         sigset.add(signal::SIGTERM);
         sigset.thread_block().unwrap();
         CatchSigterm {
             sigfd: SignalFd::with_flags(&sigset, SFD_CLOEXEC).expect("Failed to create signalfd"),
-            monitor: monitor,
+            controller: controller,
         }
     }
 }
@@ -30,7 +30,7 @@ impl Pollable for CatchSigterm {
         self.sigfd.read_signal().expect("Failed to read signalfd").unwrap();
 
         // sigterm -> shutdown
-        self.monitor.borrow_mut().shutdown();
+        self.controller.borrow_mut().shutdown();
 
         PollableResult::Ok
     }
