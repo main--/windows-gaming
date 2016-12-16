@@ -2,39 +2,45 @@ use std::path::Path;
 use std::fs::File;
 use std::io::Read;
 
-#[derive(RustcDecodable, Debug)]
+#[derive(RustcDecodable, RustcEncodable, Debug)]
 pub struct Config {
-    pub datadir: Option<String>,
-    pub workdir: Option<String>,
     pub machine: MachineConfig,
     pub samba: Option<SambaConfig>,
+    pub setup: Option<SetupConfig>,
 }
 
-#[derive(RustcDecodable, Debug)]
+#[derive(RustcDecodable, RustcEncodable, Debug)]
+pub struct SetupConfig {
+    pub cdrom: Option<String>,
+    pub floppy: Option<String>,
+    pub gui: bool,
+}
+
+#[derive(RustcDecodable, RustcEncodable, Debug)]
 pub struct MachineConfig {
     pub memory: String,
     pub hugepages: Option<bool>,
 
-    pub cores: u32,
+    pub cores: usize,
     pub threads: Option<u32>,
 
     pub network: Option<NetworkConfig>,
     pub storage: Vec<StorageDevice>,
 }
 
-#[derive(RustcDecodable, Debug)]
+#[derive(RustcDecodable, RustcEncodable, Debug)]
 pub struct StorageDevice {
     pub path: String,
     pub cache: String,
     pub format: String,
 }
 
-#[derive(RustcDecodable, Debug)]
+#[derive(RustcDecodable, RustcEncodable, Debug)]
 pub struct NetworkConfig {
     pub bridges: Vec<String>, // TODO: custom usernet
 }
 
-#[derive(RustcDecodable, Debug)]
+#[derive(RustcDecodable, RustcEncodable, Debug)]
 pub struct SambaConfig {
     pub user: String,
     pub path: String,

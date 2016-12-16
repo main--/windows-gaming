@@ -1,0 +1,2 @@
+KERNEL=="kvm", ACTION=="add", RUN+="/bin/setfacl -m g:vfio:rw- $devnode"
+SUBSYSTEM=="vfio", ACTION=="add", OWNER="root", GROUP="vfio", MODE="0660"

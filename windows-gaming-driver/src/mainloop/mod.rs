@@ -2,6 +2,7 @@ use std::io::prelude::*;
 use std::os::unix::prelude::*;
 
 use std::io::Result as IoResult;
+use std::io::ErrorKind;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -33,10 +34,12 @@ pub trait Pollable {
 
 pub fn read_byte<T: Read>(thing: &mut T) -> IoResult<Option<u8>> {
     let mut buf = [0u8; 1];
-    match thing.read(&mut buf)? {
-        0 => Ok(None),
-        1 => Ok(Some(buf[0])),
-        _ => unreachable!(),
+    match thing.read(&mut buf) {
+        Ok(0) => Ok(None),
+        Ok(1) => Ok(Some(buf[0])),
+        Ok(_) => unreachable!(),
+        Err(ref e) if e.kind() == ErrorKind::ConnectionReset => Ok(None),
+        Err(e) => Err(e),
     }
 }
 
