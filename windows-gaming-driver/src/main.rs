@@ -49,7 +49,8 @@ fn main() {
         None => {
             match mode {
                 RunMode::System => Path::new("/etc/windows-gaming-driver.toml").to_path_buf(),
-                RunMode::User => Path::new(&env::var("XDG_CONFIG_HOME").expect("Failed to get XDG_CONFIG_HOME"))
+                RunMode::User => env::var("XDG_CONFIG_HOME").map(|x| Path::new(&x).to_path_buf())
+                    .unwrap_or(env::home_dir().expect("Failed to get XDG_CONFIG_HOME").join(".config"))
                     .join("windows-gaming-driver").join("config.toml"),
             }
         }
