@@ -3,7 +3,7 @@ Description=Windows VM
 
 [Service]
 Type=notify
-ExecStart=/usr/sbin/windows-gaming-driver
+ExecStart=/usr/bin/windows-gaming-driver
 NotifyAccess=main
 KillMode=mixed
 TimeoutStartSec=infinity
