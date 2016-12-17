@@ -173,8 +173,6 @@ impl<'a> Wizard<'a> {
     fn run(&mut self, cfg: Option<Config>, target: &Path, workdir: &Path, datadir: &Path) {
         static TROUBLESHOOTING: &'static str = "Troubleshooting (since you apparently already did this):";
 
-        //             memory: ask_anything(&mut self.stdin, "How much memory would you like to assign to it?",
-        // "8G", |x| Some(x.to_owned())),
         let mut machine = MachineConfig {
             memory: "".to_owned(),
             cores: 0,
@@ -223,6 +221,8 @@ impl<'a> Wizard<'a> {
 
         println!("");
 
+        // TODO: Add a step 0 here where we add the current user to the vfio group
+
         if !is_iommu_enabled() {
             println!("Step 1: Enable IOMMU");
             println!("It's as simple as adding 'intel_iommu=on' or 'amd_iommu=on' to your kernel command line.");
@@ -245,6 +245,9 @@ impl<'a> Wizard<'a> {
             make_config(&machine, &setup).save(target);
             println!("");
         }
+
+        // TODO: Add a udev picker step here (just like the one we have for gpu) that selects USB keyboard and mouse.
+        // Then save that to the config and create a udev rule file that runs setfacl so the vfio group can use them.
 
         let passthrough_devs = self.get_passthrough_devs().expect("Failed to check gpu passthrough with udev");
         if passthrough_devs.is_empty() {
@@ -339,6 +342,9 @@ impl<'a> Wizard<'a> {
                 }
             }
 
+            // TODO: hugepages part 1 (as you have to reboot)
+
+            setup.reboot_commanded = true;
             make_config(&machine, &setup).save(target);
 
             println!("");
@@ -370,12 +376,21 @@ impl<'a> Wizard<'a> {
             let logical_cores = num_cpus::get();
             let physical_cores = num_cpus::get_physical();
 
-            machine.cores = physical_cores;
-            if logical_cores == physical_cores * 2 {
-                // hyperthreading detected
-                machine.threads = Some(2);
-            } else if logical_cores != physical_cores {
-                println!("Warning: You have {} logical on {} physical cores. No idea how to handle this.", logical_cores, physical_cores);
+            if machine.cores == 0 {
+                machine.cores = physical_cores;
+                if logical_cores == physical_cores * 2 {
+                    // hyperthreading detected
+                    machine.threads = Some(2);
+                } else if logical_cores != physical_cores {
+                    println!("Warning: You have {} logical on {} physical cores. Only using physical cores for now.", logical_cores, physical_cores);
+                }
+            }
+
+            // TODO: hugepages part 2
+            if machine.memory == "" {
+                // FIXME: validate this
+                machine.memory = ask_anything(&mut self.stdin, "How much memory would you like to assign to it?",
+                                              "be careful no validation LUL", |x| Some(x.to_owned()));
             }
 
             {
@@ -389,6 +404,7 @@ impl<'a> Wizard<'a> {
                 if !setup.gui {
                     // TODO: Here we would hook them up with mouse-only passthrough so they can
                     // do the setup without losing control over the machine.
+                    // Not implemented because the whole USB thing is still missing.
                     unimplemented!();
                 }
 
@@ -406,8 +422,14 @@ impl<'a> Wizard<'a> {
                     format: "raw".to_owned(),
                     path: ask_file("Please enter the path to the VM root block device"),
                 });
+                // TODO: Support multiple storage devices
+                // TODO: Support qcow2 images
+
+                make_config(&machine, &setup).save(target);
 
                 // Stage 1: First boot and Windows setup
+
+                // TODO: if installed, call windows10-get-download-link, wget to a temporary location and go on
                 setup.cdrom = Some(ask_file("Please enter the path to your Windows ISO"));
                 setup.floppy = Some(datadir.join("virtio-win.vfd").to_str().unwrap().to_owned());
             }
@@ -422,8 +444,16 @@ impl<'a> Wizard<'a> {
 
             qemu::run(&make_config(&machine, &setup), workdir, datadir);
 
-            println!("Alright, so far so good!");
+            // TODO:
+            // * ask if it worked, offer to retry or abort
+            // * record progress in the config file
+            // * boot again with the guest-agent ISO and tell them to install that
+            // * network
+            // * if installed: configure samba if they want it
+            // * at some point determine that everthing is properly set up
+            // * after some closing remarks to the user just switch over to normal operation
 
+            println!("Alright, so far so good!");
             unimplemented!();
         }
     }
