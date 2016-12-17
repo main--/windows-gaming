@@ -105,6 +105,12 @@ impl<'a> Wizard<'a> {
 
     fn autoconfigure_mkinitcpio(&mut self, has_modconf: &mut bool) -> IoResult<bool> {
         static MKINITCPIO_CONF: &'static str = "/etc/mkinitcpio.conf";
+
+        // File::open works on symlinks but sudo -e does not.
+        if !Path::new(MKINITCPIO_CONF).is_file() {
+            return Ok(false);
+        }
+
         if let Ok(f) = File::open(MKINITCPIO_CONF) {
             println!("It seems you are using mkinitcpio. (If you aren't, select NO here!)");
 
@@ -167,9 +173,10 @@ impl<'a> Wizard<'a> {
     fn run(&mut self, cfg: Option<Config>, target: &Path, workdir: &Path, datadir: &Path) {
         static TROUBLESHOOTING: &'static str = "Troubleshooting (since you apparently already did this):";
 
+        //             memory: ask_anything(&mut self.stdin, "How much memory would you like to assign to it?",
+        // "8G", |x| Some(x.to_owned())),
         let mut machine = MachineConfig {
-            memory: ask_anything(&mut self.stdin, "How much memory would you like to assign to it?",
-                                 "8G", |x| Some(x.to_owned())),
+            memory: "".to_owned(),
             cores: 0,
             network: None,
             storage: Vec::new(),
