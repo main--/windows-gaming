@@ -61,10 +61,14 @@ fn main() {
         RunMode::User => Path::new(&env::var("XDG_RUNTIME_DIR").expect("Failed to get XDG_RUNTIME_DIR")).to_path_buf(),
     }.join("windows-gaming-driver");
 
-    if config_path.exists() {
-        let cfg = Config::load(config_path);
-        qemu::run(&cfg, &workdir_path, Path::new(DATA_FOLDER));
+    let cfg = if config_path.exists() {
+        Some(Config::load(&config_path))
     } else {
-        setup_wizard::run(&config_path, &workdir_path, Path::new(DATA_FOLDER));
+        None
+    };
+
+    match cfg {
+        Some(ref cfg) if cfg.setup.is_none() => qemu::run(cfg, &workdir_path, Path::new(DATA_FOLDER)),
+        cfg => setup_wizard::run(cfg, &config_path, &workdir_path, Path::new(DATA_FOLDER)),
     }
 }

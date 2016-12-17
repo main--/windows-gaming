@@ -20,23 +20,36 @@ struct Wizard<'a> {
 }
 
 impl<'a> Wizard<'a> {
-    fn udev_select_gpu(&mut self) -> IoResult<Option<String>> {
+    fn udev_select_gpu(&mut self) -> UdevResult<Option<Vec<(u16, u16)>>> {
         let mut iter = Enumerator::new(&self.udev)?;
-        iter.match_subsystem("drm")?;
-        let devs: Vec<_> = iter.scan_devices()?.collect();
+        iter.match_subsystem("pci")?;
+        let pci_devs: Vec<_> = iter.scan_devices()?.map(PciDevice::new).collect();
+
+        // filter to the display controller class (0x03XXXX, udev drops the leading zero)
+        let display_controllers: Vec<_> = pci_devs.iter().filter(|x| x.pci_class.starts_with("3") && x.pci_class.len() == 5).collect();
 
         println!("");
-        let mut devs: Vec<_> = devs.iter().flat_map(|x| x.parent()).filter(|x| x.subsystem() == "pci").map(PciDevice::new).collect();
-        devs.sort();
-        devs.dedup();
-        for (i, dev) in devs.iter().enumerate() {
+        for (i, dev) in display_controllers.iter().enumerate() {
             println!("[{}]\t{}", i, dev);
         }
 
-        let selection = ask_numeric(&mut self.stdin, "Please select the graphics device you would like to pass through", 0..devs.len());
+        let selection = ask_numeric(&mut self.stdin, "Please select the graphics device you would like to pass through", 0..display_controllers.len());
+        let selected = display_controllers[selection];
 
-        let selected = devs.drain(..).skip(selection).next().unwrap();
-        //let selected = PciDevice::new(ctx.device_from_syspath(Path::new("/sys/devices/pci0000:00/00:00/0000:00:01.0/0000:01:00.0"))?);
+        let mut related_devices: Vec<_> = pci_devs.iter().filter(|x| x.pci_device() == selected.pci_device()).map(|x| x.id).collect();
+        related_devices.sort();
+        Ok(Some(related_devices))
+    }
+
+    fn check_iommu_grouping(&mut self, cfg: &SetupConfig) -> IoResult<bool> {
+        let first_id = cfg.vfio_devs[0];
+        let mut iter = Enumerator::new(&self.udev)?;
+        iter.match_subsystem("pci")?;
+        let mut iter = iter.scan_devices()?.map(PciDevice::new).filter(|x| x.id == first_id);
+        let selected = iter.next().expect("PCI device is gone now?");
+        assert!(iter.next().is_none());
+
+
         let iommu_dir = selected.dev.syspath().join("iommu_group").join("devices");
         assert!(iommu_dir.is_dir());
 
@@ -46,7 +59,7 @@ impl<'a> Wizard<'a> {
             let dev = PciDevice::new(self.udev.device_from_syspath(&entry?.path())?);
             if dev.pci_device() == selected.pci_device() {
                 // these are ours
-                related_devices.push(dev);
+                related_devices.push(dev.id);
             } else if dev.pci_class == "60400"/*pci bridge*/ {
                 // According to the Arch wiki (https://wiki.archlinux.org/index.php/PCI_passthrough_via_OVMF)
                 // passing a PCI bridge is fine, so we just ignore those.
@@ -65,14 +78,22 @@ impl<'a> Wizard<'a> {
 
             println!("This is a problem as it means that the GPU is not properly isolated - you can only pass entire groups to a VM. All or nothing.");
             println!("While there ARE fixes for this issue, it's not supported by this tool (yet), so you're on your own.");
+            // FIXME: Instead of telling them that they're screwed, we should just inform them about the all-or-nothing,
+            // ask if that's alright and then configure things that way instead (requiring another reboot to bind the remaining vfio-pci devices).
+            // (Untested but according to the wiki that's how it should work)
 
-            if !ask_yesno(&mut self.stdin, "Ignore this and carry on? (not recommended unless you know exactly what you're doing)") {
+            if !ask_yesno(&mut self.stdin,
+                          "Ignore this and carry on? (not recommended unless you know exactly what you're doing)") {
                 println!("Aborted.");
-                return Ok(None);
+                return Ok(false);
             }
         }
 
-        Ok(Some(related_devices.iter().map(|x| x.id).fold(String::new(), |s, (v, d)| s + &format!("{:04x}:{:04x},", v, d))))
+        related_devices.sort();
+        related_devices.dedup();
+
+        assert!(cfg.vfio_devs == related_devices);
+        Ok(true)
     }
 
     fn get_passthrough_devs(&self) -> UdevResult<Vec<(u16, u16)>> {
@@ -90,7 +111,7 @@ impl<'a> Wizard<'a> {
             if ask_yesno(&mut self.stdin, "Would you like me to try to edit the config file for you?") {
                 let mut hooks_added = false;
                 let mut already_added = false;
-                *has_modconf = false;
+
                 let mut mkic_conf = Vec::new();
                 for line in BufReader::new(f).lines().flat_map(|x| x.ok()) {
                     static MODULES_PREFIX: &'static str = "MODULES=\"";
@@ -136,12 +157,57 @@ impl<'a> Wizard<'a> {
         Ok(false)
     }
 
-    fn run(&mut self, target: &Path, workdir: &Path, datadir: &Path) {
+    fn write_vfio_modconf(&self, setup: &SetupConfig) {
+        let vfio_params = setup.vfio_devs.iter().fold(String::new(), |s, &(v, d)| s + &format!("{:04x}:{:04x},", v, d));
+        assert!(sudo_write_file("/etc/modprobe.d/vfio.conf", |x| {
+            writeln!(x, "options vfio-pci ids={}", vfio_params)
+        }).unwrap_or(false), "Failed to write modconf");
+    }
+
+    fn run(&mut self, cfg: Option<Config>, target: &Path, workdir: &Path, datadir: &Path) {
+        static TROUBLESHOOTING: &'static str = "Troubleshooting (since you apparently already did this):";
+
+        let mut machine = MachineConfig {
+            memory: ask_anything(&mut self.stdin, "How much memory would you like to assign to it?",
+                                 "8G", |x| Some(x.to_owned())),
+            cores: 0,
+            network: None,
+            storage: Vec::new(),
+
+            hugepages: None,
+            threads: None,
+        };
+
+        let mut setup = SetupConfig {
+            cdrom: None,
+            floppy: None,
+            gui: false,
+
+            iommu_commanded: false,
+            reboot_commanded: false,
+            vfio_devs: Vec::new(),
+        };
+
+        if let Some(cfg) = cfg {
+            machine = cfg.machine;
+            if let Some(cfg_setup) = cfg.setup {
+                setup = cfg_setup;
+            }
+        }
+
+        fn make_config(machine: &MachineConfig, setup: &SetupConfig) -> Config {
+            Config {
+                machine: machine.clone(),
+                setup: Some(setup.clone()),
+                samba: None,
+            }
+        }
+
+
         println!("Welcome!");
         println!("This wizard will help you configure a PCI passthrough setup!");
         println!("Some steps are automated, others have to be done manually. Note that answering no ('n') to those will abort the wizard.");
         println!("You can abort the wizard at any point without risking corruptions except where it specifically tells you not to.");
-        println!("When you restart the wizard after aborting it, it may lead you through some steps again even though you already completed them. This is fine, just verify that everything is the way it should be and move on.");
         println!("");
         if !ask_yesno(&mut self.stdin, "Understood?") {
             println!("Aborted.");
@@ -155,10 +221,21 @@ impl<'a> Wizard<'a> {
             println!("It's as simple as adding 'intel_iommu=on' or 'amd_iommu=on' to your kernel command line.");
             println!("Do this now, then continue here. Don't reboot yet, there's more we need to configure.");
             println!("");
+            if setup.iommu_commanded {
+                println!("{}", TROUBLESHOOTING);
+                println!("This is a kernel parameter, so it won't be active before you reboot. But if you already did that, \
+                          the kernel fails to enable it for some reason. IOMMU (aka VT-d) is disabled by default on many \
+                          mainboards, please check your firmware settings to make sure it's enabled. If that doesn't work \
+                          it's possible that your hardware just doesn't support it. If that's the reason you're out of luck \
+                          though. IOMMU is a critical component of this setup and there's no way it can work without that. Sorry.");
+            }
+
             if !ask_yesno(&mut self.stdin, "Done?") {
                 println!("Aborted.");
                 return;
             }
+            setup.iommu_commanded = true;
+            make_config(&machine, &setup).save(target);
             println!("");
         }
 
@@ -166,7 +243,19 @@ impl<'a> Wizard<'a> {
         if passthrough_devs.is_empty() {
             println!("Step 2: Setting up the vfio driver");
 
-            let vfio_params = match self.udev_select_gpu().expect("Failed to select GPU") {
+            if !setup.vfio_devs.is_empty() {
+                println!("");
+                println!("{}", TROUBLESHOOTING);
+                println!("Just like Step 1, this requires a reboot to activate. If you already did that, the most likely cause \
+                          is that things were misconfigured somehow. Are the kernel modules really in the initramfs now? \
+                          Are they loaded? Are they loaded BEFORE any graphics drivers? Is the module configuration applied \
+                          correctly? Note that vfio-pci only exists since Linux 4.1. Earlier versions are not supported by \
+                          this tool but you can still make it work with pci-stub. You're on your own there but if you need this \
+                          and figure it out remember that contributions are always appreciated!");
+                println!("");
+            }
+
+            setup.vfio_devs = match self.udev_select_gpu().expect("Failed to select GPU") {
                 Some(x) => x,
                 None => return,
             };
@@ -177,6 +266,7 @@ impl<'a> Wizard<'a> {
             let mut skip_ask = false;
             if self.autoconfigure_mkinitcpio(&mut has_modconf).unwrap_or(false) {
                 println!("Success!");
+                println!("");
                 if !has_modconf {
                     println!("However, it looks like your mkinitcpio is using a nonstandard configuration that does not use the 'modconf' hook.");
                     println!("This hook inserts a config file that tells the vfio driver what PCI devices it should bind to, so things won't work without it.");
@@ -192,9 +282,9 @@ impl<'a> Wizard<'a> {
             } else {
                 println!("Falling back to manual mode.");
                 println!("");
-                println!("Please tell your initramfs generator to load these kernel modules: {}", KERNEL_MODULES);
-                println!("Make sure that they are loaded BEFORE any graphics drivers!");
-                println!("For mkinitcpio users, adding them at the START of your MODULES line in /etc/mkinitcpio.conf will take care of this.");
+                println!("Please configure your initramfs generator to load these kernel modules: {}", KERNEL_MODULES);
+                println!("Make sure that they are loaded *before* any graphics drivers!");
+                println!("For mkinitcpio users, adding them at the *start* of your MODULES line in /etc/mkinitcpio.conf will take care of this.");
                 println!("");
                 if !ask_yesno(&mut self.stdin, "Done?") {
                     println!("Aborted.");
@@ -207,15 +297,11 @@ impl<'a> Wizard<'a> {
                     println!("Looks like your mkinitcpio contains the hook that does this ('modconf') but perhaps you'd like to double-check.");
                 } else {
                     println!("Since you're either not using mkinitcpio at all or heavily customized your configuration, you're on your own here. Good luck.");
+                    println!("(Feel free to contribute support for other initramfs generators.)");
                 }
             }
 
-            let modconf_success = sudo_write_file("/etc/modprobe.d/vfio.conf", |x| {
-                writeln!(x, "options vfio-pci ids={}", vfio_params)
-            }).unwrap_or(false);
-            if !modconf_success {
-                panic!("Failed to write modconf");
-            }
+            self.write_vfio_modconf(&setup);
 
             if !skip_ask {
                 if !ask_yesno(&mut self.stdin, "Done?") {
@@ -246,6 +332,8 @@ impl<'a> Wizard<'a> {
                 }
             }
 
+            make_config(&machine, &setup).save(target);
+
             println!("");
             println!("Step 4: Reboot");
             println!("Now that everything is properly configured, the initramfs should load vfio which should then grab your graphics card.");
@@ -263,42 +351,27 @@ impl<'a> Wizard<'a> {
             println!("");
             println!("With that out of the way, your next step after the reboot is simply to launch this wizard again and we can move on!");
         } else { // if something is actually passed through properly
-            println!("Step 5: VM setup");
+            println!("Step 5: Check IOMMU grouping");
+            if !self.check_iommu_grouping(&setup).expect("Failed to check IOMMU grouping") {
+                return;
+            }
+            println!("");
+
+            println!("Step 6: VM setup");
             println!("Looks like everything is working fine so far! Time to configure your VM!");
 
             let logical_cores = num_cpus::get();
             let physical_cores = num_cpus::get_physical();
 
-            let mut cfg = Config {
-                samba: None,
-                machine: MachineConfig {
-                    memory: ask_anything(&mut self.stdin, "How much memory would you like to assign to it?",
-                                         "8G", |x| Some(x.to_owned())),
-                    cores: physical_cores,
-                    network: None,
-                    storage: Vec::new(),
-
-                    hugepages: None,
-                    threads: None,
-                },
-                setup: Some(SetupConfig {
-                    cdrom: None,
-                    floppy: None,
-                    gui: false,
-                }),
-            };
-
-
+            machine.cores = physical_cores;
             if logical_cores == physical_cores * 2 {
                 // hyperthreading detected
-                cfg.machine.threads = Some(2);
+                machine.threads = Some(2);
             } else if logical_cores != physical_cores {
-                println!("Warning: You have {} logical on {} physical cores. No idea how to handle this.",
-                         logical_cores, physical_cores);
+                println!("Warning: You have {} logical on {} physical cores. No idea how to handle this.", logical_cores, physical_cores);
             }
 
             {
-                let setup = cfg.setup.as_mut().unwrap();
                 if env::var("DISPLAY").is_ok() {
                     println!("It seems you're running this setup in a graphical environment. This can make things a lot easier!");
                     println!("While our objective is of course VGA passthrough, running a virtual display during setup is very convenient for many reasons. We strongly recommend using this.");
@@ -321,7 +394,7 @@ impl<'a> Wizard<'a> {
                 });
                 println!("Configuring VM root hard disk. Only raw disks are supported for now (sorry).");
                 println!("WARNING: ALL DATA ON THE BLOCK DEVICE YOU SELECT HERE WILL BE DELETED!");
-                cfg.machine.storage.push(StorageDevice {
+                machine.storage.push(StorageDevice {
                     cache: "none".to_owned(),
                     format: "raw".to_owned(),
                     path: ask_file("Please enter the path to the VM root block device"),
@@ -340,7 +413,7 @@ impl<'a> Wizard<'a> {
                 return;
             }
 
-            qemu::run(&cfg, workdir, datadir);
+            qemu::run(&make_config(&machine, &setup), workdir, datadir);
 
             println!("Alright, so far so good!");
 
@@ -396,10 +469,10 @@ fn ask_anything<T, F: Fn(&str) -> Option<T>>(stdin: &mut StdinLock, question: &s
 }
 
 
-pub fn run(target: &Path, workdir: &Path, datadir: &Path) {
+pub fn run(cfg: Option<Config>, target: &Path, workdir: &Path, datadir: &Path) {
     let stdin = io::stdin();
     Wizard {
         stdin: stdin.lock(),
         udev: Context::new().expect("Failed to create udev context"),
-    }.run(target, workdir, datadir);
+    }.run(cfg, target, workdir, datadir);
 }
