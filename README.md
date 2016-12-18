@@ -1,3 +1,3 @@
 # Windows gaming
 
-Utilities to make qemu VGA passthrough nice.
+This project makes it easy and straightforward to set up PCI/VGA passthrough on your system.
