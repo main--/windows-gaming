@@ -83,7 +83,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
 
 
     if machine.hugepages.unwrap_or(false) {
-        qemu.args(&["-mem-path", "/dev/hugepages"]);
+        qemu.args(&["-mem-path", "/dev/hugepages_vfio_1G/", "-mem-prealloc"]);
     }
 
     qemu.args(&["-m", &machine.memory]);
