@@ -13,7 +13,7 @@ mod sd_notify;
 mod samba;
 mod controller;
 mod pci_device;
-mod setup_wizard;
+mod setup;
 mod hwid;
 mod qemu;
 
@@ -69,6 +69,6 @@ fn main() {
 
     match cfg {
         Some(ref cfg) if cfg.setup.is_none() => qemu::run(cfg, &workdir_path, Path::new(DATA_FOLDER)),
-        cfg => setup_wizard::run(cfg, &config_path, &workdir_path, Path::new(DATA_FOLDER)),
+        cfg => setup::run(cfg, &config_path, &workdir_path, Path::new(DATA_FOLDER)),
     }
 }
