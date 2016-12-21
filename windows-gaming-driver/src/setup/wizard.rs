@@ -102,7 +102,7 @@ impl<'a> Wizard<'a> {
     }
 
     fn autoconfigure_mkinitcpio(&mut self, has_modconf: &mut bool) -> IoResult<bool> {
-        static MKINITCPIO_CONF: &'static str = "/etc/mkinitcpio.conf";
+        const MKINITCPIO_CONF: &'static str = "/etc/mkinitcpio.conf";
 
         // File::open works on symlinks but sudo -e does not.
         if !Path::new(MKINITCPIO_CONF).is_file() {
@@ -118,8 +118,8 @@ impl<'a> Wizard<'a> {
 
                 let mut mkic_conf = Vec::new();
                 for line in BufReader::new(f).lines().flat_map(|x| x.ok()) {
-                    static MODULES_PREFIX: &'static str = "MODULES=\"";
-                    static HOOKS_PREFIX: &'static str = "HOOKS=\"";
+                    const MODULES_PREFIX: &'static str = "MODULES=\"";
+                    const HOOKS_PREFIX: &'static str = "HOOKS=\"";
                     if line.starts_with(MODULES_PREFIX) {
                         if line.contains(KERNEL_MODULES) {
                             // Already added.
@@ -169,7 +169,7 @@ impl<'a> Wizard<'a> {
     }
 
     fn run(&mut self, cfg: Option<Config>, target: &Path, workdir: &Path, datadir: &Path) {
-        static TROUBLESHOOTING: &'static str = "Troubleshooting (since you apparently already did this):";
+        const TROUBLESHOOTING: &'static str = "Troubleshooting (since you apparently already did this):";
 
         let mut machine = MachineConfig {
             memory: "".to_owned(),
@@ -450,7 +450,7 @@ impl<'a> Wizard<'a> {
     }
 }
 
-static KERNEL_MODULES: &'static str = "vfio vfio_iommu_type1 vfio_pci vfio_virqfd";
+const KERNEL_MODULES: &'static str = "vfio vfio_iommu_type1 vfio_pci vfio_virqfd";
 
 fn is_iommu_enabled() -> bool {
     read_dir("/sys/devices/virtual/iommu/").ok().and_then(|mut x| x.next()).is_some()
