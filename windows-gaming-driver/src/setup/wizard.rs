@@ -1,11 +1,8 @@
 use std::io::{self, Write, BufRead, BufReader, StdinLock, Result as IoResult};
 use std::process::{Command, Stdio, ChildStdin};
 use std::fs::{read_dir, File};
-use std::path::{Path};
+use std::path::Path;
 use std::iter::Iterator;
-use std::ops::Range;
-use std::str::FromStr;
-use std::fmt::Display;
 use std::env;
 
 use libudev::{Result as UdevResult, Context, Enumerator};
@@ -13,6 +10,7 @@ use num_cpus;
 use config::{Config, MachineConfig, StorageDevice, SetupConfig};
 use pci_device::PciDevice;
 use qemu;
+use setup::ask;
 
 struct Wizard<'a> {
     stdin: StdinLock<'a>,
@@ -33,7 +31,7 @@ impl<'a> Wizard<'a> {
             println!("[{}]\t{}", i, dev);
         }
 
-        let selection = ask_numeric(&mut self.stdin, "Please select the graphics device you would like to pass through", 0..display_controllers.len());
+        let selection = ask::numeric(&mut self.stdin, "Please select the graphics device you would like to pass through", 0..display_controllers.len());
         let selected = display_controllers[selection];
 
         let mut related_devices: Vec<_> = pci_devs.iter().filter(|x| x.pci_device() == selected.pci_device()).map(|x| x.id).collect();
@@ -82,7 +80,7 @@ impl<'a> Wizard<'a> {
             // ask if that's alright and then configure things that way instead (requiring another reboot to bind the remaining vfio-pci devices).
             // (Untested but according to the wiki that's how it should work)
 
-            if !ask_yesno(&mut self.stdin,
+            if !ask::yesno(&mut self.stdin,
                           "Ignore this and carry on? (not recommended unless you know exactly what you're doing)") {
                 println!("Aborted.");
                 return Ok(false);
@@ -114,7 +112,7 @@ impl<'a> Wizard<'a> {
         if let Ok(f) = File::open(MKINITCPIO_CONF) {
             println!("It seems you are using mkinitcpio. (If you aren't, select NO here!)");
 
-            if ask_yesno(&mut self.stdin, "Would you like me to try to edit the config file for you?") {
+            if ask::yesno(&mut self.stdin, "Would you like me to try to edit the config file for you?") {
                 let mut hooks_added = false;
                 let mut already_added = false;
 
@@ -214,7 +212,7 @@ impl<'a> Wizard<'a> {
         println!("Some steps are automated, others have to be done manually. Note that answering no ('n') to those will abort the wizard.");
         println!("You can abort the wizard at any point without risking corruptions except where it specifically tells you not to.");
         println!("");
-        if !ask_yesno(&mut self.stdin, "Understood?") {
+        if !ask::yesno(&mut self.stdin, "Understood?") {
             println!("Aborted.");
             return;
         }
@@ -237,7 +235,7 @@ impl<'a> Wizard<'a> {
                           though. IOMMU is a critical component of this setup and there's no way it can work without that. Sorry.");
             }
 
-            if !ask_yesno(&mut self.stdin, "Done?") {
+            if !ask::yesno(&mut self.stdin, "Done?") {
                 println!("Aborted.");
                 return;
             }
@@ -282,7 +280,7 @@ impl<'a> Wizard<'a> {
                     println!("This hook inserts a config file that tells the vfio driver what PCI devices it should bind to, so things won't work without it.");
                     println!("If our detection just bugged and you actually have the hook enabled, things are obviously fine.");
                     println!("Alternatively, you have to make sure that our configuration at /etc/modprobe.d/vfio.conf (creating right now) is properly applied.");
-                    if !ask_yesno(&mut self.stdin, "Done?") {
+                    if !ask::yesno(&mut self.stdin, "Done?") {
                         println!("Aborted.");
                         return;
                     }
@@ -296,7 +294,7 @@ impl<'a> Wizard<'a> {
                 println!("Make sure that they are loaded *before* any graphics drivers!");
                 println!("For mkinitcpio users, adding them at the *start* of your MODULES line in /etc/mkinitcpio.conf will take care of this.");
                 println!("");
-                if !ask_yesno(&mut self.stdin, "Done?") {
+                if !ask::yesno(&mut self.stdin, "Done?") {
                     println!("Aborted.");
                     return;
                 }
@@ -314,7 +312,7 @@ impl<'a> Wizard<'a> {
             self.write_vfio_modconf(&setup);
 
             if !skip_ask {
-                if !ask_yesno(&mut self.stdin, "Done?") {
+                if !ask::yesno(&mut self.stdin, "Done?") {
                     println!("Aborted.");
                     return;
                 }
@@ -323,7 +321,7 @@ impl<'a> Wizard<'a> {
             println!("");
             println!("Step 3: Update initramfs");
             let mut skip_ask = false;
-            if ask_yesno(&mut self.stdin, "Are you using the default kernel ('linux')?") {
+            if ask::yesno(&mut self.stdin, "Are you using the default kernel ('linux')?") {
                 let status = Command::new("/usr/bin/sudo").arg("/usr/bin/mkinitcpio")
                     .arg("-p").arg("linux").status().expect("Failed to run mkinitcpio");
                 if !status.success() {
@@ -336,7 +334,7 @@ impl<'a> Wizard<'a> {
             }
 
             if !skip_ask {
-                if !ask_yesno(&mut self.stdin, "Done?") {
+                if !ask::yesno(&mut self.stdin, "Done?") {
                     println!("Aborted.");
                     return;
                 }
@@ -389,7 +387,7 @@ impl<'a> Wizard<'a> {
             // TODO: hugepages part 2
             if machine.memory == "" {
                 // FIXME: validate this
-                machine.memory = ask_anything(&mut self.stdin, "How much memory would you like to assign to it?",
+                machine.memory = ask::anything(&mut self.stdin, "How much memory would you like to assign to it?",
                                               "be careful no validation LUL", |x| Some(x.to_owned()));
             }
 
@@ -397,7 +395,7 @@ impl<'a> Wizard<'a> {
                 if env::var("DISPLAY").is_ok() {
                     println!("It seems you're running this setup in a graphical environment. This can make things a lot easier!");
                     println!("While our objective is of course VGA passthrough, running a virtual display during setup is very convenient for many reasons. We strongly recommend using this.");
-                    if ask_yesno(&mut self.stdin, "Would you like to enable virtual graphics (only during setup)?") {
+                    if ask::yesno(&mut self.stdin, "Would you like to enable virtual graphics (only during setup)?") {
                         setup.gui = true;
                     }
                 }
@@ -408,19 +406,12 @@ impl<'a> Wizard<'a> {
                     unimplemented!();
                 }
 
-                let mut ask_file = |q| ask_anything(&mut self.stdin, q, "", |x| {
-                    if Path::new(x).exists() {
-                        Some(x.to_owned())
-                    } else {
-                        None
-                    }
-                });
                 println!("Configuring VM root hard disk. Only raw disks are supported for now (sorry).");
                 println!("WARNING: ALL DATA ON THE BLOCK DEVICE YOU SELECT HERE WILL BE DELETED!");
                 machine.storage.push(StorageDevice {
                     cache: "none".to_owned(),
                     format: "raw".to_owned(),
-                    path: ask_file("Please enter the path to the VM root block device"),
+                    path: ask::file(&mut self.stdin, "Please enter the path to the VM root block device"),
                 });
                 // TODO: Support multiple storage devices
                 // TODO: Support qcow2 images
@@ -430,14 +421,14 @@ impl<'a> Wizard<'a> {
                 // Stage 1: First boot and Windows setup
 
                 // TODO: if installed, call windows10-get-download-link, wget to a temporary location and go on
-                setup.cdrom = Some(ask_file("Please enter the path to your Windows ISO"));
+                setup.cdrom = Some(ask::file(&mut self.stdin, "Please enter the path to your Windows ISO"));
                 setup.floppy = Some(datadir.join("virtio-win.vfd").to_str().unwrap().to_owned());
             }
             println!("Your VM is going to boot now.");
             println!("Just install Windows and shut it down cleanly as soon as that's done so we can continue.");
             println!("");
             println!("Note: Windows probably won't pick up the virtio-scsi storage device right away. You can load the drivers from the attached floppy drive.");
-            if !ask_yesno(&mut self.stdin, "Ready?") {
+            if !ask::yesno(&mut self.stdin, "Ready?") {
                 println!("Aborted.");
                 return;
             }
@@ -474,37 +465,6 @@ fn sudo_write_file<P: AsRef<Path>, F: FnOnce(&mut ChildStdin) -> IoResult<()>>(p
     }
     Ok(writer_child.wait()?.success())
 }
-
-fn ask_yesno(stdin: &mut StdinLock, question: &str) -> bool {
-    ask_anything(stdin, question, "y/n", |line| {
-        if line == "y" { Some(true) }
-        else if line == "n" { Some(false) }
-        else { None }
-    })
-}
-
-fn ask_numeric<T : PartialOrd<T> + FromStr + Copy + Display>(stdin: &mut StdinLock, question: &str, range: Range<T>) -> T {
-    // bug: the options string is off by one as the end index is exclusive
-    ask_anything(stdin, question, &format!("{}..{}", range.start, range.end), |line| {
-        line.parse().ok().and_then(|x| if (range.start <= x) && (range.end > x) { Some(x) } else { None })
-    })
-}
-
-fn ask_anything<T, F: Fn(&str) -> Option<T>>(stdin: &mut StdinLock, question: &str, options: &str, parse_answer: F) -> T {
-    let mut line = String::new();
-    loop {
-        print!("{} [{}] ", question, options);
-        io::stdout().flush().ok().expect("Could not flush stdout");
-        stdin.read_line(&mut line).unwrap();
-
-        if let Some(t) = parse_answer(&line[..(line.len() - 1)]) {
-            return t;
-        }
-
-        line.clear();
-    }
-}
-
 
 pub fn run(cfg: Option<Config>, target: &Path, workdir: &Path, datadir: &Path) {
     let stdin = io::stdin();
