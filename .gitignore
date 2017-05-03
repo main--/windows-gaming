@@ -46,3 +46,5 @@ flycheck_*.el
 
 
 wrk/
+ovmf-x64
+ovmf.rpm
