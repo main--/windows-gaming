@@ -31,14 +31,14 @@ clean:
 
 
 install: all
-	install -D $(DRIVER) /usr/bin/windows-gaming-driver
-	install -D -m644 ovmf-x64/OVMF_CODE-pure-efi.fd /usr/lib/windows-gaming/ovmf-code.fd
-	install -D -m644 ovmf-x64/OVMF_VARS-pure-efi.fd /usr/lib/windows-gaming/ovmf-vars.fd
-	install -D -m644 $(GA_ISO) /usr/lib/windows-gaming/windows-gaming-ga.iso
-	install -D -m644 ../virtio-win_amd64.vfd /usr/lib/windows-gaming/virtio-win.vfd #FIXME
-	install -D -m644 misc/windows.service /lib/systemd/system/windows.service
-	install -D -m644 misc/windows.service /lib/systemd/user/windows.service
-	install -D -m644 misc/80-vfio.rules /lib/udev/rules.d/80-vfio.rules
+	install -D $(DRIVER) $(DESTDIR)/usr/bin/windows-gaming-driver
+	install -D -m644 ovmf-x64/OVMF_CODE-pure-efi.fd $(DESTDIR)/usr/lib/windows-gaming/ovmf-code.fd
+	install -D -m644 ovmf-x64/OVMF_VARS-pure-efi.fd $(DESTDIR)/usr/lib/windows-gaming/ovmf-vars.fd
+	install -D -m644 $(GA_ISO) $(DESTDIR)/usr/lib/windows-gaming/windows-gaming-ga.iso
+	install -D -m644 ../virtio-win_amd64.vfd $(DESTDIR)/usr/lib/windows-gaming/virtio-win.vfd #FIXME
+	install -D -m644 misc/windows.service $(DESTDIR)/lib/systemd/system/windows.service
+	install -D -m644 misc/windows.service $(DESTDIR)/lib/systemd/user/windows.service
+	install -D -m644 misc/80-vfio.rules $(DESTDIR)/lib/udev/rules.d/80-vfio.rules
 
 
 
