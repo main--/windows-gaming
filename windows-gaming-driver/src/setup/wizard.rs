@@ -176,6 +176,7 @@ impl<'a> Wizard<'a> {
             cores: 0,
             network: None,
             storage: Vec::new(),
+            usb_devices: Vec::new(),
 
             hugepages: None,
             threads: None,

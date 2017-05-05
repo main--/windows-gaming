@@ -9,6 +9,7 @@ use std::rc::Rc;
 use std::os::unix::net::{UnixListener, UnixStream};
 
 use controller::Controller;
+use config::Config;
 
 pub mod clientpipe_handler;
 pub mod monitor_handler;
@@ -98,8 +99,9 @@ fn poll_core<'a>(mut components: Vec<Box<Pollable>>) {
     }
 }
 
-pub fn run(monitor_stream: UnixStream, clientpipe_stream: UnixStream, control_socket: UnixListener) {
-    let ctrl = Rc::new(RefCell::new(Controller::new(&monitor_stream, &clientpipe_stream)));
+pub fn run(cfg: &Config, monitor_stream: UnixStream, clientpipe_stream: UnixStream, control_socket: UnixListener) {
+    let ctrl = Controller::new(cfg.machine.usb_devices.clone(), &monitor_stream, &clientpipe_stream);
+    let ctrl = Rc::new(RefCell::new(ctrl));
 
     poll_core(vec![
         Box::new(monitor_handler::MonitorHandler::new(monitor_stream)),

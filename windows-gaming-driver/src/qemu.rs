@@ -129,7 +129,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
 
     notify_systemd(false, "Booting ...");
 
-    mainloop::run(monitor_stream, clientpipe_stream, control_socket);
+    mainloop::run(cfg, monitor_stream, clientpipe_stream, control_socket);
 
     qemu.wait().unwrap();
     println!("windows-gaming-driver down.");

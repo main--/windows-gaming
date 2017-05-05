@@ -2,6 +2,8 @@ use std::os::unix::net::UnixStream;
 use std::io::prelude::*;
 
 pub struct Controller {
+    usb_devs: Vec<(u16, u16)>,
+
     ga_up: bool,
     ga_pong_expected: bool,
 
@@ -16,17 +18,21 @@ enum GaCmd {
     Ping = 0x01,
 }
 
+fn writemon(monitor: &mut UnixStream, command: &str) {
+    writeln!(monitor, "{}", command).expect("Failed to write to monitor");
+}
+
 impl Controller {
     fn write_ga(&mut self, cmd: GaCmd) {
         self.clientpipe.write_all(&[cmd as u8]).expect("Failed to write to clientpipe");
     }
 
-    fn writemon(&mut self, command: &str) {
-        writeln!(self.monitor, "{}", command).expect("Failed to write to monitor");
-    }
-
-    pub fn new(monitor: &UnixStream, clientpipe: &UnixStream) -> Controller {
+    pub fn new(usb_devs: Vec<(u16, u16)>,
+               monitor: &UnixStream,
+               clientpipe: &UnixStream) -> Controller {
         Controller {
+            usb_devs,
+
             ga_up: false,
             ga_pong_expected: false,
 
@@ -86,13 +92,17 @@ impl Controller {
             match (self.io_attached, state) {
                 (false, true) => {
                     // attach
-                    self.writemon("device_add usb-host,vendorid=0x1532,productid=0x0024,id=mouse");
-                    self.writemon("device_add usb-host,vendorid=0x1532,productid=0x011a,id=kbd");
+                    for (i, &(vendor, product)) in self.usb_devs.iter().enumerate() {
+                        writemon(&mut self.monitor,
+                                 &format!("device_add usb-host,vendorid={},productid={},id=usb{}",
+                                          vendor, product, i));
+                    }
                 }
                 (true, false) => {
                     // detach
-                    self.writemon("device_del kbd");
-                    self.writemon("device_del mouse");
+                    for i in 0..self.usb_devs.len() {
+                        writemon(&mut self.monitor, &format!("device_del usb{}", i));
+                    }
                 }
                 _ => (),
             }
@@ -101,6 +111,6 @@ impl Controller {
     }
 
     pub fn shutdown(&mut self) {
-        self.writemon("system_powerdown");
+        writemon(&mut self.monitor, "system_powerdown");
     }
 }

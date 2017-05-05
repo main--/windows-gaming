@@ -35,6 +35,7 @@ pub struct MachineConfig {
 
     pub network: Option<NetworkConfig>,
     pub storage: Vec<StorageDevice>,
+    pub usb_devices: Vec<(u16, u16)>, // convention: first element is the mouse (for mouse only setup)
 }
 
 #[derive(RustcDecodable, RustcEncodable, Debug, Clone)]
