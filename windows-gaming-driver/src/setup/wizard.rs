@@ -12,6 +12,12 @@ use pci_device::PciDevice;
 use qemu;
 use setup::ask;
 
+#[derive(Clone, Copy)]
+enum HidKind {
+    Mouse,
+    Keyboard,
+}
+
 struct Wizard<'a> {
     stdin: StdinLock<'a>,
     udev: Context,
@@ -40,6 +46,77 @@ impl<'a> Wizard<'a> {
         setup.vfio_devs = related_devices.iter().map(|dev| dev.id).collect();
         machine.vfio_slots = related_devices.iter().map(|dev| dev.pci_slot.clone()).collect();
         Ok(())
+    }
+
+    fn udev_pick_usb(&mut self,
+                     special: Option<HidKind>,
+                     blacklist: &[(u16, u16)]) -> UdevResult<Option<(u16, u16)>> {
+        use util::parse_hex;
+
+        let mut iter = Enumerator::new(&self.udev)?;
+        iter.match_subsystem("usb")?;
+        let devtype = if special.is_some() { "usb_interface" } else { "usb_device" };
+        iter.match_property("DEVTYPE", devtype)?;
+
+        if let Some(h) = special {
+            iter.match_attribute("bInterfaceClass", "03")?; // HID
+            iter.match_attribute("bInterfaceSubClass", "01")?; // boot interface (?)
+            let protocol = match h {
+                HidKind::Mouse => "02",
+                HidKind::Keyboard => "01",
+            };
+            iter.match_attribute("bInterfaceProtocol", protocol)?;
+        }
+
+        let mut devs = Vec::new();
+
+        for (i, dev) in iter.scan_devices()?.enumerate() {
+            let dev = if special.is_some() {
+                dev.parent().unwrap()
+            } else {
+                dev
+            };
+
+            let mut vendor = None;
+            let mut product = None;
+            let mut vendor_name = "Unknown vendor".to_owned();
+            let mut product_name = "Unknown product".to_owned();
+
+            for attr in dev.properties() {
+                if let Some(val) = attr.value().to_str() {
+                    if attr.name() == "ID_VENDOR_ID" {
+                        vendor = parse_hex(val);
+                    } else if attr.name() == "ID_MODEL_ID" {
+                        product = parse_hex(val);
+                    } else if attr.name() == "ID_VENDOR_FROM_DATABASE" {
+                        vendor_name = val.to_owned();
+                    } else if attr.name() == "ID_MODEL_FROM_DATABASE" {
+                        product_name = val.to_owned();
+                    }
+                }
+            }
+
+            let id = (vendor.unwrap(), product.unwrap());
+            if !blacklist.contains(&id) {
+                devs.push(Some(id));
+                println!("[{}]\t{} {} [{:04x}:{:04x}]", i, vendor_name, product_name, id.0, id.1);
+            }
+        }
+
+        if special.is_some() {
+            println!("[{}]\tNone of the above - it's not listed here", devs.len());
+            devs.push(None);
+        }
+
+        let k = match special {
+            None => "usb device",
+            Some(HidKind::Mouse) => "mouse",
+            Some(HidKind::Keyboard) => "keyboard",
+        };
+        let selection = ask::numeric(&mut self.stdin,
+                                     &format!("Please select the {} you would like to pass through", k),
+                                     0..devs.len());
+        Ok(devs[selection])
     }
 
     fn check_iommu_grouping(&mut self, cfg: &SetupConfig) -> IoResult<bool> {

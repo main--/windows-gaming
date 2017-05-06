@@ -16,6 +16,7 @@ mod pci_device;
 mod setup;
 mod hwid;
 mod qemu;
+mod util;
 
 use std::iter::Iterator;
 use std::path::Path;

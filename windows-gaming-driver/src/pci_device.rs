@@ -4,6 +4,7 @@ use std::cmp::Ordering;
 use std::fmt::{Formatter, Error as FmtError};
 
 use libudev::Device;
+use util::parse_hex;
 
 pub struct PciDevice<'a> {
     pub dev: Device<'a>,
@@ -88,13 +89,5 @@ impl<'a> PciDevice<'a> {
 
     pub fn pci_device(&self) -> &str {
         &self.pci_slot[.. self.pci_slot.rfind('.').unwrap()]
-    }
-}
-
-fn parse_hex(s: &str) -> Option<u16> {
-    if s.starts_with("0x") {
-        u16::from_str_radix(&s[2..], 16).ok()
-    } else {
-        None
     }
 }
