@@ -21,6 +21,7 @@ pub struct SetupConfig {
 
     // setup state
     pub iommu_commanded: bool,
+    // convention: gpu must be first for iommu group checks
     pub vfio_devs: Vec<(u16, u16)>,
     pub reboot_commanded: bool,
 }
@@ -33,9 +34,12 @@ pub struct MachineConfig {
     pub cores: usize,
     pub threads: Option<u32>,
 
+    // convention: gpu is first
+    pub vfio_slots: Vec<String>,
     pub network: Option<NetworkConfig>,
     pub storage: Vec<StorageDevice>,
-    pub usb_devices: Vec<(u16, u16)>, // convention: first element is the mouse (for mouse only setup)
+    // convention: first element is the mouse (for mouse only setup)
+    pub usb_devices: Vec<(u16, u16)>,
 }
 
 #[derive(RustcDecodable, RustcEncodable, Debug, Clone)]

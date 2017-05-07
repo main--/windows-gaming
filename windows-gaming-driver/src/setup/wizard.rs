@@ -18,7 +18,7 @@ struct Wizard<'a> {
 }
 
 impl<'a> Wizard<'a> {
-    fn udev_select_gpu(&mut self) -> UdevResult<Option<Vec<(u16, u16)>>> {
+    fn udev_select_gpu(&mut self, setup: &mut SetupConfig, machine: &mut MachineConfig) -> UdevResult<()> {
         let mut iter = Enumerator::new(&self.udev)?;
         iter.match_subsystem("pci")?;
         let pci_devs: Vec<_> = iter.scan_devices()?.map(PciDevice::new).collect();
@@ -34,9 +34,12 @@ impl<'a> Wizard<'a> {
         let selection = ask::numeric(&mut self.stdin, "Please select the graphics device you would like to pass through", 0..display_controllers.len());
         let selected = display_controllers[selection];
 
-        let mut related_devices: Vec<_> = pci_devs.iter().filter(|x| x.pci_device() == selected.pci_device()).map(|x| x.id).collect();
-        related_devices.sort();
-        Ok(Some(related_devices))
+        let mut related_devices: Vec<_> = pci_devs.iter().filter(|x| x.pci_device() == selected.pci_device()).collect();
+        let gpu_index = related_devices.iter().position(|dev| dev == &selected).unwrap();
+        related_devices.swap(0, gpu_index);
+        setup.vfio_devs = related_devices.iter().map(|dev| dev.id).collect();
+        machine.vfio_slots = related_devices.iter().map(|dev| dev.pci_slot.clone()).collect();
+        Ok(())
     }
 
     fn check_iommu_grouping(&mut self, cfg: &SetupConfig) -> IoResult<bool> {
@@ -174,6 +177,7 @@ impl<'a> Wizard<'a> {
         let mut machine = MachineConfig {
             memory: "".to_owned(),
             cores: 0,
+            vfio_slots: Vec::new(),
             network: None,
             storage: Vec::new(),
             usb_devices: Vec::new(),
@@ -264,10 +268,7 @@ impl<'a> Wizard<'a> {
                 println!("");
             }
 
-            setup.vfio_devs = match self.udev_select_gpu().expect("Failed to select GPU") {
-                Some(x) => x,
-                None => return,
-            };
+            self.udev_select_gpu(&mut setup, &mut machine).expect("Failed to select GPU");
             println!("Success!");
             println!("");
 

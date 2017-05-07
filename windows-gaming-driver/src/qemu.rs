@@ -101,10 +101,9 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     }
     qemu.args(&["-netdev", &usernet, "-device", "e1000,netdev=unet"]);
 
-    qemu.args(&["-device",
-                "vfio-pci,host=01:00.0,multifunction=on",
-                "-device",
-                "vfio-pci,host=01:00.1"]);
+    for slot in cfg.machine.vfio_slots.iter() {
+        qemu.args(&["-device", &format!("vfio-pci,host={},multifunction=on", slot)]);
+    }
 
     for (idx, drive) in machine.storage.iter().enumerate() {
         qemu.args(&["-drive",
