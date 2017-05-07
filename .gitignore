@@ -44,6 +44,10 @@ flycheck_*.el
 # directory configuration
 .dir-locals.el
 
+# intellij idea project files
+.idea/
+*.iml
+
 
 wrk/
 ovmf-x64
