@@ -1,9 +1,9 @@
 use std::io::{BufRead, BufReader, Result as IoResult};
 use std::fs::File;
 
-fn hwid_resolve_pci(vendor_id: u16, product_id: u16) -> IoResult<Option<(String, Option<String>)>> {
+pub fn hwid_resolve_usb(vendor_id: u16, product_id: u16) -> IoResult<Option<(String, Option<String>)>> {
     let mut vendor = None;
-    for line in BufReader::new(File::open("/usr/share/hwdata/pci.ids")?).lines() {
+    for line in BufReader::new(File::open("/usr/share/hwdata/usb.ids")?).lines() {
         let line = line?;
 
         if line.starts_with("#") {
@@ -12,12 +12,10 @@ fn hwid_resolve_pci(vendor_id: u16, product_id: u16) -> IoResult<Option<(String,
             if u16::from_str_radix(&line[1..5], 16) == Ok(product_id) {
                 return Ok(Some((vendor.unwrap(), Some(line[5..].trim().to_owned()))));
             }
-        } else if line.len() > 4 {
+        } else if vendor.is_some() {
             // vendor is over, product not found
-            if let Some(vendor) = vendor {
-                return Ok(Some((vendor, None)));
-            }
-
+            return Ok(Some((vendor.unwrap(), None)));
+        } else if line.len() > 4 {
             if u16::from_str_radix(&line[..4], 16) == Ok(vendor_id) {
                 vendor = Some(line[4..].trim().to_owned());
             }
