@@ -11,6 +11,13 @@ use config::{Config, MachineConfig, StorageDevice, SetupConfig};
 use pci_device::PciDevice;
 use qemu;
 use setup::ask;
+use hwid;
+
+#[derive(Clone, Copy)]
+enum HidKind {
+    Mouse,
+    Keyboard,
+}
 
 struct Wizard<'a> {
     stdin: StdinLock<'a>,
@@ -40,6 +47,76 @@ impl<'a> Wizard<'a> {
         setup.vfio_devs = related_devices.iter().map(|dev| dev.id).collect();
         machine.vfio_slots = related_devices.iter().map(|dev| dev.pci_slot.clone()).collect();
         Ok(())
+    }
+
+    fn udev_pick_usb(&mut self, special: Option<HidKind>,
+                     blacklist: &[(u16, u16)], allow_abort: bool) -> UdevResult<Option<(u16, u16)>> {
+        use util::parse_hex;
+
+        let mut iter = Enumerator::new(&self.udev)?;
+        iter.match_subsystem("usb")?;
+        let devtype = if special.is_some() { "usb_interface" } else { "usb_device" };
+        iter.match_property("DEVTYPE", devtype)?;
+
+        if let Some(h) = special {
+            iter.match_attribute("bInterfaceClass", "03")?; // HID
+            iter.match_attribute("bInterfaceSubClass", "01")?; // boot interface (?)
+            let protocol = match h {
+                HidKind::Mouse => "02",
+                HidKind::Keyboard => "01",
+            };
+            iter.match_attribute("bInterfaceProtocol", protocol)?;
+        }
+
+        let mut devs = Vec::new();
+
+        for dev in iter.scan_devices()? {
+            let dev = if special.is_some() {
+                dev.parent().unwrap()
+            } else {
+                dev
+            };
+
+            let mut vendor = None;
+            let mut product = None;
+            let mut vendor_name = "Unknown vendor".to_owned();
+            let mut product_name = "Unknown product".to_owned();
+
+            for attr in dev.properties() {
+                if let Some(val) = attr.value().to_str() {
+                    if attr.name() == "ID_VENDOR_ID" {
+                        vendor = parse_hex(val);
+                    } else if attr.name() == "ID_MODEL_ID" {
+                        product = parse_hex(val);
+                    } else if attr.name() == "ID_VENDOR_FROM_DATABASE" {
+                        vendor_name = val.to_owned();
+                    } else if attr.name() == "ID_MODEL_FROM_DATABASE" {
+                        product_name = val.to_owned();
+                    }
+                }
+            }
+
+            let id = (vendor.unwrap(), product.unwrap());
+            if !blacklist.contains(&id) {
+                println!("[{}]\t{} {} [{:04x}:{:04x}]", devs.len(), vendor_name, product_name, id.0, id.1);
+                devs.push(Some(id));
+            }
+        }
+
+        if allow_abort {
+            println!("[{}]\tNone of the above", devs.len());
+            devs.push(None);
+        }
+
+        let k = match special {
+            None => "usb device",
+            Some(HidKind::Mouse) => "mouse",
+            Some(HidKind::Keyboard) => "keyboard",
+        };
+        let selection = ask::numeric(&mut self.stdin,
+                                     &format!("Please select the {} you would like to pass through", k),
+                                     0..devs.len());
+        Ok(devs[selection])
     }
 
     fn check_iommu_grouping(&mut self, cfg: &SetupConfig) -> IoResult<bool> {
@@ -249,12 +326,61 @@ impl<'a> Wizard<'a> {
             println!("");
         }
 
-        // TODO: Add a udev picker step here (just like the one we have for gpu) that selects USB keyboard and mouse.
-        // Then save that to the config and create a udev rule file that runs setfacl so the vfio group can use them.
+        // select mouse and keyboard
+        println!("Step 2: Select USB Devices");
+        println!();
+        if !machine.usb_devices.is_empty() {
+            println!("You have currently selected the following usb devices: ");
+            for &(vendor, product) in machine.usb_devices.iter() {
+                let name = match hwid::hwid_resolve_usb(vendor, product) {
+                    Err(_) | Ok(None)=> "Unknown vendor Unknown product".to_string(),
+                    Ok(Some((vendor, None))) => format!("{} Unknown product", vendor),
+                    Ok(Some((vendor, Some(product)))) => format!("{} {}", vendor, product)
+                };
+                println!("    {} [{:04x}:{:04x}]", name, vendor, product);
+            }
+            if ask::yesno(&mut self.stdin, "Do you want to remove them before proceeding?") {
+                machine.usb_devices.clear();
+                println!("Removed.");
+            }
+        }
+        let mouse = self.udev_pick_usb(Some(HidKind::Mouse), &machine.usb_devices, true).expect("Failed to select Mouse");
+        let keyboard = self.udev_pick_usb(Some(HidKind::Keyboard), &machine.usb_devices, true).expect("Failed to select Keyboard");
+        if let Some(id) = mouse {
+            machine.usb_devices.insert(0, id);
+        } else {
+            println!("No mouse selected. Please select your mouse from this complete list of connected devices:");
+            let mouse = self.udev_pick_usb(None, &machine.usb_devices, !machine.usb_devices.is_empty()).expect("Failed to select mouse from complete list");
+            if let Some(id) = mouse {
+                machine.usb_devices.insert(0, id);
+            }
+        }
+        if let Some(id) = keyboard {
+            machine.usb_devices.push(id);
+        } else {
+            println!("No keyboard selected. Please select your keyboard from this complete list of connected devices:");
+            let keyboard = self.udev_pick_usb(None, &machine.usb_devices, true).expect("Failed to select keyboard from complete list");
+            if let Some(id) = keyboard {
+                machine.usb_devices.push(id);
+            }
+        }
+        if !ask::yesno(&mut self.stdin, "Done?") {
+            println!("Aborted.");
+            return;
+        }
+        // add udev rule to add selected devices to vfio group
+        sudo_write_file("/etc/udev/rules.d/80-vfio-usb.rules", |mut w| {
+            for &(vendor, product) in machine.usb_devices.iter() {
+                writeln!(w, r#"SUBSYSTEM=="usb", ATTR{{idVendor}}=="{:04x}", ATTR{{idProduct}}=="{:04x}", ACTION=="add", RUN+="/usr/bin/setfacl -m g:vfio:rw- $devnode""#, vendor, product)?;
+            }
+            Ok(())
+        }).expect("Cannot write udev rules");
+        make_config(&machine, &setup).save(target);
+        println!("");
 
         let passthrough_devs = self.get_passthrough_devs().expect("Failed to check gpu passthrough with udev");
         if passthrough_devs.is_empty() {
-            println!("Step 2: Setting up the vfio driver");
+            println!("Step 3: Setting up the vfio driver");
 
             if !setup.vfio_devs.is_empty() {
                 println!("");
@@ -321,7 +447,7 @@ impl<'a> Wizard<'a> {
             }
 
             println!("");
-            println!("Step 3: Update initramfs");
+            println!("Step 4: Update initramfs");
             let mut skip_ask = false;
             if ask::yesno(&mut self.stdin, "Are you using the default kernel ('linux')?") {
                 let status = Command::new("/usr/bin/sudo").arg("/usr/bin/mkinitcpio")
@@ -348,7 +474,7 @@ impl<'a> Wizard<'a> {
             make_config(&machine, &setup).save(target);
 
             println!("");
-            println!("Step 4: Reboot");
+            println!("Step 5: Reboot");
             println!("Now that everything is properly configured, the initramfs should load vfio which should then grab your graphics card.");
             println!("Before you boot into Linux again, please check your firmware/bios settings to make sure that the guest GPU is NOT your \
                       primary graphics device. If everything works correctly, the host's graphics drivers will no longer see the card so \
@@ -364,13 +490,13 @@ impl<'a> Wizard<'a> {
             println!("");
             println!("With that out of the way, your next step after the reboot is simply to launch this wizard again and we can move on!");
         } else { // if something is actually passed through properly
-            println!("Step 5: Check IOMMU grouping");
+            println!("Step 6: Check IOMMU grouping");
             if !self.check_iommu_grouping(&setup).expect("Failed to check IOMMU grouping") {
                 return;
             }
             println!("");
 
-            println!("Step 6: VM setup");
+            println!("Step 7: VM setup");
             println!("Looks like everything is working fine so far! Time to configure your VM!");
 
             let logical_cores = num_cpus::get();
