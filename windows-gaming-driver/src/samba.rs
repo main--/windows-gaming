@@ -6,7 +6,13 @@ use std::fmt::Write as FmtWrite;
 use users::get_user_by_name;
 use nix::unistd::chown;
 
+pub fn is_installed() -> bool {
+    Path::new("/usr/sbin/smbd").is_file()
+}
+
 pub fn setup(tmp: &Path, samba: &::config::SambaConfig, usernet: &mut String) {
+    assert!(is_installed(), "Optional samba dependency not installed!");
+
     let user = get_user_by_name(&samba.user).unwrap();
 
     let samba_cfg = tmp.join("smbd.conf");

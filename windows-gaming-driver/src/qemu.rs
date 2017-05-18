@@ -10,6 +10,18 @@ use sd_notify::notify_systemd;
 use samba;
 use mainloop;
 
+const QEMU: &str = "/usr/bin/qemu-system-x86_64";
+
+fn supports_display(kind: &str) -> bool {
+    Command::new(QEMU).args(&["-display", kind, "-version"])
+        .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null())
+        .status().unwrap().success()
+}
+
+pub fn has_gtk_support() -> bool {
+    supports_display("gtk")
+}
+
 pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     let machine = &cfg.machine;
 
@@ -41,7 +53,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     }
 
     notify_systemd(false, "Starting qemu ...");
-    let mut qemu = Command::new("qemu-system-x86_64");
+    let mut qemu = Command::new(QEMU);
     qemu.args(&["-enable-kvm",
                 "-machine",
                 "q35",

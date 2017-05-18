@@ -525,7 +525,7 @@ impl<'a> Wizard<'a> {
             }
 
             {
-                if env::var("DISPLAY").is_ok() {
+                if qemu::has_gtk_support() && env::var("DISPLAY").is_ok() {
                     println!("It seems you're running this setup in a graphical environment. This can make things a lot easier!");
                     println!("While our objective is of course VGA passthrough, running a virtual display during setup is very convenient for many reasons. We strongly recommend using this.");
                     if ask::yesno(&mut self.stdin, "Would you like to enable virtual graphics (only during setup)?") {
