@@ -2,6 +2,7 @@ use std::io::{self, Write, BufRead, BufReader, StdinLock, Result as IoResult};
 use std::process::{Command, Stdio, ChildStdin};
 use std::fs::{read_dir, File};
 use std::path::Path;
+use std::borrow::Cow;
 use std::iter::Iterator;
 use std::env;
 
@@ -185,9 +186,13 @@ impl<'a> Wizard<'a> {
         const MKINITCPIO_CONF: &'static str = "/etc/mkinitcpio.conf";
 
         // File::open works on symlinks but sudo -e does not.
-        if !Path::new(MKINITCPIO_CONF).is_file() {
-            return Ok(false);
+        // So we dereference.
+        let mut path = Cow::from(Path::new(MKINITCPIO_CONF));
+        while let Ok(p) = path.read_link() {
+            path = Cow::from(p);
         }
+
+        assert!(path.is_file());
 
         if let Ok(f) = File::open(MKINITCPIO_CONF) {
             println!("It seems you are using mkinitcpio. (If you aren't, select NO here!)");
