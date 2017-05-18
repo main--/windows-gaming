@@ -49,6 +49,7 @@ namespace VfioService
         private const int WmHotkey = 0x0312;
 
         private const int PbtApmSuspend = 0x04;
+        private const int PbtApmResume = 0x12;
 
         private const int HkIoExit = 1;
 
@@ -65,11 +66,13 @@ namespace VfioService
                     }
                     break;
                 case WmPowerBroadcast:
-
                     switch (m.WParam.ToInt64())
                     {
                         case PbtApmSuspend:
                             ClientManager.SendCommand(CommandOut.Suspending);
+                            break;
+                        case PbtApmResume:
+                            ClientManager.SendCommand(CommandOut.ReportBoot);
                             break;
                     }
                     break;

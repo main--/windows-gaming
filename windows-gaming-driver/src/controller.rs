@@ -2,12 +2,19 @@ use std::os::unix::net::UnixStream;
 use std::io::prelude::*;
 use serde_json;
 
+#[derive(PartialEq, Eq, Clone, Copy)]
+enum State {
+    Down,
+    Up,
+    Pinging,
+    Suspending,
+    Resuming,
+}
+
 pub struct Controller {
     usb_devs: Vec<(u16, u16)>,
 
-    ga_up: bool,
-    ga_pong_expected: bool,
-
+    ga: State,
     io_attached: bool,
 
     // write-only
@@ -22,6 +29,7 @@ enum QmpCommand {
     DeviceAdd { driver: &'static str, id: String, vendorid: u16, productid: u16 },
     DeviceDel { id: String },
     SystemPowerdown,
+    SystemWakeup,
 }
 
 enum GaCmd {
@@ -46,9 +54,7 @@ impl Controller {
         Controller {
             usb_devs,
 
-            ga_up: false,
-            ga_pong_expected: false,
-
+            ga: State::Down,
             io_attached: false,
 
             monitor,
@@ -58,23 +64,27 @@ impl Controller {
 
     pub fn ga_ping(&mut self) -> bool {
         // the idea is that someone else (timer) calls this periodically
-        assert!(self.ga_up);
-
-        if self.ga_pong_expected {
-            // the last ping wasn't even answered
-            // we conclude that the ga has died
-            self.ga_up = false;
-            self.set_io_attached(false, true);
-            false
-        } else {
-            self.ga_pong_expected = true;
-            self.write_ga(GaCmd::Ping);
-            true
+        match self.ga {
+            State::Pinging => {
+                // the last ping wasn't even answered
+                // we conclude that the ga has died
+                self.ga = State::Down;
+                self.set_io_attached(false, true);
+                false
+            }
+            State::Up => {
+                self.ga = State::Pinging;
+                self.write_ga(GaCmd::Ping);
+                true
+            }
+            _ => false,
         }
     }
 
     pub fn ga_pong(&mut self) {
-        self.ga_pong_expected = false;
+        if self.ga == State::Pinging {
+            self.ga = State::Up;
+        }
     }
 
     pub fn ga_hello(&mut self) -> bool {
@@ -90,18 +100,42 @@ impl Controller {
         // we return false if we didn't notice the GA going down as the timer still
         // exists in that case so it would be a bug to create a second one.
 
-        self.ga_pong_expected = false;
-
-        if self.ga_up {
-            return false;
+        let ga = self.ga;
+        self.ga = State::Up;
+        match ga {
+            State::Pinging | State::Up => false,
+            State::Down => true,
+            State::Resuming => {
+                self.set_io_attached(true, false);
+                true
+            }
+            State::Suspending => false, // wtf though
         }
+    }
 
-        self.ga_up = true;
-        true
+    pub fn ga_suspending(&mut self) {
+        self.set_io_attached(false, true);
+        self.ga = State::Suspending;
     }
 
     pub fn set_io_attached(&mut self, state: bool, force: bool) {
-        if self.ga_up || force {
+        let go = match self.ga {
+            State::Up | State::Pinging => true,
+            State::Down => force,
+            State::Suspending => {
+                assert!(state, "trying to exit from a suspended vm?");
+
+                // make them wake up
+                writemon(&mut self.monitor, &QmpCommand::SystemWakeup);
+
+                // can't enter now - gotta wait for GA to get ready
+                self.ga = State::Resuming;
+                false
+            }
+            State::Resuming => false,
+        };
+
+        if go {
             match (self.io_attached, state) {
                 (false, true) => {
                     // attach

@@ -41,7 +41,7 @@ impl Pollable for ClientpipeHandler {
             }
             Some(3) => {
                 println!("client says that it's suspending");
-                // TODO: do something here
+                self.controller.borrow_mut().ga_suspending();
             }
             Some(4) => {
                 self.controller.borrow_mut().ga_pong();
