@@ -12,6 +12,7 @@ rustc-serialize = "0.3.21"
 timerfd = "0.2.0"
 libudev = "0.2.0"
 num_cpus = "1.2.0"
+xdg = "^2.1"
 
 [replace]
 "systemd:0.0.10" = { git = "https://github.com/main--/rust-systemd.git" }

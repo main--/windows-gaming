@@ -6,6 +6,7 @@ extern crate rustc_serialize;
 extern crate timerfd;
 extern crate libudev;
 extern crate num_cpus;
+extern crate xdg;
 
 mod mainloop;
 mod config;
@@ -45,22 +46,22 @@ fn main() {
         RunMode::User
     };
 
+    let xdg_dirs = xdg::BaseDirectories::with_prefix("windows-gaming-driver").unwrap();
+
     let config_path = match config_path {
         Some(x) => Path::new(&x).to_path_buf(),
         None => {
             match mode {
                 RunMode::System => Path::new("/etc/windows-gaming-driver.toml").to_path_buf(),
-                RunMode::User => env::var("XDG_CONFIG_HOME").map(|x| Path::new(&x).to_path_buf())
-                    .unwrap_or(env::home_dir().expect("Failed to get XDG_CONFIG_HOME").join(".config"))
-                    .join("windows-gaming-driver").join("config.toml"),
+                RunMode::User => xdg_dirs.place_config_file("config.toml").expect("Failed to create config directory."),
             }
         }
     };
 
     let workdir_path = match mode {
         RunMode::System => Path::new("/run/windows-gaming-driver").to_path_buf(),
-        RunMode::User => Path::new(&env::var("XDG_RUNTIME_DIR").expect("Failed to get XDG_RUNTIME_DIR")).to_path_buf(),
-    }.join("windows-gaming-driver");
+        RunMode::User => xdg_dirs.create_runtime_directory("").expect("Failed to create runtime directory."),
+    };
 
     let cfg = if config_path.exists() {
         Some(Config::load(&config_path))
