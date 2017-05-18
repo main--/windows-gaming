@@ -41,7 +41,9 @@ impl Controller {
     pub fn new(usb_devs: Vec<(u16, u16)>,
                monitor: &UnixStream,
                clientpipe: &UnixStream) -> Controller {
-        let mut c = Controller {
+        let mut monitor = monitor.try_clone().unwrap();
+        writemon(&mut monitor, &QmpCommand::QmpCapabilities);
+        Controller {
             usb_devs,
 
             ga_up: false,
@@ -49,11 +51,9 @@ impl Controller {
 
             io_attached: false,
 
-            monitor: monitor.try_clone().unwrap(),
+            monitor,
             clientpipe: clientpipe.try_clone().unwrap(),
-        };
-        writemon(&mut c.monitor, &QmpCommand::QmpCapabilities);
-        c
+        }
     }
 
     pub fn ga_ping(&mut self) -> bool {
