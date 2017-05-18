@@ -4,6 +4,7 @@ Description=Windows VM
 [Service]
 Type=notify
 ExecStart=/usr/bin/windows-gaming-driver
+PassEnvironment=XDG_CONFIG_HOME
 NotifyAccess=main
 KillMode=mixed
 TimeoutStartSec=infinity
