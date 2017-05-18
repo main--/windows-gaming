@@ -1,5 +1,6 @@
 use std::os::unix::net::UnixStream;
 use std::io::prelude::*;
+use serde_json;
 
 pub struct Controller {
     usb_devs: Vec<(u16, u16)>,
@@ -14,12 +15,22 @@ pub struct Controller {
     clientpipe: UnixStream,
 }
 
+#[derive(Serialize)]
+#[serde(tag = "execute", content = "arguments", rename_all = "snake_case")]
+enum QmpCommand {
+    QmpCapabilities,
+    DeviceAdd { driver: &'static str, id: String, vendorid: u16, productid: u16 },
+    DeviceDel { id: String },
+    SystemPowerdown,
+}
+
 enum GaCmd {
     Ping = 0x01,
 }
 
-fn writemon(monitor: &mut UnixStream, command: &str) {
-    writeln!(monitor, "{}", command).expect("Failed to write to monitor");
+fn writemon(monitor: &mut UnixStream, command: &QmpCommand) {
+    let cmd = serde_json::to_string(command).unwrap();
+    writeln!(monitor, "{}", cmd).expect("Failed to write to monitor");
 }
 
 impl Controller {
@@ -30,7 +41,7 @@ impl Controller {
     pub fn new(usb_devs: Vec<(u16, u16)>,
                monitor: &UnixStream,
                clientpipe: &UnixStream) -> Controller {
-        Controller {
+        let mut c = Controller {
             usb_devs,
 
             ga_up: false,
@@ -40,7 +51,9 @@ impl Controller {
 
             monitor: monitor.try_clone().unwrap(),
             clientpipe: clientpipe.try_clone().unwrap(),
-        }
+        };
+        writemon(&mut c.monitor, &QmpCommand::QmpCapabilities);
+        c
     }
 
     pub fn ga_ping(&mut self) -> bool {
@@ -93,15 +106,18 @@ impl Controller {
                 (false, true) => {
                     // attach
                     for (i, &(vendor, product)) in self.usb_devs.iter().enumerate() {
-                        writemon(&mut self.monitor,
-                                 &format!("device_add usb-host,vendorid={},productid={},id=usb{}",
-                                          vendor, product, i));
+                        writemon(&mut self.monitor, &QmpCommand::DeviceAdd {
+                            driver: "usb-host",
+                            id: format!("usb{}", i),
+                            vendorid: vendor,
+                            productid: product,
+                        });
                     }
                 }
                 (true, false) => {
                     // detach
                     for i in 0..self.usb_devs.len() {
-                        writemon(&mut self.monitor, &format!("device_del usb{}", i));
+                        writemon(&mut self.monitor, &QmpCommand::DeviceDel { id: format!("usb{}", i) });
                     }
                 }
                 _ => (),
@@ -111,6 +127,6 @@ impl Controller {
     }
 
     pub fn shutdown(&mut self) {
-        writemon(&mut self.monitor, "system_powerdown");
+        writemon(&mut self.monitor, &QmpCommand::SystemPowerdown);
     }
 }

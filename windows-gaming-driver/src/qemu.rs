@@ -67,7 +67,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
                 "-net",
                 "none",
                 "-display", "none", "-vga", "none",
-                "-monitor",
+                "-qmp",
                 &format!("unix:{}", monitor_socket_file.display()),
                 "-drive",
                 &format!("if=pflash,format=raw,readonly,file={}",
