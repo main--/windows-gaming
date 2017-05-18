@@ -454,7 +454,7 @@ impl<'a> Wizard<'a> {
             println!("");
             println!("Step 4: Update initramfs");
             let mut skip_ask = false;
-            if ask::yesno(&mut self.stdin, "Are you using the default kernel ('linux')?") {
+            if ask::yesno(&mut self.stdin, "Are you using mkinitcpio with the default kernel ('linux')?") {
                 let status = Command::new("/usr/bin/sudo").arg("/usr/bin/mkinitcpio")
                     .arg("-p").arg("linux").status().expect("Failed to run mkinitcpio");
                 if !status.success() {
