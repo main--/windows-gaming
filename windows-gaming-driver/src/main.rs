@@ -2,11 +2,13 @@ extern crate systemd;
 extern crate nix;
 extern crate users;
 extern crate toml;
-extern crate rustc_serialize;
 extern crate timerfd;
 extern crate libudev;
 extern crate num_cpus;
 extern crate xdg;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 
 mod mainloop;
 mod config;

@@ -2,17 +2,16 @@ use std::path::Path;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 
-use toml::{self, Parser, Decoder, Value};
-use rustc_serialize::Decodable;
+use toml;
 
-#[derive(RustcDecodable, RustcEncodable, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Config {
     pub machine: MachineConfig,
     pub samba: Option<SambaConfig>,
     pub setup: Option<SetupConfig>,
 }
 
-#[derive(RustcDecodable, RustcEncodable, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct SetupConfig {
     // VM options
     pub cdrom: Option<String>,
@@ -26,7 +25,7 @@ pub struct SetupConfig {
     pub reboot_commanded: bool,
 }
 
-#[derive(RustcDecodable, RustcEncodable, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct MachineConfig {
     pub memory: String,
     pub hugepages: Option<bool>,
@@ -42,19 +41,19 @@ pub struct MachineConfig {
     pub usb_devices: Vec<(u16, u16)>,
 }
 
-#[derive(RustcDecodable, RustcEncodable, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct StorageDevice {
     pub path: String,
     pub cache: String,
     pub format: String,
 }
 
-#[derive(RustcDecodable, RustcEncodable, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct NetworkConfig {
     pub bridges: Vec<String>, // TODO: custom usernet
 }
 
-#[derive(RustcDecodable, RustcEncodable, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct SambaConfig {
     pub user: String,
     pub path: String,
@@ -64,7 +63,7 @@ pub struct SambaConfig {
 
 impl Config {
     pub fn save<P: AsRef<Path>>(&self, path: P) {
-        let contents = toml::encode_str(self);
+        let contents = toml::to_string(self).unwrap();
         let mut file = OpenOptions::new().create(true).write(true)
             .truncate(true).open(path).expect("Failed to open config file");
         write!(file, "{}", contents).expect("Failed to write config file");
@@ -77,21 +76,6 @@ impl Config {
             config_file.read_to_string(&mut config).expect("Failed to read config file");
         }
 
-        let mut parser = Parser::new(&config);
-
-        let parsed = match parser.parse() {
-            Some(x) => x,
-            None => {
-                for e in parser.errors {
-                    println!("{}", e);
-                }
-                panic!("Failed to parse config");
-            }
-        };
-
-        match Decodable::decode(&mut Decoder::new(Value::Table(parsed))) {
-            Ok(x) => x,
-            Err(e) => panic!("Failed to decode config: {}", e),
-        }
+        toml::from_str(&config).expect("Failed to decode config")
     }
 }
