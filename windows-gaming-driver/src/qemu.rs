@@ -74,6 +74,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
                          data.join("ovmf-code.fd").display()),
                 "-drive",
                 &format!("if=pflash,format=raw,file={}", efivars_file.display()),
+                "-device", "qemu-xhci,id=xhci",
                 "-device",
                 "virtio-scsi-pci,id=scsi"]);
     // "-monitor",

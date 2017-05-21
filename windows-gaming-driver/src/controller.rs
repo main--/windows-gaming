@@ -19,7 +19,7 @@ pub struct Controller {
 #[serde(tag = "execute", content = "arguments", rename_all = "snake_case")]
 enum QmpCommand {
     QmpCapabilities,
-    DeviceAdd { driver: &'static str, id: String, vendorid: u16, productid: u16 },
+    DeviceAdd { driver: &'static str, id: String, vendorid: u16, productid: u16, bus: &'static str, port: usize },
     DeviceDel { id: String },
     SystemPowerdown,
 }
@@ -108,6 +108,8 @@ impl Controller {
                     for (i, &(vendor, product)) in self.usb_devs.iter().enumerate() {
                         writemon(&mut self.monitor, &QmpCommand::DeviceAdd {
                             driver: "usb-host",
+                            bus: "xhci.0",
+                            port: i + 1,
                             id: format!("usb{}", i),
                             vendorid: vendor,
                             productid: product,
