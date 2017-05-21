@@ -1,13 +1,20 @@
 use std::os::unix::net::UnixStream;
 use std::io::prelude::*;
+use std::mem;
 use serde_json;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
+/// States the state machine of this Controller can have
 enum State {
+    /// GA is down
     Down,
+    /// GA is up
     Up,
+    /// We wait for a ping response
     Pinging,
+    /// Windows is currently suspending
     Suspending,
+    /// Windows is currently waking up from suspend
     Resuming,
 }
 
@@ -69,7 +76,7 @@ impl Controller {
                 // the last ping wasn't even answered
                 // we conclude that the ga has died
                 self.ga = State::Down;
-                self.set_io_attached(false, true);
+                self.io_detach();
                 false
             }
             State::Up => {
@@ -100,13 +107,12 @@ impl Controller {
         // we return false if we didn't notice the GA going down as the timer still
         // exists in that case so it would be a bug to create a second one.
 
-        let ga = self.ga;
-        self.ga = State::Up;
+        let ga = mem::replace(&mut self.ga, State::Up);
         match ga {
             State::Pinging | State::Up => false,
             State::Down => true,
             State::Resuming => {
-                self.set_io_attached(true, false);
+                self.io_attach();
                 true
             }
             State::Suspending => false, // wtf though
@@ -114,50 +120,50 @@ impl Controller {
     }
 
     pub fn ga_suspending(&mut self) {
-        self.set_io_attached(false, true);
+        self.io_detach();
         self.ga = State::Suspending;
     }
 
-    pub fn set_io_attached(&mut self, state: bool, force: bool) {
-        let go = match self.ga {
-            State::Up | State::Pinging => true,
-            State::Down => force,
+    /// Attaches all configured devices if GA is up and wakes the host up if it's suspended
+    pub fn io_attach(&mut self) {
+        match self.ga {
+            State::Down | State::Resuming => (),
             State::Suspending => {
-                assert!(state, "trying to exit from a suspended vm?");
-
                 // make them wake up
                 writemon(&mut self.monitor, &QmpCommand::SystemWakeup);
-
                 // can't enter now - gotta wait for GA to get ready
                 self.ga = State::Resuming;
-                false
-            }
-            State::Resuming => false,
-        };
-
-        if go {
-            match (self.io_attached, state) {
-                (false, true) => {
-                    // attach
-                    for (i, &(vendor, product)) in self.usb_devs.iter().enumerate() {
-                        writemon(&mut self.monitor, &QmpCommand::DeviceAdd {
-                            driver: "usb-host",
-                            id: format!("usb{}", i),
-                            vendorid: vendor,
-                            productid: product,
-                        });
-                    }
-                }
-                (true, false) => {
-                    // detach
-                    for i in 0..self.usb_devs.len() {
-                        writemon(&mut self.monitor, &QmpCommand::DeviceDel { id: format!("usb{}", i) });
-                    }
-                }
-                _ => (),
-            }
-            self.io_attached = state;
+            },
+            State::Up | State::Pinging => self.io_force_attach()
         }
+    }
+
+    /// Attaches all configured devices regardless of GA state
+    pub fn io_force_attach(&mut self) {
+        if self.io_attached {
+            return;
+        }
+        for (i, &(vendor, product)) in self.usb_devs.iter().enumerate() {
+            writemon(&mut self.monitor, &QmpCommand::DeviceAdd {
+                driver: "usb-host",
+                id: format!("usb{}", i),
+                vendorid: vendor,
+                productid: product,
+            });
+        }
+        self.io_attached = true;
+    }
+
+    /// Detaches all configured devices
+    pub fn io_detach(&mut self) {
+        assert!(self.ga != State::Suspending, "trying to exit from a suspended vm?");
+        if !self.io_attached {
+            return;
+        }
+        for i in 0..self.usb_devs.len() {
+            writemon(&mut self.monitor, &QmpCommand::DeviceDel { id: format!("usb{}", i) });
+        }
+        self.io_attached = false;
     }
 
     pub fn shutdown(&mut self) {
