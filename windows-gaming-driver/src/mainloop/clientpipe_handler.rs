@@ -37,11 +37,11 @@ impl Pollable for ClientpipeHandler {
             }
             Some(2) => {
                 println!("client requests IO exit");
-                self.controller.borrow_mut().set_io_attached(false, true);
+                self.controller.borrow_mut().io_detach();
             }
             Some(3) => {
                 println!("client says that it's suspending");
-                // TODO: do something here
+                self.controller.borrow_mut().ga_suspending();
             }
             Some(4) => {
                 self.controller.borrow_mut().ga_pong();
