@@ -8,7 +8,7 @@ use std::env;
 
 use libudev::{Result as UdevResult, Context, Enumerator};
 use num_cpus;
-use config::{Config, MachineConfig, StorageDevice, SetupConfig};
+use config::{Config, MachineConfig, StorageDevice, SetupConfig, DeviceId};
 use pci_device::PciDevice;
 use qemu;
 use setup::ask;
@@ -45,13 +45,13 @@ impl<'a> Wizard<'a> {
         let mut related_devices: Vec<_> = pci_devs.iter().filter(|x| x.pci_device() == selected.pci_device()).collect();
         let gpu_index = related_devices.iter().position(|dev| dev == &selected).unwrap();
         related_devices.swap(0, gpu_index);
-        setup.vfio_devs = related_devices.iter().map(|dev| dev.id).collect();
+        setup.vfio_devs = related_devices.iter().map(|dev| dev.id.into()).collect();
         machine.vfio_slots = related_devices.iter().map(|dev| dev.pci_slot.clone()).collect();
         Ok(())
     }
 
     fn udev_pick_usb(&mut self, special: Option<HidKind>,
-                     blacklist: &[(u16, u16)], allow_abort: bool) -> UdevResult<Option<(u16, u16)>> {
+                     blacklist: &[DeviceId], allow_abort: bool) -> UdevResult<Option<DeviceId>> {
         use util::parse_hex;
 
         let mut iter = Enumerator::new(&self.udev)?;
@@ -97,9 +97,10 @@ impl<'a> Wizard<'a> {
                 }
             }
 
-            let id = (vendor.unwrap(), product.unwrap());
+            let id = (vendor.unwrap(), product.unwrap()).into();
             if !blacklist.contains(&id) {
-                println!("[{}]\t{} {} [{:04x}:{:04x}]", devs.len(), vendor_name, product_name, id.0, id.1);
+                println!("[{}]\t{} {} [{:04x}:{:04x}]", devs.len(), vendor_name, product_name,
+                         id.vendor, id.product);
                 devs.push(Some(id));
             }
         }
@@ -124,7 +125,7 @@ impl<'a> Wizard<'a> {
         let first_id = cfg.vfio_devs[0];
         let mut iter = Enumerator::new(&self.udev)?;
         iter.match_subsystem("pci")?;
-        let mut iter = iter.scan_devices()?.map(PciDevice::new).filter(|x| x.id == first_id);
+        let mut iter = iter.scan_devices()?.map(PciDevice::new).filter(|x| x.id == first_id.into());
         let selected = iter.next().expect("PCI device is gone now?");
         assert!(iter.next().is_none());
 
@@ -171,7 +172,7 @@ impl<'a> Wizard<'a> {
         related_devices.sort();
         related_devices.dedup();
 
-        assert!(cfg.vfio_devs == related_devices);
+        assert!(cfg.vfio_devs.iter().cloned().map::<(u16, u16), _>(From::from).eq(related_devices.iter().cloned()));
         Ok(true)
     }
 
@@ -247,7 +248,8 @@ impl<'a> Wizard<'a> {
     }
 
     fn write_vfio_modconf(&self, setup: &SetupConfig) {
-        let vfio_params = setup.vfio_devs.iter().fold(String::new(), |s, &(v, d)| s + &format!("{:04x}:{:04x},", v, d));
+        let vfio_params = setup.vfio_devs.iter().fold(String::new(),
+                                                      |s, i| s + &format!("{:04x}:{:04x},", i.vendor, i.product));
         assert!(sudo_write_file("/etc/modprobe.d/vfio.conf", |x| {
             writeln!(x, "options vfio-pci ids={}", vfio_params)
         }).unwrap_or(false), "Failed to write modconf");
@@ -336,7 +338,7 @@ impl<'a> Wizard<'a> {
         println!();
         if !machine.usb_devices.is_empty() {
             println!("You have currently selected the following usb devices: ");
-            for &(vendor, product) in machine.usb_devices.iter() {
+            for &DeviceId { vendor, product } in machine.usb_devices.iter() {
                 let name = match hwid::hwid_resolve_usb(vendor, product) {
                     Err(_) | Ok(None)=> "Unknown vendor Unknown product".to_string(),
                     Ok(Some((vendor, None))) => format!("{} Unknown product", vendor),
@@ -375,7 +377,7 @@ impl<'a> Wizard<'a> {
         }
         // add udev rule to add selected devices to vfio group
         sudo_write_file("/etc/udev/rules.d/80-vfio-usb.rules", |mut w| {
-            for &(vendor, product) in machine.usb_devices.iter() {
+            for &DeviceId { vendor, product } in machine.usb_devices.iter() {
                 writeln!(w, r#"SUBSYSTEM=="usb", ATTR{{idVendor}}=="{:04x}", ATTR{{idProduct}}=="{:04x}", ACTION=="add", RUN+="/usr/bin/setfacl -m g:vfio:rw- $devnode""#, vendor, product)?;
             }
             Ok(())

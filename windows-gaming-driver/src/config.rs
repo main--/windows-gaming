@@ -4,6 +4,12 @@ use std::io::{Read, Write};
 
 use toml;
 
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Copy)]
+pub struct DeviceId {
+    pub vendor: u16,
+    pub product: u16,
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Config {
     pub machine: MachineConfig,
@@ -21,7 +27,7 @@ pub struct SetupConfig {
     // setup state
     pub iommu_commanded: bool,
     // convention: gpu must be first for iommu group checks
-    pub vfio_devs: Vec<(u16, u16)>,
+    pub vfio_devs: Vec<DeviceId>,
     pub reboot_commanded: bool,
 }
 
@@ -38,7 +44,7 @@ pub struct MachineConfig {
     pub network: Option<NetworkConfig>,
     pub storage: Vec<StorageDevice>,
     // convention: first element is the mouse (for mouse only setup)
-    pub usb_devices: Vec<(u16, u16)>,
+    pub usb_devices: Vec<DeviceId>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -59,7 +65,20 @@ pub struct SambaConfig {
     pub path: String,
 }
 
+impl From<(u16, u16)> for DeviceId {
+    fn from(old: (u16, u16)) -> DeviceId {
+        DeviceId {
+            vendor: old.0,
+            product: old.1,
+        }
+    }
+}
 
+impl From<DeviceId> for (u16, u16) {
+    fn from(old: DeviceId) -> (u16, u16) {
+        (old.vendor, old.product)
+    }
+}
 
 impl Config {
     pub fn save<P: AsRef<Path>>(&self, path: P) {

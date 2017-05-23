@@ -2,6 +2,7 @@ use std::os::unix::net::UnixStream;
 use std::io::prelude::*;
 use std::mem;
 use serde_json;
+use config::DeviceId;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 /// States the state machine of this Controller can have
@@ -19,7 +20,7 @@ enum State {
 }
 
 pub struct Controller {
-    usb_devs: Vec<(u16, u16)>,
+    usb_devs: Vec<DeviceId>,
 
     ga: State,
     io_attached: bool,
@@ -53,7 +54,7 @@ impl Controller {
         self.clientpipe.write_all(&[cmd as u8]).expect("Failed to write to clientpipe");
     }
 
-    pub fn new(usb_devs: Vec<(u16, u16)>,
+    pub fn new(usb_devs: Vec<DeviceId>,
                monitor: &UnixStream,
                clientpipe: &UnixStream) -> Controller {
         let mut monitor = monitor.try_clone().unwrap();
@@ -143,7 +144,7 @@ impl Controller {
         if self.io_attached {
             return;
         }
-        for (i, &(vendor, product)) in self.usb_devs.iter().enumerate() {
+        for (i, &DeviceId { vendor, product }) in self.usb_devs.iter().enumerate() {
             writemon(&mut self.monitor, &QmpCommand::DeviceAdd {
                 driver: "usb-host",
                 bus: "xhci.0",
