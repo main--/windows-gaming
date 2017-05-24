@@ -11,7 +11,7 @@ pub fn enable(setup: &mut SetupConfig) -> bool {
     println!("Step 1: Enable IOMMU");
     println!("It's as simple as adding 'intel_iommu=on' or 'amd_iommu=on' to your kernel command line.");
     println!("Do this now, then continue here. Don't reboot yet, there's more we need to configure.");
-    println!("");
+    println!();
     if is_enabled() {
         if ask::yesno("IOMMU is already enabled. Do you want to skip this step?") {
             return true;
@@ -22,7 +22,7 @@ pub fn enable(setup: &mut SetupConfig) -> bool {
         println!("This is a kernel parameter, so it won't be active before you reboot. But if you already did that, \
                   the kernel fails to enable it for some reason. IOMMU (aka VT-d) is disabled by default on many \
                   mainboards, please check your firmware settings to make sure it's enabled. If that doesn't work \
-                  it's possible that your hardware just doesn't support it. If that's the reason you're out of luck \
+                  it's possible that your hardware just doesn't support it. If that's the reason, you're out of luck \
                   though. IOMMU is a critical component of this setup and there's no way it can work without that. Sorry.");
     }
 
@@ -31,7 +31,7 @@ pub fn enable(setup: &mut SetupConfig) -> bool {
         return false;
     }
     setup.iommu_commanded = true;
-    println!("");
+    println!();
     true
 }
 
