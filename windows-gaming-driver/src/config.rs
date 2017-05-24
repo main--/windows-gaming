@@ -10,14 +10,14 @@ pub struct DeviceId {
     pub product: u16,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct Config {
     pub machine: MachineConfig,
     pub samba: Option<SambaConfig>,
     pub setup: Option<SetupConfig>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct SetupConfig {
     // VM options
     pub cdrom: Option<String>,
@@ -31,7 +31,7 @@ pub struct SetupConfig {
     pub reboot_commanded: bool,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct MachineConfig {
     pub memory: String,
     pub hugepages: Option<bool>,
