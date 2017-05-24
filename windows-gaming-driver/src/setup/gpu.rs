@@ -13,7 +13,7 @@ pub fn select(setup: &mut SetupConfig, machine: &mut MachineConfig) -> Result<()
     // filter to the display controller class (0x03XXXX, udev drops the leading zero)
     let display_controllers: Vec<_> = pci_devs.iter().filter(|x| x.pci_class.starts_with("3") && x.pci_class.len() == 5).collect();
 
-    println!("");
+    println!();
     for (i, dev) in display_controllers.iter().enumerate() {
         println!("[{}]\t{}", i, dev);
     }

@@ -27,13 +27,13 @@ impl Wizard {
         println!("This wizard will help you configure a PCI passthrough setup!");
         println!("Some steps are automated, others have to be done manually. Note that answering no ('n') to those will abort the wizard.");
         println!("You can abort the wizard at any point without risking corruptions except where it specifically tells you not to.");
-        println!("");
+        println!();
         if !ask::yesno("Understood?") {
             println!("Aborted.");
             return;
         }
 
-        println!("");
+        println!();
 
         // TODO: Add a step 0 here where we add the current user to the vfio group
 
@@ -63,7 +63,7 @@ impl Wizard {
             config.setup.as_mut().unwrap().reboot_commanded = true;
             config.save(cfg_path);
 
-            println!("");
+            println!();
             println!("Step 5: Reboot");
             println!("Now that everything is properly configured, the initramfs should load vfio which should then grab your graphics card.");
             println!("Before you boot into Linux again, please check your firmware/bios settings to make sure that the guest GPU is NOT your \
@@ -77,14 +77,14 @@ impl Wizard {
             println!("If you don't have anything like that, now is the time to change your mind and undo these changes. (Removing the vfio \
                       module from your initramfs should almost certainly leave you with a perfectly working system.)");
             println!("You have been warned.");
-            println!("");
+            println!();
             println!("With that out of the way, your next step after the reboot is simply to launch this wizard again and we can move on!");
         } else { // if something is actually passed through properly
             println!("Step 6: Check IOMMU grouping");
             if !iommu::check_grouping(config.setup.as_ref().unwrap()).expect("Failed to check IOMMU grouping") {
                 return;
             }
-            println!("");
+            println!();
 
             if !vm::setup(config.setup.as_mut().unwrap(), &mut config.machine, datadir) {
                 return;
@@ -93,7 +93,7 @@ impl Wizard {
 
             println!("Your VM is going to boot now.");
             println!("Just install Windows and shut it down cleanly as soon as that's done so we can continue.");
-            println!("");
+            println!();
             println!("Note: Windows probably won't pick up the virtio-scsi storage device right away. You can load the drivers from the attached floppy drive.");
             if !ask::yesno("Ready?") {
                 println!("Aborted.");

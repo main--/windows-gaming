@@ -3,7 +3,7 @@ use std::process::Command;
 use setup::ask;
 
 pub fn rebuild() -> bool {
-    println!("");
+    println!();
     println!("Step 4: Update initramfs");
     let mut skip_ask = false;
     if ask::yesno("Are you using mkinitcpio with the default kernel ('linux')?") {

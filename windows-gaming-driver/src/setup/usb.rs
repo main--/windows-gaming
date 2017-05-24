@@ -67,7 +67,7 @@ pub fn select(machine: &mut MachineConfig) -> bool {
         }
         Ok(())
     }).expect("Cannot write udev rules");
-    println!("");
+    println!();
     true
 }
 

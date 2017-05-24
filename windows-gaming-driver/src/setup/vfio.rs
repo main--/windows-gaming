@@ -14,7 +14,7 @@ pub fn setup(setup: &mut SetupConfig, machine: &mut MachineConfig) -> bool {
     println!("Step 3: Setting up the vfio driver");
 
     if !setup.vfio_devs.is_empty() {
-        println!("");
+        println!();
         println!("{}", "Troubleshooting (since you apparently already did this):");
         println!("Just like Step 1, this requires a reboot to activate. If you already did that, the most likely cause \
                   is that things were misconfigured somehow. Are the kernel modules really in the initramfs now? \
@@ -22,18 +22,18 @@ pub fn setup(setup: &mut SetupConfig, machine: &mut MachineConfig) -> bool {
                   correctly? Note that vfio-pci only exists since Linux 4.1. Earlier versions are not supported by \
                   this tool but you can still make it work with pci-stub. You're on your own there but if you need this \
                   and figure it out remember that contributions are always appreciated!");
-        println!("");
+        println!();
     }
 
     gpu::select(setup, machine).expect("Failed to select GPU");
     println!("Success!");
-    println!("");
+    println!();
 
     let mut has_modconf = false;
     let mut skip_ask = false;
     if autoconfigure_mkinitcpio(&mut has_modconf).unwrap_or(false) {
         println!("Success!");
-        println!("");
+        println!();
         if !has_modconf {
             println!("However, it looks like your mkinitcpio is using a nonstandard configuration that does not use the 'modconf' hook.");
             println!("This hook inserts a config file that tells the vfio driver what PCI devices it should bind to, so things won't work without it.");
@@ -48,11 +48,11 @@ pub fn setup(setup: &mut SetupConfig, machine: &mut MachineConfig) -> bool {
         }
     } else {
         println!("Falling back to manual mode.");
-        println!("");
+        println!();
         println!("Please configure your initramfs generator to load these kernel modules: {}", KERNEL_MODULES);
         println!("Make sure that they are loaded *before* any graphics drivers!");
         println!("For mkinitcpio users, adding them at the *start* of your MODULES line in /etc/mkinitcpio.conf will take care of this.");
-        println!("");
+        println!();
         if !ask::yesno("Done?") {
             println!("Aborted.");
             return false;
