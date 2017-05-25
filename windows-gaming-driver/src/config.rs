@@ -20,8 +20,105 @@ pub enum UsbBinding {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct Config {
     pub machine: MachineConfig,
+    pub sound: SoundConfig,
     pub samba: Option<SambaConfig>,
     pub setup: Option<SetupConfig>,
+}
+
+#[serde(default)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct SoundConfig {
+    pub timer_period: usize,
+    pub input: SoundSettings,
+    pub output: SoundSettings,
+    pub backend: SoundBackend,
+}
+
+impl Default for SoundConfig {
+    fn default() -> SoundConfig {
+        SoundConfig {
+            timer_period: 100,
+            input: SoundSettings::default(),
+            output: SoundSettings::default(),
+            backend: SoundBackend::default(),
+        }
+    }
+}
+
+#[serde(default)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct SoundSettings {
+    pub voices: usize,
+    pub use_polling: bool,
+    pub fixed: Option<SoundFixedSettings>,
+}
+
+impl Default for SoundSettings {
+    fn default() -> SoundSettings {
+        SoundSettings {
+            voices: 1,
+            use_polling: true,
+            fixed: None,
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct SoundFixedSettings {
+    pub frequency: usize,
+    pub format: String,
+    pub channels: usize,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub enum SoundBackend {
+    None,
+
+    Alsa {
+        sink: AlsaSettings,
+        source: AlsaSettings,
+    },
+
+    PulseAudio {
+        buffer_samples: usize,
+        server: Option<String>,
+        sink_name: Option<String>,
+        source_name: Option<String>,
+    },
+}
+
+impl Default for SoundBackend {
+    fn default() -> SoundBackend {
+        SoundBackend::None
+    }
+}
+
+#[serde(default)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct AlsaSettings {
+    pub name: String,
+
+    pub unit: AlsaUnit,
+    pub buffer_size: usize,
+    pub period_size: usize,
+}
+
+impl Default for AlsaSettings {
+    fn default() -> AlsaSettings {
+        AlsaSettings {
+            name: "default".to_owned(),
+
+            unit: AlsaUnit::Frames,
+            buffer_size: 0,
+            period_size: 0,
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+pub enum AlsaUnit {
+    Frames,
+    MicroSeconds,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
