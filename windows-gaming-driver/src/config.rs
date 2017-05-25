@@ -3,6 +3,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 
 use toml;
+use serde_yaml;
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Copy)]
 pub struct DeviceId {
@@ -82,19 +83,39 @@ impl From<DeviceId> for (u16, u16) {
 
 impl Config {
     pub fn save<P: AsRef<Path>>(&self, path: P) {
-        let contents = toml::to_string(self).unwrap();
+        let contents = serde_yaml::to_string(self).unwrap();
         let mut file = OpenOptions::new().create(true).write(true)
             .truncate(true).open(path).expect("Failed to open config file");
-        write!(file, "{}", contents).expect("Failed to write config file");
+        writeln!(file, "{}", contents).expect("Failed to write config file");
     }
 
-    pub fn load<P: AsRef<Path>>(path: P) -> Config {
+    pub fn load<P: AsRef<Path>>(path: P) -> Option<Config> {
+        let yaml_path = path.as_ref().with_extension("yml");
+        let file_path;
+        let needs_upgrade = !yaml_path.exists();
+        if needs_upgrade {
+            file_path = yaml_path.with_extension("toml");
+        } else {
+            file_path = yaml_path.clone();
+        }
+
+        if !file_path.exists() {
+            return None;
+        }
+
         let mut config = String::new();
         {
-            let mut config_file = File::open(path).expect("Failed to open config file");
+            let mut config_file = File::open(file_path).expect("Failed to open config file");
             config_file.read_to_string(&mut config).expect("Failed to read config file");
         }
 
-        toml::from_str(&config).expect("Failed to decode config")
+        Some(if needs_upgrade {
+            // old-style toml config - upgrade it
+            let cfg: Config = toml::from_str(&config).expect("Failed to decode old-style TOML config");
+            cfg.save(yaml_path);
+            cfg
+        } else {
+            serde_yaml::from_str(&config).expect("Failed to decode config")
+        })
     }
 }

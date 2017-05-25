@@ -10,6 +10,7 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
+extern crate serde_yaml;
 
 mod mainloop;
 mod config;
@@ -66,11 +67,7 @@ fn main() {
         RunMode::User => xdg_dirs.create_runtime_directory("").expect("Failed to create runtime directory."),
     };
 
-    let cfg = if config_path.exists() {
-        Some(Config::load(&config_path))
-    } else {
-        None
-    };
+    let cfg = Config::load(&config_path);
 
     match cfg {
         Some(ref cfg) if cfg.setup.is_none() => qemu::run(cfg, &workdir_path, Path::new(DATA_FOLDER)),
