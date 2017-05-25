@@ -11,6 +11,12 @@ pub struct DeviceId {
     pub product: u16,
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+pub enum UsbBinding {
+    ById(DeviceId),
+    ByPort { bus: u16, port: u16 },
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct Config {
     pub machine: MachineConfig,
@@ -45,7 +51,7 @@ pub struct MachineConfig {
     pub network: Option<NetworkConfig>,
     pub storage: Vec<StorageDevice>,
     // convention: first element is the mouse (for mouse only setup)
-    pub usb_devices: Vec<DeviceId>,
+    pub usb_devices: Vec<UsbBinding>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
