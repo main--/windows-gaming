@@ -5,7 +5,7 @@ use std::os::unix::net::UnixListener;
 use std::os::unix::fs::PermissionsExt;
 use std::iter::Iterator;
 
-use config::Config;
+use config::{Config, SoundBackend, AlsaUnit};
 use sd_notify::notify_systemd;
 use samba;
 use mainloop;
@@ -129,6 +129,76 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
                     &format!("scsi-hd,drive=disk{}", idx)]);
     }
 
+    {
+        let sound = &cfg.sound;
+
+        qemu.env("QEMU_AUDIO_TIMER_PERIOD", sound.timer_period.to_string());
+
+        qemu.env("QEMU_AUDIO_DAC_VOICES", sound.output.voices.to_string());
+        qemu.env("QEMU_AUDIO_DAC_TRY_POLL", if sound.output.use_polling { "1" } else { "0" });
+
+        match &sound.output.fixed {
+            &None => {
+                qemu.env("QEMU_AUDIO_DAC_FIXED_SETTINGS", "0");
+            }
+            &Some(ref x) => {
+                qemu.env("QEMU_AUDIO_DAC_FIXED_SETTINGS", "1");
+                qemu.env("QEMU_AUDIO_DAC_FIXED_FREQ", x.frequency.to_string());
+                qemu.env("QEMU_AUDIO_DAC_FIXED_FMT", &x.format);
+                qemu.env("QEMU_AUDIO_DAC_FIXED_CHANNELS", x.channels.to_string());
+            }
+        }
+
+        qemu.env("QEMU_AUDIO_ADC_VOICES", sound.input.voices.to_string());
+        qemu.env("QEMU_AUDIO_ADC_TRY_POLL", if sound.output.use_polling { "1" } else { "0" });
+
+        match &sound.input.fixed {
+            &None => {
+                qemu.env("QEMU_AUDIO_ADC_FIXED_SETTINGS", "0");
+            }
+            &Some(ref x) => {
+                qemu.env("QEMU_AUDIO_ADC_FIXED_SETTINGS", "1");
+                qemu.env("QEMU_AUDIO_ADC_FIXED_FREQ", x.frequency.to_string());
+                qemu.env("QEMU_AUDIO_ADC_FIXED_FMT", &x.format);
+                qemu.env("QEMU_AUDIO_ADC_FIXED_CHANNELS", x.channels.to_string());
+            }
+        }
+
+        match &sound.backend {
+            &SoundBackend::None => {
+                qemu.env("QEMU_AUDIO_DRV", "none");
+            }
+            &SoundBackend::Alsa { ref sink, ref source } => {
+                qemu.env("QEMU_AUDIO_DRV", "alsa");
+
+                qemu.env("QEMU_ALSA_DAC_DEV", &sink.name);
+                qemu.env("QEMU_ALSA_DAC_SIZE_IN_USEC",
+                         if sink.unit == AlsaUnit::MicroSeconds { "1" } else { "0" });
+                qemu.env("QEMU_ALSA_DAC_BUFFER_SIZE", sink.buffer_size.to_string());
+                qemu.env("QEMU_ALSA_DAC_PERIOD_SIZE", sink.period_size.to_string());
+
+                qemu.env("QEMU_ALSA_ADC_DEV", &source.name);
+                qemu.env("QEMU_ALSA_ADC_SIZE_IN_USEC",
+                         if source.unit == AlsaUnit::MicroSeconds { "1" } else { "0" });
+                qemu.env("QEMU_ALSA_ADC_BUFFER_SIZE", source.buffer_size.to_string());
+                qemu.env("QEMU_ALSA_ADC_PERIOD_SIZE", source.period_size.to_string());
+            }
+            &SoundBackend::PulseAudio {
+                buffer_samples,
+                ref server,
+                ref sink_name,
+                ref source_name,
+            } => {
+                qemu.env("QEMU_AUDIO_DRV", "pa");
+
+                qemu.env("QEMU_PA_SAMPLES", buffer_samples.to_string());
+                option2env(&mut qemu, "QEMU_PA_SERVER", server);
+                option2env(&mut qemu, "QEMU_PA_SINK", sink_name);
+                option2env(&mut qemu, "QEMU_PA_SOURCE", source_name);
+            }
+        }
+    }
+
     qemu.stdin(Stdio::null());
 
     let mut qemu = qemu.spawn().expect("Failed to start qemu");
@@ -145,4 +215,11 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
 
     qemu.wait().unwrap();
     println!("windows-gaming-driver down.");
+}
+
+fn option2env(cmd: &mut Command, name: &str, val: &Option<String>) {
+    match val {
+        &None => cmd.env_remove(name),
+        &Some(ref x) => cmd.env(name, &x),
+    };
 }

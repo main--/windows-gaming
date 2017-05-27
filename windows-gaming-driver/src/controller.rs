@@ -1,8 +1,10 @@
 use std::os::unix::net::UnixStream;
 use std::io::prelude::*;
 use std::mem;
+use std::ffi::OsStr;
 use serde_json;
-use config::DeviceId;
+use config::{DeviceId, UsbBinding};
+use libudev::{Result as UdevResult, Context, Enumerator};
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 /// States the state machine of this Controller can have
@@ -20,7 +22,7 @@ enum State {
 }
 
 pub struct Controller {
-    usb_devs: Vec<DeviceId>,
+    usb_devs: Vec<UsbBinding>,
 
     ga: State,
     io_attached: bool,
@@ -34,7 +36,14 @@ pub struct Controller {
 #[serde(tag = "execute", content = "arguments", rename_all = "snake_case")]
 enum QmpCommand {
     QmpCapabilities,
-    DeviceAdd { driver: &'static str, id: String, vendorid: u16, productid: u16, bus: &'static str, port: usize },
+    DeviceAdd {
+        driver: &'static str,
+        id: String,
+        bus: &'static str,
+        port: usize,
+        hostbus: String,
+        hostaddr: String,
+    },
     DeviceDel { id: String },
     SystemPowerdown,
     SystemWakeup,
@@ -54,7 +63,7 @@ impl Controller {
         self.clientpipe.write_all(&[cmd as u8]).expect("Failed to write to clientpipe");
     }
 
-    pub fn new(usb_devs: Vec<DeviceId>,
+    pub fn new(usb_devs: Vec<UsbBinding>,
                monitor: &UnixStream,
                clientpipe: &UnixStream) -> Controller {
         let mut monitor = monitor.try_clone().unwrap();
@@ -144,15 +153,21 @@ impl Controller {
         if self.io_attached {
             return;
         }
-        for (i, &DeviceId { vendor, product }) in self.usb_devs.iter().enumerate() {
-            writemon(&mut self.monitor, &QmpCommand::DeviceAdd {
-                driver: "usb-host",
-                bus: "xhci.0",
-                port: i + 1,
-                id: format!("usb{}", i),
-                vendorid: vendor,
-                productid: product,
-            });
+
+        let mut udev = Context::new().expect("Failed to create udev context");
+
+        for (i, binding) in self.usb_devs.iter().enumerate() {
+            if let Some((bus, addr)) = udev_resolve_binding(&mut udev, binding)
+                .expect("Failed to resolve usb binding") {
+                    writemon(&mut self.monitor, &QmpCommand::DeviceAdd {
+                        driver: "usb-host",
+                        bus: "xhci.0",
+                        port: i + 1,
+                        id: format!("usb{}", i),
+                        hostbus: bus,
+                        hostaddr: addr,
+                    });
+                }
         }
         self.io_attached = true;
     }
@@ -172,4 +187,53 @@ impl Controller {
     pub fn shutdown(&mut self) {
         writemon(&mut self.monitor, &QmpCommand::SystemPowerdown);
     }
+}
+
+/// Resolves a `UsbBinding` to a (bus, addr) tuple.
+fn udev_resolve_binding(udev: &mut Context, binding: &UsbBinding)
+                        -> UdevResult<Option<(String, String)>> {
+    let mut iter = Enumerator::new(udev).unwrap();
+
+    iter.match_subsystem("usb")?;
+    iter.match_property("DEVTYPE", "usb_device")?;
+
+    match binding {
+        &UsbBinding::ById(DeviceId { vendor, product }) => {
+            iter.match_attribute("idVendor", format!("{:04x}", vendor))?;
+            iter.match_attribute("idProduct", format!("{:04x}", product))?;
+        }
+        &UsbBinding::ByPort { bus, port } => {
+            iter.match_attribute("busnum", bus.to_string())?;
+            iter.match_attribute("devpath", port.to_string())?;
+        }
+    }
+
+    let mut scanner = iter.scan_devices().unwrap();
+    // FIXME: rust-lang/rust#42222
+    return match scanner.next() {
+        Some(dev) => {
+            let mut bus = None;
+            let mut addr = None;
+            for attr in dev.attributes() {
+                if let Some(val) = attr.value().and_then(OsStr::to_str) {
+                    if attr.name() == "busnum" {
+                        bus = Some(val.to_owned());
+                    } else if attr.name() == "devnum" {
+                        addr = Some(val.to_owned());
+                    }
+                }
+            }
+
+            if scanner.next().is_some() {
+                println!("Warning: Multiple matches for {:?} found.", binding);
+                println!("         Binding to the first one we see, just like qemu would.");
+            }
+
+            Ok(Some((bus.unwrap(), addr.unwrap())))
+        }
+        None => {
+            println!("Warning: Didn't find any devices for {:?}", binding);
+            Ok(None)
+        }
+    };
 }
