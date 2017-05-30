@@ -186,9 +186,10 @@ impl From<DeviceId> for (u16, u16) {
 
 impl Config {
     pub fn save<P: AsRef<Path>>(&self, path: P) {
+        let yaml_path = path.as_ref().with_extension("yml");
         let contents = serde_yaml::to_string(self).unwrap();
         let mut file = OpenOptions::new().create(true).write(true)
-            .truncate(true).open(path).expect("Failed to open config file");
+            .truncate(true).open(yaml_path).expect("Failed to open config file");
         writeln!(file, "{}", contents).expect("Failed to write config file");
     }
 

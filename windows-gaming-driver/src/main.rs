@@ -57,7 +57,7 @@ fn main() {
         None => {
             match mode {
                 RunMode::System => Path::new("/etc/windows-gaming-driver.toml").to_path_buf(),
-                RunMode::User => xdg_dirs.place_config_file("config.toml").expect("Failed to create config directory."),
+                RunMode::User => xdg_dirs.place_config_file("config").expect("Failed to create config directory."),
             }
         }
     };
