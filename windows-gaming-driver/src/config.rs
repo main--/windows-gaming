@@ -11,6 +11,18 @@ pub struct DeviceId {
     pub product: u16,
 }
 
+// rust-yaml doesn't seem to support Unit `()`.
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
+pub enum True {
+    True
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+pub struct UsbDevice {
+    pub binding: UsbBinding,
+    pub permanent: Option<True>,
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub enum UsbBinding {
     ById(DeviceId),
@@ -148,7 +160,7 @@ pub struct MachineConfig {
     pub network: Option<NetworkConfig>,
     pub storage: Vec<StorageDevice>,
     // convention: first element is the mouse (for mouse only setup)
-    pub usb_devices: Vec<UsbBinding>,
+    pub usb_devices: Vec<UsbDevice>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

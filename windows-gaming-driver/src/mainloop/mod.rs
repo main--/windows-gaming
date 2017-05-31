@@ -100,7 +100,7 @@ fn poll_core<'a>(mut components: Vec<Box<Pollable>>) {
 }
 
 pub fn run(cfg: &Config, monitor_stream: UnixStream, clientpipe_stream: UnixStream, control_socket: UnixListener) {
-    let ctrl = Controller::new(cfg.machine.usb_devices.clone(), &monitor_stream, &clientpipe_stream);
+    let ctrl = Controller::new(cfg.machine.clone(), &monitor_stream, &clientpipe_stream);
     let ctrl = Rc::new(RefCell::new(ctrl));
 
     poll_core(vec![

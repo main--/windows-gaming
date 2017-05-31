@@ -6,6 +6,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::iter::Iterator;
 
 use config::{Config, SoundBackend, AlsaUnit};
+use controller;
 use sd_notify::notify_systemd;
 use samba;
 use mainloop;
@@ -116,6 +117,15 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
 
     for slot in cfg.machine.vfio_slots.iter() {
         qemu.args(&["-device", &format!("vfio-pci,host={},multifunction=on", slot)]);
+    }
+
+    for (i, dev) in cfg.machine.usb_devices.iter().enumerate()
+            .filter(|&(_, dev)| dev.permanent.is_some()) {
+        if let Some((bus, addr)) = controller::resolve_binding(&dev.binding)
+                .expect("Failed to resolve usb binding") {
+            qemu.args(&["-device",
+                &format!("usb-host,hostbus={},hostaddr={},bus=xhci.0,port={}", bus, addr, i+1)]);
+        }
     }
 
     for (idx, drive) in machine.storage.iter().enumerate() {
