@@ -1,0 +1,9 @@
+language: generic
+script: make
+addons:
+  apt:
+    packages:
+    - rpm2cpio
+    - genisoimage
+    - mono
+
