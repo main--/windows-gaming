@@ -6,7 +6,7 @@ OVMF   := ovmf-x64/OVMF_CODE-pure-efi.fd ovmf-x64/OVMF_VARS-pure-efi.fd
 all: $(DRIVER) $(GA_ISO) $(OVMF)
 
 test:
-	cd windows-gaming-driver && cargo test --release --locked
+	cd windows-gaming-driver && cargo test --release --locked && cargo test --locked
 
 $(DRIVER):
 	cd windows-gaming-driver && cargo build --release --locked
