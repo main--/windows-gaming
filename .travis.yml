@@ -1,7 +1,11 @@
 language: csharp
 mono: latest
+env:
+ - RUST_TOOLCHAIN=stable
+ - RUST_TOOLCHAIN=beta
+ - RUST_TOOLCHAIN=nightly
 install:
- - curl -sSf https://sh.rustup.rs | sh -s -- --default-toolchain=stable -y
+ - curl -sSf https://sh.rustup.rs | sh -s -- --default-toolchain=$RUST_TOOLCHAIN -y
  - export PATH=$HOME/.cargo/bin:$PATH
 script: make
 addons:
