@@ -9,3 +9,4 @@ addons:
     - rpm2cpio
     - genisoimage
     - mono-devel
+    - libudev-dev
