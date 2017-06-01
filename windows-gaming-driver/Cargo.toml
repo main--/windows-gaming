@@ -4,7 +4,8 @@ version = "0.1.0"
 authors = ["main() <main@ehvag.de>"]
 
 [dependencies]
-systemd = "0.0.10"
+libc = "0.2"
+lazy_static = "0.2"
 nix = { version = "0.7.0", features = ["signalfd"] }
 users = "0.5.2"
 toml = "0.4"
@@ -16,7 +17,3 @@ timerfd = "0.2.0"
 libudev = "0.2.0"
 num_cpus = "1.2.0"
 xdg = "^2.1"
-
-
-[replace]
-"systemd:0.0.10" = { git = "https://github.com/main--/rust-systemd.git" }

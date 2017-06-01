@@ -1,4 +1,3 @@
-extern crate systemd;
 extern crate nix;
 extern crate users;
 extern crate toml;
@@ -11,6 +10,9 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 extern crate serde_yaml;
+extern crate libc;
+#[macro_use]
+extern crate lazy_static;
 
 mod mainloop;
 mod config;
