@@ -10,3 +10,5 @@ addons:
     - genisoimage
     - mono-devel
     - libsystemd-dev
+    sources:
+    - sourceline: 'deb http://de.archive.ubuntu.com/ubuntu/ xenial main'
