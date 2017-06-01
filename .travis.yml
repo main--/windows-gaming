@@ -9,4 +9,4 @@ addons:
     - rpm2cpio
     - genisoimage
     - mono-devel
-
+    - libsystemd-dev
