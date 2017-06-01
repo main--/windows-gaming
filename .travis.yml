@@ -5,5 +5,5 @@ addons:
     packages:
     - rpm2cpio
     - genisoimage
-    - mono
+    - mono-devel
 
