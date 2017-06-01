@@ -7,7 +7,7 @@ env:
 install:
  - curl -sSf https://sh.rustup.rs | sh -s -- --default-toolchain=$RUST_TOOLCHAIN -y
  - export PATH=$HOME/.cargo/bin:$PATH
-script: make
+script: make all test
 addons:
   apt:
     packages:
