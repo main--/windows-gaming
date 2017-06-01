@@ -9,5 +9,5 @@ addons:
     packages:
     - rpm2cpio
     - genisoimage
-    - mono-devel
+    - bsdtar
     - libudev-dev
