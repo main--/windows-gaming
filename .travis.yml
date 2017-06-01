@@ -1,4 +1,5 @@
 language: generic
+install: curl -sSf https://sh.rustup.rs | sh -s -- --default-toolchain=stable -y
 script: make
 addons:
   apt:
