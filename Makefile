@@ -5,8 +5,11 @@ OVMF   := ovmf-x64/OVMF_CODE-pure-efi.fd ovmf-x64/OVMF_VARS-pure-efi.fd
 
 all: $(DRIVER) $(GA_ISO) $(OVMF)
 
+test:
+	cd windows-gaming-driver && cargo test --release --locked && cargo test --locked
+
 $(DRIVER):
-	cd windows-gaming-driver && cargo build --release --locked # TODO: Is --locked really what we want here?
+	cd windows-gaming-driver && cargo build --release --locked
 
 $(GA_EXE): guest-agent/VfioService/VfioService.sln $(wildcard guest-agent/VfioService/VfioService/*.*) $(wildcard guest-agent/VfioService/VfioService/Properties/*)
 	cd guest-agent && xbuild /p:Configuration=Release VfioService/VfioService.sln
