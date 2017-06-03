@@ -13,6 +13,7 @@ extern crate serde_yaml;
 extern crate libc;
 #[macro_use]
 extern crate lazy_static;
+extern crate itertools;
 
 mod mainloop;
 mod config;

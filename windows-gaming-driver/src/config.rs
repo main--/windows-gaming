@@ -1,6 +1,7 @@
 use std::path::Path;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
+use std::fmt::{Display, Formatter, Result as FmtResult};
 
 use toml;
 use serde_yaml;
@@ -11,22 +12,63 @@ pub struct DeviceId {
     pub product: u16,
 }
 
-// rust-yaml doesn't seem to support Unit `()`.
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
-pub enum True {
-    True
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+pub enum UsbBinding {
+    ById(DeviceId),
+    ByPort { bus: u16, port: u16 },
+}
+
+// https://en.wikipedia.org/wiki/Host_controller_interface_(USB,_Firewire)#Open_Host_Controller_Interface_2
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq)]
+pub enum UsbBus {
+    Ohci,
+    Uhci,
+    Ehci,
+    Xhci,
+}
+
+impl Display for UsbBus {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        f.write_str(match self {
+            &UsbBus::Ohci => "ohci",
+            &UsbBus::Uhci => "uhci",
+            &UsbBus::Ehci => "ehci",
+            &UsbBus::Xhci => "xhci",
+        })
+    }
+}
+
+impl Default for UsbBus {
+    fn default() -> Self {
+        UsbBus::Xhci
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct UsbDevice {
     pub binding: UsbBinding,
-    pub permanent: Option<True>,
+    #[serde(default = "default_usbdevice_permanent")]
+    pub permanent: bool,
+    #[serde(default = "default_usbdevice_bus")]
+    pub bus: UsbBus,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
-pub enum UsbBinding {
-    ById(DeviceId),
-    ByPort { bus: u16, port: u16 },
+fn default_usbdevice_permanent() -> bool {
+    false
+}
+
+fn default_usbdevice_bus() -> UsbBus {
+    UsbBus::Xhci
+}
+
+impl UsbDevice {
+    pub fn from_binding(binding: UsbBinding) -> Self {
+        UsbDevice {
+            binding: binding,
+            permanent: default_usbdevice_permanent(),
+            bus: default_usbdevice_bus(),
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]

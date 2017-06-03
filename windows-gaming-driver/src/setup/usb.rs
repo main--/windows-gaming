@@ -43,23 +43,23 @@ pub fn select(machine: &mut MachineConfig) -> bool {
     let keyboard = pick(Some(HidKind::Keyboard), &machine.usb_devices, true)
         .expect("Failed to select Keyboard");
     if let Some(id) = mouse {
-        machine.usb_devices.insert(0, UsbDevice { binding: UsbBinding::ById(id), permanent: None });
+        machine.usb_devices.insert(0, UsbDevice::from_binding(UsbBinding::ById(id)));
     } else {
         println!("No mouse selected. Please select your mouse from this complete list of connected devices:");
         let mouse = pick(None, &machine.usb_devices, !machine.usb_devices.is_empty())
             .expect("Failed to select mouse from complete list");
         if let Some(id) = mouse {
-            machine.usb_devices.insert(0, UsbDevice { binding: UsbBinding::ById(id), permanent: None });
+            machine.usb_devices.insert(0, UsbDevice::from_binding(UsbBinding::ById(id)));
         }
     }
     if let Some(id) = keyboard {
-        machine.usb_devices.push(UsbDevice { binding: UsbBinding::ById(id), permanent: None });
+        machine.usb_devices.push(UsbDevice::from_binding(UsbBinding::ById(id)));
     } else {
         println!("No keyboard selected. Please select your keyboard from this complete list of connected devices:");
         let keyboard = pick(None, &machine.usb_devices, true)
             .expect("Failed to select keyboard from complete list");
         if let Some(id) = keyboard {
-            machine.usb_devices.push(UsbDevice { binding: UsbBinding::ById(id), permanent: None });
+            machine.usb_devices.push(UsbDevice::from_binding(UsbBinding::ById(id)));
         }
     }
     if !ask::yesno("Done?") {
