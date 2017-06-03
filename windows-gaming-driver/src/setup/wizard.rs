@@ -28,6 +28,11 @@ impl Wizard {
         println!("Some steps are automated, others have to be done manually. Note that answering no ('n') to those will abort the wizard.");
         println!("You can abort the wizard at any point without risking corruptions except where it specifically tells you not to.");
         println!();
+        println!("This setup assumes that you are currently running on the GPU you want Linux to run on.");
+        println!("Make sure that you remove unnecessary drivers as they might interfere.");
+        println!("You may also need to configure your display server's config files accordingly (e.g. xorg.conf for Xorg).");
+        println!();
+
         if !ask::yesno("Understood?") {
             println!("Aborted.");
             return;
