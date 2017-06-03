@@ -2,9 +2,13 @@ use std::os::unix::net::UnixStream;
 use std::io::prelude::*;
 use std::mem;
 use std::ffi::OsStr;
+
+use itertools::Itertools;
 use serde_json;
-use config::{DeviceId, UsbBinding};
 use libudev::{Result as UdevResult, Context, Enumerator};
+
+use config::{DeviceId, UsbBinding, MachineConfig};
+use util;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 /// States the state machine of this Controller can have
@@ -22,7 +26,7 @@ enum State {
 }
 
 pub struct Controller {
-    usb_devs: Vec<UsbBinding>,
+    machine_config: MachineConfig,
 
     ga: State,
     io_attached: bool,
@@ -39,7 +43,7 @@ enum QmpCommand {
     DeviceAdd {
         driver: &'static str,
         id: String,
-        bus: &'static str,
+        bus: String,
         port: usize,
         hostbus: String,
         hostaddr: String,
@@ -63,13 +67,13 @@ impl Controller {
         self.clientpipe.write_all(&[cmd as u8]).expect("Failed to write to clientpipe");
     }
 
-    pub fn new(usb_devs: Vec<UsbBinding>,
+    pub fn new(machine_config: MachineConfig,
                monitor: &UnixStream,
                clientpipe: &UnixStream) -> Controller {
         let mut monitor = monitor.try_clone().unwrap();
         writemon(&mut monitor, &QmpCommand::QmpCapabilities);
         Controller {
-            usb_devs,
+            machine_config,
 
             ga: State::Down,
             io_attached: false,
@@ -156,18 +160,22 @@ impl Controller {
 
         let mut udev = Context::new().expect("Failed to create udev context");
 
-        for (i, binding) in self.usb_devs.iter().enumerate() {
-            if let Some((bus, addr)) = udev_resolve_binding(&mut udev, binding)
-                .expect("Failed to resolve usb binding") {
-                    writemon(&mut self.monitor, &QmpCommand::DeviceAdd {
-                        driver: "usb-host",
-                        bus: "xhci.0",
-                        port: i + 1,
-                        id: format!("usb{}", i),
-                        hostbus: bus,
-                        hostaddr: addr,
-                    });
-                }
+        let groups = self.machine_config.usb_devices.iter().enumerate().group_by(|&(_, dev)| dev.bus);
+        for (i, (port, dev)) in groups.into_iter().flat_map(|(_, group)| group.enumerate())
+                .filter(|&(_, (_, ref dev))| !dev.permanent) {
+            if let Some((hostbus, hostaddr)) = udev_resolve_binding(&mut udev, &dev.binding)
+                    .expect("Failed to resolve usb binding") {
+                let bus = dev.bus;
+                let usable_ports = util::usable_ports(bus);
+                writemon(&mut self.monitor, &QmpCommand::DeviceAdd {
+                    driver: "usb-host",
+                    bus: format!("{}{}.0", bus, port / usable_ports),
+                    port: (port % usable_ports) + 1,
+                    id: format!("usb{}", i),
+                    hostbus: hostbus,
+                    hostaddr: hostaddr,
+                });
+            }
         }
         self.io_attached = true;
     }
@@ -178,7 +186,8 @@ impl Controller {
         if !self.io_attached {
             return;
         }
-        for i in 0..self.usb_devs.len() {
+        for i in self.machine_config.usb_devices.iter().enumerate()
+            .filter(|&(_, dev)| !dev.permanent).map(|(i, _)| i) {
             writemon(&mut self.monitor, &QmpCommand::DeviceDel { id: format!("usb{}", i) });
         }
         self.io_attached = false;
@@ -190,7 +199,7 @@ impl Controller {
 }
 
 /// Resolves a `UsbBinding` to a (bus, addr) tuple.
-fn udev_resolve_binding(udev: &mut Context, binding: &UsbBinding)
+pub fn udev_resolve_binding(udev: &Context, binding: &UsbBinding)
                         -> UdevResult<Option<(String, String)>> {
     let mut iter = Enumerator::new(udev).unwrap();
 
@@ -236,4 +245,12 @@ fn udev_resolve_binding(udev: &mut Context, binding: &UsbBinding)
             Ok(None)
         }
     };
+}
+
+/// Resolves a `UsbBinding` to a (bus, addr) tuple.
+///
+/// This is just a wrapper around `udev_resolve_binding` creating a new udev context.
+pub fn resolve_binding(binding: &UsbBinding) -> UdevResult<Option<(String, String)>> {
+    let udev = Context::new().expect("Failed to create udev context");
+    udev_resolve_binding(&udev, binding)
 }

@@ -5,10 +5,14 @@ use std::os::unix::net::UnixListener;
 use std::os::unix::fs::PermissionsExt;
 use std::iter::Iterator;
 
-use config::{Config, SoundBackend, AlsaUnit};
+use itertools::Itertools;
+
+use config::{Config, SoundBackend, AlsaUnit, UsbBus};
+use controller;
 use sd_notify::notify_systemd;
 use samba;
 use mainloop;
+use util;
 
 const QEMU: &str = "/usr/bin/qemu-system-x86_64";
 
@@ -63,7 +67,6 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
                 "-rtc",
                 "base=localtime",
                 "-nodefaults",
-                "-usb",
                 "-net",
                 "none",
                 "-display", "none", "-vga", "none",
@@ -74,9 +77,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
                          data.join("ovmf-code.fd").display()),
                 "-drive",
                 &format!("if=pflash,format=raw,file={}", efivars_file.display()),
-                "-device", "qemu-xhci,id=xhci",
-                "-device",
-                "virtio-scsi-pci,id=scsi"]);
+                "-device", "virtio-scsi-pci,id=scsi"]);
     // "-monitor",
     // "telnet:127.0.0.1:31338,server,nowait"
 
@@ -116,6 +117,35 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
 
     for slot in cfg.machine.vfio_slots.iter() {
         qemu.args(&["-device", &format!("vfio-pci,host={},multifunction=on", slot)]);
+    }
+
+    // create usb buses
+    {
+        let mut create_usb_buses = |name, typ, ports| {
+            let count = cfg.machine.usb_devices.iter().filter(|dev| dev.bus == typ).count();
+            let usable_ports = util::usable_ports(typ);
+            for i in 0..(count + usable_ports - 1) / usable_ports {
+                let device = format!("{},id={}{}{}", name, typ, i, ports);
+                qemu.args(&["-device", &device]);
+            }
+        };
+        create_usb_buses("pci-ohci", UsbBus::Ohci, ",num-ports=15");
+        create_usb_buses("ich9-usb-uhci1", UsbBus::Uhci, "");
+        create_usb_buses("ich9-usb-ehci1", UsbBus::Ehci, "");
+        create_usb_buses("qemu-xhci", UsbBus::Xhci, ",p2=15,p3=15");
+    }
+
+    let groups = cfg.machine.usb_devices.iter().group_by(|dev| dev.bus);
+    for (port, dev) in groups.into_iter().flat_map(|(_, group)| group.enumerate())
+            .filter(|&(_, ref dev)| dev.permanent) {
+        if let Some((hostbus, hostaddr)) = controller::resolve_binding(&dev.binding)
+                .expect("Failed to resolve usb binding") {
+            let bus = dev.bus;
+            let usable_ports = util::usable_ports(bus);
+            qemu.args(&["-device",
+                &format!("usb-host,hostbus={},hostaddr={},bus={}{}.0,port={}", hostbus, hostaddr,
+                         bus, port / usable_ports, (port % usable_ports) + 1)]);
+        }
     }
 
     for (idx, drive) in machine.storage.iter().enumerate() {

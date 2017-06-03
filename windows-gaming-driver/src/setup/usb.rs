@@ -3,7 +3,7 @@ use std::io::Write;
 use libudev::{Result, Context, Enumerator};
 
 use util::parse_hex;
-use config::{MachineConfig, DeviceId, UsbBinding};
+use config::{MachineConfig, DeviceId, UsbBinding, UsbDevice};
 use hwid;
 use setup::ask;
 use setup::wizard;
@@ -19,9 +19,9 @@ pub fn select(machine: &mut MachineConfig) -> bool {
     println!();
     if !machine.usb_devices.is_empty() {
         println!("You have currently selected the following usb devices: ");
-        for binding in machine.usb_devices.iter() {
-            match binding {
-                &UsbBinding::ById(DeviceId { vendor, product }) => {
+        for dev in machine.usb_devices.iter() {
+            match dev.binding {
+                UsbBinding::ById(DeviceId { vendor, product }) => {
                     let name = match hwid::hwid_resolve_usb(vendor, product) {
                         Err(_) | Ok(None)=> "Unknown vendor Unknown product".to_string(),
                         Ok(Some((vendor, None))) => format!("{} Unknown product", vendor),
@@ -29,7 +29,7 @@ pub fn select(machine: &mut MachineConfig) -> bool {
                     };
                     println!("\t{} [{:04x}:{:04x}]", name, vendor, product);
                 }
-                &UsbBinding::ByPort { bus, port } =>
+                UsbBinding::ByPort { bus, port } =>
                     println!("\tBus {} Port {}", bus, port), // TODO: improve this
             }
         }
@@ -43,23 +43,23 @@ pub fn select(machine: &mut MachineConfig) -> bool {
     let keyboard = pick(Some(HidKind::Keyboard), &machine.usb_devices, true)
         .expect("Failed to select Keyboard");
     if let Some(id) = mouse {
-        machine.usb_devices.insert(0, UsbBinding::ById(id));
+        machine.usb_devices.insert(0, UsbDevice::from_binding(UsbBinding::ById(id)));
     } else {
         println!("No mouse selected. Please select your mouse from this complete list of connected devices:");
         let mouse = pick(None, &machine.usb_devices, !machine.usb_devices.is_empty())
             .expect("Failed to select mouse from complete list");
         if let Some(id) = mouse {
-            machine.usb_devices.insert(0, UsbBinding::ById(id));
+            machine.usb_devices.insert(0, UsbDevice::from_binding(UsbBinding::ById(id)));
         }
     }
     if let Some(id) = keyboard {
-        machine.usb_devices.push(UsbBinding::ById(id));
+        machine.usb_devices.push(UsbDevice::from_binding(UsbBinding::ById(id)));
     } else {
         println!("No keyboard selected. Please select your keyboard from this complete list of connected devices:");
         let keyboard = pick(None, &machine.usb_devices, true)
             .expect("Failed to select keyboard from complete list");
         if let Some(id) = keyboard {
-            machine.usb_devices.push(UsbBinding::ById(id));
+            machine.usb_devices.push(UsbDevice::from_binding(UsbBinding::ById(id)));
         }
     }
     if !ask::yesno("Done?") {
@@ -68,11 +68,11 @@ pub fn select(machine: &mut MachineConfig) -> bool {
     }
     // add udev rule to add selected devices to vfio group
     wizard::sudo_write_file("/etc/udev/rules.d/80-vfio-usb.rules", |mut w| {
-        for binding in machine.usb_devices.iter() {
-            match binding {
-                &UsbBinding::ById(DeviceId { vendor, product }) =>
+        for dev in machine.usb_devices.iter() {
+            match dev.binding {
+                UsbBinding::ById(DeviceId { vendor, product }) =>
                     writeln!(w, r#"SUBSYSTEM=="usb", ATTR{{idVendor}}=="{:04x}", ATTR{{idProduct}}=="{:04x}", ACTION=="add", RUN+="/usr/bin/setfacl -m g:vfio:rw- $devnode""#, vendor, product)?,
-                &UsbBinding::ByPort { bus, port } =>
+                UsbBinding::ByPort { bus, port } =>
                     writeln!(w, r#"SUBSYSTEM=="usb", ATTR{{busnum}}=="{}", ATTR{{devpath}}=="{}", ACTION=="add", RUN+="/usr/bin/setfacl -m g:vfio:rw- $devnode""#, bus, port)?,
             }
         }
@@ -83,7 +83,7 @@ pub fn select(machine: &mut MachineConfig) -> bool {
 }
 
 fn pick(special: Option<HidKind>,
-                 blacklist: &[UsbBinding], allow_abort: bool) -> Result<Option<DeviceId>> {
+                 blacklist: &[UsbDevice], allow_abort: bool) -> Result<Option<DeviceId>> {
     let udev = Context::new().expect("Failed to create udev context");
     let mut iter = Enumerator::new(&udev)?;
     iter.match_subsystem("usb")?;
@@ -129,7 +129,7 @@ fn pick(special: Option<HidKind>,
         }
 
         let id = (vendor.unwrap(), product.unwrap()).into();
-        if !blacklist.contains(&UsbBinding::ById(id)) {
+        if !blacklist.iter().any(|dev| dev.binding == UsbBinding::ById(id)) {
             println!("[{}]\t{} {} [{:04x}:{:04x}]", devs.len(), vendor_name, product_name,
                      id.vendor, id.product);
             devs.push(Some(id));
