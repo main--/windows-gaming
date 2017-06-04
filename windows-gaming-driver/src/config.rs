@@ -19,7 +19,7 @@ pub enum UsbBinding {
 }
 
 // https://en.wikipedia.org/wiki/Host_controller_interface_(USB,_Firewire)#Open_Host_Controller_Interface_2
-#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq)]
+#[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum UsbBus {
     Ohci,
     Uhci,

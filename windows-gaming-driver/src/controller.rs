@@ -160,8 +160,10 @@ impl Controller {
 
         let mut udev = Context::new().expect("Failed to create udev context");
 
-        let groups = self.machine_config.usb_devices.iter().enumerate().group_by(|&(_, dev)| dev.bus);
-        for (i, (port, dev)) in groups.into_iter().flat_map(|(_, group)| group.enumerate())
+        let mut sorted = self.machine_config.usb_devices.iter().enumerate()
+            .sorted_by(|&(_, a), &(_, b)| a.bus.cmp(&b.bus));
+        let groups = sorted.drain(..).group_by(|&(_, dev)| dev.bus);
+        for (port, (i, dev)) in groups.into_iter().flat_map(|(_, group)| group.enumerate())
                 .filter(|&(_, (_, ref dev))| !dev.permanent) {
             if let Some((hostbus, hostaddr)) = udev_resolve_binding(&mut udev, &dev.binding)
                     .expect("Failed to resolve usb binding") {
