@@ -135,7 +135,8 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
         create_usb_buses("qemu-xhci", UsbBus::Xhci, ",p2=15,p3=15");
     }
 
-    let groups = cfg.machine.usb_devices.iter().group_by(|dev| dev.bus);
+    let sorted = cfg.machine.usb_devices.iter().sorted_by(|a, b| a.bus.cmp(&b.bus));
+    let groups = sorted.iter().group_by(|dev| dev.bus);
     for (port, dev) in groups.into_iter().flat_map(|(_, group)| group.enumerate())
             .filter(|&(_, ref dev)| dev.permanent) {
         if let Some((hostbus, hostaddr)) = controller::resolve_binding(&dev.binding)
