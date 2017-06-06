@@ -14,11 +14,11 @@ namespace VfioService
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            using (var manager = new ClientManager())
+            var form = new MainForm();
+            using (var manager = new ClientManager(form))
             {
                 manager.SendCommand(CommandOut.ReportBoot);
 
-                var form = new MainForm(manager);
                 var _ = form.Handle; // create form without showing
                 Application.Run();
             }
