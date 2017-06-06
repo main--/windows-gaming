@@ -17,6 +17,7 @@ namespace VfioService
             var form = new MainForm();
             using (var manager = new ClientManager(form))
             {
+                form.ClientManager = manager;
                 manager.SendCommand(CommandOut.ReportBoot);
 
                 var _ = form.Handle; // create form without showing
