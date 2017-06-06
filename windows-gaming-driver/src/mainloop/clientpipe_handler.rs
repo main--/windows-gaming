@@ -36,10 +36,6 @@ impl Pollable for ClientpipeHandler {
                     return PollableResult::Child(Box::new(pinger));
                 }
             }
-            Some(2) => {
-                println!("client requests IO exit");
-                self.controller.borrow_mut().io_detach();
-            }
             Some(3) => {
                 println!("client says that it's suspending");
                 self.controller.borrow_mut().ga_suspending();

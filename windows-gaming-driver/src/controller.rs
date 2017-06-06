@@ -158,7 +158,9 @@ impl Controller {
         match self.machine_config.hotkeys.get(index as usize).cloned() {
             None => println!("Client sent invalid hotkey id"),
             Some((_, HotKeyAction::Action(action))) => self.action(action),
-            Some((_, HotKeyAction::Exec(cmd))) => Command::new("/bin/sh").arg("-c").arg(&cmd).spawn(),
+            Some((_, HotKeyAction::Exec(cmd))) => {
+                Command::new("/bin/sh").arg("-c").arg(&cmd).spawn().unwrap();
+            }
         }
     }
 
