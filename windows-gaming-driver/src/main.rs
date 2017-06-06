@@ -14,6 +14,7 @@ extern crate libc;
 #[macro_use]
 extern crate lazy_static;
 extern crate itertools;
+extern crate byteorder;
 
 mod mainloop;
 mod config;

@@ -19,30 +19,51 @@ namespace VfioService
         public enum HotkeyModifiers : uint
         {
             Alt = 0x0001,
-            Control = 0x0002,
+            Ctrl = 0x0002,
             Shift = 0x0004,
-            Windows = 0x0008,
-            Norepeat = 0x4000,
-        }
-
-        public enum VirtualKeyCodes : uint
-        {
-            Insert = 0x2d,
+            Win = 0x0008,
+            NoRepeat = 0x4000,
         }
 
         [DllImport("User32.dll")]
-        private static extern bool RegisterHotKey(IntPtr hwnd, int id, HotkeyModifiers modifiers, VirtualKeyCodes vk);
+        private static extern bool RegisterHotKey(IntPtr hwnd, int id, HotkeyModifiers modifiers, Keys vk);
 
-        private readonly ClientManager ClientManager;
+        public ClientManager ClientManager { get; set; }
 
-        public MainForm(ClientManager clientManager)
+        public MainForm()
         {
-            ClientManager = clientManager;
-            if (!RegisterHotKey(Handle, HkIoExit, HotkeyModifiers.Control | HotkeyModifiers.Alt
-                | HotkeyModifiers.Norepeat, VirtualKeyCodes.Insert))
-                throw new Win32Exception();
-
             InitializeComponent();
+        }
+
+        public string RegisterHotKey(int id, string hotkey)
+        {
+            HotkeyModifiers modifiers = 0;
+            Keys? key = null;
+
+            foreach (var ele in hotkey.Split('+'))
+            {
+                HotkeyModifiers hkm;
+                Keys k;
+                if (Enum.TryParse(ele, true, out hkm))
+                    modifiers |= hkm;
+                else if (Enum.TryParse(ele, false, out k))
+                {
+                    if (key == null)
+                        key = k;
+                    else
+                        return "parse error: multiple keys";
+                }
+                else
+                    return "parse error: unknown key";
+            }
+
+            if (!key.HasValue)
+                return "parse error: no key";
+
+            if (!RegisterHotKey(Handle, id, modifiers, key.Value))
+                return "bind error: " + new Win32Exception().ToString();
+
+            return null;
         }
 
         private const int WmPowerBroadcast = 0x0218;
@@ -51,18 +72,15 @@ namespace VfioService
         private const int PbtApmSuspend = 0x04;
         private const int PbtApmResume = 0x12;
 
-        private const int HkIoExit = 1;
-
         protected override void WndProc(ref Message m)
         {
             switch (m.Msg)
             {
                 case WmHotkey:
-                    switch (m.WParam.ToInt64())
+                    lock (ClientManager.WriteLock)
                     {
-                        case HkIoExit:
-                            ClientManager.SendCommand(CommandOut.IoExit);
-                            break;
+                        ClientManager.SendCommand(CommandOut.HotKey);
+                        ClientManager.SendData(BitConverter.GetBytes(m.WParam.ToInt32()));
                     }
                     break;
                 case WmPowerBroadcast:
