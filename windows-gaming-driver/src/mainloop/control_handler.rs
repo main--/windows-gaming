@@ -53,6 +53,10 @@ impl Pollable for ControlClientHandler {
                 println!("IO entry FORCED!");
                 self.controller.borrow_mut().io_force_attach();
             }
+            Some(4) => {
+                println!("IO exit!");
+                self.controller.borrow_mut().io_detach();
+            }
             Some(x) => println!("control sent invalid request {}", x),
             None => return PollableResult::Death,
         }

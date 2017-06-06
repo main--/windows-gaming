@@ -2,12 +2,14 @@ use std::os::unix::net::UnixStream;
 use std::io::prelude::*;
 use std::mem;
 use std::ffi::OsStr;
+use std::process::Command;
 
 use itertools::Itertools;
 use serde_json;
 use libudev::{Result as UdevResult, Context, Enumerator};
+use byteorder::{WriteBytesExt, LittleEndian};
 
-use config::{DeviceId, UsbBinding, MachineConfig};
+use config::{DeviceId, UsbBinding, MachineConfig, HotKeyAction, Action};
 use util;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -55,6 +57,7 @@ enum QmpCommand {
 
 enum GaCmd {
     Ping = 0x01,
+    RegisterHotKey = 0x02,
 }
 
 fn writemon(monitor: &mut UnixStream, command: &QmpCommand) {
@@ -65,6 +68,10 @@ fn writemon(monitor: &mut UnixStream, command: &QmpCommand) {
 impl Controller {
     fn write_ga(&mut self, cmd: GaCmd) {
         self.clientpipe.write_all(&[cmd as u8]).expect("Failed to write to clientpipe");
+    }
+    fn write_ga_buf(&mut self, cmd: GaCmd, buf: &[u8]) {
+        self.write_ga(cmd);
+        self.clientpipe.write_all(buf).expect("Failed to write to clientpipe");
     }
 
     pub fn new(machine_config: MachineConfig,
@@ -111,6 +118,15 @@ impl Controller {
     pub fn ga_hello(&mut self) -> bool {
         ::sd_notify::notify_systemd(true, "Ready");
 
+        // send GA all hotkeys we want to register
+        for (i, &(ref key, _)) in self.machine_config.hotkeys.clone().iter().enumerate() {
+            let mut buf = Vec::new();
+            buf.write_u32::<LittleEndian>(i as u32).unwrap();
+            buf.write_u32::<LittleEndian>(key.len() as u32).unwrap();
+            buf.extend(key.bytes());
+            self.write_ga_buf(GaCmd::RegisterHotKey, &buf);
+        }
+
         // Whenever a ga_hello message arrives, we know that the GA just started.
         // Typically, it would be the initial launch after boot but it might also be
         // a restart. There is even the racy case where it restarts before responding
@@ -136,6 +152,23 @@ impl Controller {
     pub fn ga_suspending(&mut self) {
         self.io_detach();
         self.ga = State::Suspending;
+    }
+
+    pub fn ga_hotkey(&mut self, index: u32) {
+        match self.machine_config.hotkeys.get(index as usize).cloned() {
+            None => println!("Client sent invalid hotkey id"),
+            Some((_, HotKeyAction::Action(action))) => self.action(action),
+            Some((_, HotKeyAction::Exec(cmd))) => Command::new("/bin/sh").arg("-c").arg(&cmd).spawn(),
+        }
+    }
+
+    /// Executes given action
+    pub fn action(&mut self, action: Action) {
+        match action {
+            Action::IoEntry => self.io_attach(),
+            Action::IoEntryForced => self.io_force_attach(),
+            Action::IoExit => self.io_detach(),
+        }
     }
 
     /// Attaches all configured devices if GA is up and wakes the host up if it's suspended
