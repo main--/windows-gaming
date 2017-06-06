@@ -72,6 +72,11 @@ impl UsbDevice {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct HotKey {
+    pub key: String,
+    pub action: HotKeyAction,
+}
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub enum HotKeyAction {
     Exec(String),
     Action(Action),
@@ -217,11 +222,14 @@ pub struct MachineConfig {
     // convention: first element is the mouse (for mouse only setup)
     pub usb_devices: Vec<UsbDevice>,
     #[serde(default = "machineconfig_hotkeys_default")]
-    pub hotkeys: Vec<(String, HotKeyAction)>,
+    pub hotkeys: Vec<HotKey>,
 }
 
-fn machineconfig_hotkeys_default() -> Vec<(String, HotKeyAction)> {
-    vec![("Ctrl+Alt+NoRepeat+Insert".to_string(), HotKeyAction::Action(Action::IoExit))]
+fn machineconfig_hotkeys_default() -> Vec<HotKey> {
+    vec![HotKey {
+         key: "Ctrl+Alt+NoRepeat+Insert".to_string(),
+         action: HotKeyAction::Action(Action::IoExit),
+    }]
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

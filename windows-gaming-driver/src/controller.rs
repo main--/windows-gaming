@@ -119,11 +119,11 @@ impl Controller {
         ::sd_notify::notify_systemd(true, "Ready");
 
         // send GA all hotkeys we want to register
-        for (i, &(ref key, _)) in self.machine_config.hotkeys.clone().iter().enumerate() {
+        for (i, hotkey) in self.machine_config.hotkeys.clone().iter().enumerate() {
             let mut buf = Vec::new();
             buf.write_u32::<LittleEndian>(i as u32).unwrap();
-            buf.write_u32::<LittleEndian>(key.len() as u32).unwrap();
-            buf.extend(key.bytes());
+            buf.write_u32::<LittleEndian>(hotkey.key.len() as u32).unwrap();
+            buf.extend(hotkey.key.bytes());
             self.write_ga_buf(GaCmd::RegisterHotKey, &buf);
         }
 
@@ -155,10 +155,10 @@ impl Controller {
     }
 
     pub fn ga_hotkey(&mut self, index: u32) {
-        match self.machine_config.hotkeys.get(index as usize).cloned() {
+        match self.machine_config.hotkeys.get(index as usize).cloned().map(|h| h.action) {
             None => println!("Client sent invalid hotkey id"),
-            Some((_, HotKeyAction::Action(action))) => self.action(action),
-            Some((_, HotKeyAction::Exec(cmd))) => {
+            Some(HotKeyAction::Action(action) ) => self.action(action),
+            Some(HotKeyAction::Exec(cmd)) => {
                 Command::new("/bin/sh").arg("-c").arg(&cmd).spawn().unwrap();
             }
         }
