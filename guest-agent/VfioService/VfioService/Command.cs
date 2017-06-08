@@ -20,5 +20,6 @@ namespace VfioService
     {
         Ping = 0x01,
         RegisterHotKey = 0x02,
+        ReleaseModifiers = 0x03,
     }
 }
