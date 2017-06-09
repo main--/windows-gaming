@@ -43,21 +43,22 @@ impl Pollable for ControlClientHandler {
     fn run(&mut self) -> PollableResult {
         match read_byte(&mut self.client).expect("control channel read failed") {
             Some(1) => {
-                println!("IO entry requested!");
+                info!("IO entry requested!");
                 self.controller.borrow_mut().io_attach();
             }
             Some(2) => {
+                info!("Shutdown requested");
                 self.controller.borrow_mut().shutdown();
             }
             Some(3) => {
-                println!("IO entry FORCED!");
+                info!("IO entry FORCED!");
                 self.controller.borrow_mut().io_force_attach();
             }
             Some(4) => {
-                println!("IO exit!");
+                info!("IO exit!");
                 self.controller.borrow_mut().io_detach();
             }
-            Some(x) => println!("control sent invalid request {}", x),
+            Some(x) => warn!("control sent invalid request {}", x),
             None => return PollableResult::Death,
         }
         PollableResult::Ok
