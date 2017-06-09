@@ -13,7 +13,7 @@ $(DRIVER):
 
 $(GA_EXE): guest-agent/VfioService/VfioService.sln $(wildcard guest-agent/VfioService/VfioService/*.*) $(wildcard guest-agent/VfioService/VfioService/Properties/*)
 	cd guest-agent && xbuild /p:Configuration=Release VfioService/VfioService.sln
-	cp --preserve=timestamps guest-agent/VfioService/VfioService/bin/Release/VfioService.exe guest-agent
+	cp --preserve=timestamps guest-agent/VfioService/VfioService/bin/x86/Release/VfioService.exe guest-agent
 
 $(GA_ISO): $(GA_EXE) guest-agent/install.bat guest-agent/uninstall.bat
 	cd guest-agent && mkisofs -m VfioService -o windows-gaming-ga.iso -r -J -input-charset iso8859-1 -V "windows-gaming-ga" .
