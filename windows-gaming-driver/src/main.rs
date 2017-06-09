@@ -19,6 +19,8 @@ extern crate byteorder;
 extern crate log;
 extern crate env_logger;
 extern crate time;
+extern crate mio;
+extern crate mio_uds;
 
 mod logger;
 mod mainloop;
@@ -31,6 +33,7 @@ mod setup;
 mod hwid;
 mod qemu;
 mod util;
+mod my_io;
 
 use std::iter::Iterator;
 use std::path::Path;

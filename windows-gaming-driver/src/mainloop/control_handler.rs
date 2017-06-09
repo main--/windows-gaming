@@ -1,5 +1,4 @@
-use std::os::unix::net::{UnixListener, UnixStream};
-use std::os::unix::io::{AsRawFd, RawFd};
+use mio_uds::{UnixListener, UnixStream};
 
 use mainloop::*;
 
@@ -18,12 +17,12 @@ impl ControlServerHandler {
 }
 
 impl Pollable for ControlServerHandler {
-    fn fd(&self) -> RawFd {
-        self.controlserver.as_raw_fd()
+    fn evented(&self) -> &::mio::Evented {
+        &self.controlserver
     }
 
     fn run(&mut self) -> PollableResult {
-        let (client, _) = self.controlserver.accept().unwrap();
+        let (client, _) = self.controlserver.accept().unwrap().unwrap();
         PollableResult::Child(Box::new(ControlClientHandler {
             controller: self.controller.clone(),
             client: client,
@@ -37,9 +36,10 @@ struct ControlClientHandler {
 }
 
 impl Pollable for ControlClientHandler {
-    fn fd(&self) -> RawFd {
-        self.client.as_raw_fd()
+    fn evented(&self) -> &::mio::Evented {
+        &self.client
     }
+
     fn run(&mut self) -> PollableResult {
         match read_byte(&mut self.client).expect("control channel read failed") {
             Some(1) => {

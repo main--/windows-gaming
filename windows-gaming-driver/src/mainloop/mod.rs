@@ -1,12 +1,14 @@
 use std::io::prelude::*;
-use std::os::unix::prelude::*;
 
 use std::io::Result as IoResult;
 use std::io::ErrorKind;
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::collections::HashMap;
 use std::os::unix::net::{UnixListener, UnixStream};
+
+use mio::Evented;
 
 use controller::Controller;
 use config::Config;
@@ -26,7 +28,7 @@ pub enum PollableResult {
 }
 
 pub trait Pollable {
-    fn fd(&self) -> RawFd;
+    fn evented(&self) -> &Evented;
     fn run(&mut self) -> PollableResult;
     fn is_critical(&self) -> bool {
         false // eventloop will run until all critical ones are gone
@@ -58,55 +60,54 @@ pub fn drain_stdout<T: Read>(thing: &mut T) -> PollableResult {
 
 
 
-fn poll_core<'a>(mut components: Vec<Box<Pollable>>) {
-    while components.iter().any(|x| x.is_critical()) {
-        use nix::poll::*;
+fn poll_core<'a>(components: Vec<Box<Pollable>>) {
+    use mio::*;
 
-        let mut deathlist = Vec::new();
-        let mut newchildren = Vec::new();
-        {
+    let mut token_alloc = 0;
+    let mut next_token = || {
+        let ret = token_alloc;
+        token_alloc += 1;
+        Token(ret)
+    };
 
-            let mut pollfds: Vec<_> = components.iter()
-                .map(|x| PollFd::new(x.fd(), POLLIN, EventFlags::empty()))
-                .collect();
-            let poll_count = poll(&mut pollfds, -1).expect("poll failed");
-            assert!(poll_count > 0);
+    let mut components: HashMap<_, _> = components.into_iter().map(|x| (next_token(), x)).collect();
 
+    let poll = Poll::new().unwrap();
+    for (&token, component) in &components {
+        poll.register(component.evented(), token, Ready::readable(), PollOpt::level()).unwrap();
+    }
 
-            for (idx, (pollable, pollfd)) in components.iter_mut().zip(pollfds).enumerate() {
-                let mut bits = pollfd.revents().unwrap();
-                if bits.intersects(POLLIN) {
-                    match pollable.run() {
-                        PollableResult::Death => deathlist.push(idx),
-                        PollableResult::Child(c) => newchildren.push(c),
-                        PollableResult::Ok => (),
-                    }
+    let mut events = Events::with_capacity(1024);
+    while components.values().any(|x| x.is_critical()) {
+        poll.poll(&mut events, None).unwrap();
+
+        for token in events.iter().map(|x| x.token()) {
+            match components.get_mut(&token).unwrap().run() {
+                PollableResult::Death => {
+                    let component = components.remove(&token).unwrap();
+                    poll.deregister(component.evented()).unwrap();
                 }
-                bits.remove(POLLIN);
-                // assert!(bits.is_empty());
+                PollableResult::Child(c) => {
+                    let token = next_token();
+                    poll.register(c.evented(), token, Ready::readable(), PollOpt::level()).unwrap();
+                    components.insert(token, c);
+                }
+                PollableResult::Ok => (),
             }
         }
-
-        // remove in reverse order so we don't mess up each subsequent index
-        for &i in deathlist.iter().rev() {
-            components.remove(i);
-        }
-
-        for c in newchildren {
-            components.push(c);
-        }
-
     }
 }
 
 pub fn run(cfg: &Config, monitor_stream: UnixStream, clientpipe_stream: UnixStream, control_socket: UnixListener) {
+    use mio_uds::{UnixListener as MioListener, UnixStream as MioStream};
+
     let ctrl = Controller::new(cfg.machine.clone(), &monitor_stream, &clientpipe_stream);
     let ctrl = Rc::new(RefCell::new(ctrl));
 
     poll_core(vec![
-        Box::new(monitor_handler::MonitorHandler::new(monitor_stream)),
-        Box::new(clientpipe_handler::ClientpipeHandler::new(ctrl.clone(), clientpipe_stream)),
-        Box::new(control_handler::ControlServerHandler::new(ctrl.clone(), control_socket)),
+        Box::new(monitor_handler::MonitorHandler::new(MioStream::from_stream(monitor_stream).unwrap())),
+        Box::new(clientpipe_handler::ClientpipeHandler::new(ctrl.clone(), MioStream::from_stream(clientpipe_stream).unwrap())),
+        Box::new(control_handler::ControlServerHandler::new(ctrl.clone(), MioListener::from_listener(control_socket).unwrap())),
         Box::new(catch_sigterm::CatchSigterm::new(ctrl.clone())),
     ]);
 }

@@ -1,5 +1,4 @@
-use std::os::unix::net::UnixStream;
-use std::os::unix::io::{AsRawFd, RawFd};
+use mio_uds::UnixStream;
 use std::time::Duration;
 
 use byteorder::{ReadBytesExt, LittleEndian};
@@ -23,8 +22,8 @@ impl ClientpipeHandler {
 }
 
 impl Pollable for ClientpipeHandler {
-    fn fd(&self) -> RawFd {
-        self.clientpipe.as_raw_fd()
+    fn evented(&self) -> &::mio::Evented {
+        &self.clientpipe
     }
 
     fn run(&mut self) -> PollableResult {

@@ -1,5 +1,4 @@
-use std::os::unix::net::UnixStream;
-use std::os::unix::io::{AsRawFd, RawFd};
+use mio_uds::UnixStream;
 
 use mainloop::*;
 
@@ -16,8 +15,8 @@ impl MonitorHandler {
 }
 
 impl Pollable for MonitorHandler {
-    fn fd(&self) -> RawFd {
-        self.stream.as_raw_fd()
+    fn evented(&self) -> &::mio::Evented {
+        &self.stream
     }
 
     fn run(&mut self) -> PollableResult {
