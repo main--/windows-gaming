@@ -27,36 +27,45 @@ pub fn has_gtk_support() -> bool {
 }
 
 pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
+    trace!("qemu::run");
     let machine = &cfg.machine;
 
     let _ = remove_dir_all(tmp); // may fail - we dont care
     create_dir(tmp).expect("Failed to create TMP_FOLDER"); // may not fail - has to be new
+    trace!("created tmp dir");
 
     let efivars_file = tmp.join("efivars.fd");
     copy(data.join("ovmf-vars.fd"), &efivars_file).expect("Failed to copy efivars image");
+    trace!("copied efivars file");
 
     let monitor_socket_file = tmp.join("monitor.sock");
     let monitor_socket = UnixListener::bind(&monitor_socket_file)
         .expect("Failed to create monitor socket");
+    debug!("Started Monitor");
 
     let clientpipe_socket_file = tmp.join("clientpipe.sock");
     let clientpipe_socket = UnixListener::bind(&clientpipe_socket_file)
         .expect("Failed to create clientpipe socket");
+    debug!("Started Clientpipe");
 
     let control_socket_file = tmp.join("control.sock");
     let control_socket = UnixListener::bind(&control_socket_file)
         .expect("Failed to create control socket");
     set_permissions(control_socket_file, Permissions::from_mode(0o777))
         .expect("Failed to set permissions on control socket");
+    debug!("Started Control socket");
 
     let mut usernet = format!("user,id=unet,restrict=on,guestfwd=tcp:10.0.2.1:31337-unix:{}",
                               clientpipe_socket_file.display());
 
     if let Some(ref samba) = cfg.samba {
+        trace!("setting up samba");
         samba::setup(&tmp, samba, &mut usernet);
+        debug!("Samba started");
     }
 
     notify_systemd(false, "Starting qemu ...");
+    trace!("starting qemu setup");
     let mut qemu = Command::new(QEMU);
     qemu.args(&["-enable-kvm",
                 "-machine",
@@ -84,39 +93,49 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     if let Some(ref setup) = cfg.setup {
         if setup.gui {
             qemu.args(&["-display", "gtk", "-vga", "qxl"]);
+            debug!("Applied gtk to qemu");
         }
 
         if let Some(ref cdrom) = setup.cdrom {
             qemu.arg("-cdrom").arg(cdrom);
+            debug!("Forward cdrom {:?}", cdrom);
         }
 
         if let Some(ref floppy) = setup.floppy {
             qemu.arg("-drive").arg(format!("file={},index=0,if=floppy,readonly", floppy));
+            debug!("Forward floppy {:?}", floppy);
         }
     }
 
 
     if machine.hugepages.unwrap_or(false) {
         qemu.args(&["-mem-path", "/dev/hugepages_vfio_1G/", "-mem-prealloc"]);
+        debug!("Enabled hugepages");
     }
 
+    trace!("Memory: {}", machine.memory);
     qemu.args(&["-m", &machine.memory]);
+    trace!("Threads: {}, {}", machine.cores, machine.threads.unwrap_or(1));
     qemu.args(&["-smp",
                 &format!("cores={},threads={}",
                          machine.cores,
                          machine.threads.unwrap_or(1))]);
+    trace!("use hda sound hardware");
     qemu.args(&["-soundhw", "hda"]);
 
     for (idx, bridge) in machine.network.iter().flat_map(|x| x.bridges.iter()).enumerate() {
+        trace!("setup bridge {}", bridge);
         qemu.args(&["-netdev",
                     &format!("bridge,id=bridge{},br={}", idx, bridge),
                     "-device",
                     &format!("e1000,netdev=bridge{}", idx)]);
     }
+    trace!("setup usernet");
     qemu.args(&["-netdev", &usernet, "-device", "e1000,netdev=unet"]);
 
     for slot in cfg.machine.vfio_slots.iter() {
         qemu.args(&["-device", &format!("vfio-pci,host={},multifunction=on", slot)]);
+        debug!("Passed through {}", slot);
     }
 
     // create usb buses
@@ -124,8 +143,11 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
         let mut create_usb_buses = |name, typ, ports| {
             let count = cfg.machine.usb_devices.iter().filter(|dev| dev.bus == typ).count();
             let usable_ports = util::usable_ports(typ);
-            for i in 0..(count + usable_ports - 1) / usable_ports {
+            let num = (count + usable_ports - 1) / usable_ports;
+            debug!("Setup {} {:?} bus(es)", num, typ);
+            for i in 0..num {
                 let device = format!("{},id={}{}{}", name, typ, i, ports);
+                trace!("Bus: {}", device);
                 qemu.args(&["-device", &device]);
             }
         };
@@ -146,6 +168,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
             qemu.args(&["-device",
                 &format!("usb-host,hostbus={},hostaddr={},bus={}{}.0,port={}", hostbus, hostaddr,
                          bus, port / usable_ports, (port % usable_ports) + 1)]);
+            debug!("Connected {:?} to bus {}", dev.binding, bus);
         }
     }
 
@@ -158,9 +181,11 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
                              drive.cache),
                     "-device",
                     &format!("scsi-hd,drive=disk{}", idx)]);
+        debug!("Passed through {}", drive.path);
     }
 
     {
+        trace!("Applying sound config");
         let sound = &cfg.sound;
 
         qemu.env("QEMU_AUDIO_TIMER_PERIOD", sound.timer_period.to_string());
@@ -233,6 +258,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     qemu.stdin(Stdio::null());
 
     let mut qemu = qemu.spawn().expect("Failed to start qemu");
+    trace!("qemu spawned");
 
     let (monitor_stream, _) = monitor_socket.accept().expect("Failed to get monitor");
     drop(monitor_socket);
@@ -241,11 +267,12 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     drop(clientpipe_socket);
 
     notify_systemd(false, "Booting ...");
+    debug!("Windows is starting");
 
     mainloop::run(cfg, monitor_stream, clientpipe_stream, control_socket);
 
     qemu.wait().unwrap();
-    println!("windows-gaming-driver down.");
+    info!("windows-gaming-driver down.");
 }
 
 fn option2env(cmd: &mut Command, name: &str, val: &Option<String>) {

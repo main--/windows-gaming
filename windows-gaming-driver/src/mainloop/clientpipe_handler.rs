@@ -30,21 +30,23 @@ impl Pollable for ClientpipeHandler {
     fn run(&mut self) -> PollableResult {
         match read_byte(&mut self.clientpipe).expect("clientpipe read failed") {
             Some(1) => {
-                println!("client is now alive!");
+                info!("client is now alive!");
                 if self.controller.borrow_mut().ga_hello() {
                     let pinger = Pinger::new(Duration::new(1, 0), self.controller.clone());
                     return PollableResult::Child(Box::new(pinger));
                 }
             }
             Some(3) => {
-                println!("client says that it's suspending");
+                info!("client says that it's suspending");
                 self.controller.borrow_mut().ga_suspending();
             }
             Some(4) => {
+                trace!("ga pong'ed");
                 self.controller.borrow_mut().ga_pong();
             }
             Some(5) => {
                 let id = self.clientpipe.read_u32::<LittleEndian>().expect("clientpipe read failed");
+                debug!("hotkey pressed: {}", id);
                 self.controller.borrow_mut().ga_hotkey(id);
             }
             Some(6) => {
@@ -52,9 +54,9 @@ impl Pollable for ClientpipeHandler {
                 let mut vec = vec![0; len as usize];
                 self.clientpipe.read_exact(&mut vec).expect("clientpipe read failed");
                 let s = String::from_utf8_lossy(&vec);
-                println!("HotKeyBinding failed: {}", s);
+                warn!("HotKeyBinding failed: {}", s);
             }
-            Some(x) => println!("client sent invalid request {}", x),
+            Some(x) => warn!("client sent invalid request {}", x),
             None => return PollableResult::Death,
         }
         PollableResult::Ok

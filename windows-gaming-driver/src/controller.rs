@@ -157,7 +157,7 @@ impl Controller {
 
     pub fn ga_hotkey(&mut self, index: u32) {
         match self.machine_config.hotkeys.get(index as usize).cloned().map(|h| h.action) {
-            None => println!("Client sent invalid hotkey id"),
+            None => warn!("Client sent invalid hotkey id"),
             Some(HotKeyAction::Action(action) ) => self.action(action),
             Some(HotKeyAction::Exec(cmd)) => {
                 Command::new("/bin/sh").arg("-c").arg(&cmd).spawn().unwrap();
@@ -275,14 +275,14 @@ pub fn udev_resolve_binding(udev: &Context, binding: &UsbBinding)
             }
 
             if scanner.next().is_some() {
-                println!("Warning: Multiple matches for {:?} found.", binding);
-                println!("         Binding to the first one we see, just like qemu would.");
+                warn!("Multiple matches for {:?} found. Binding to the first one we see,\
+                 just like qemu would.", binding);
             }
 
             Ok(Some((bus.unwrap(), addr.unwrap())))
         }
         None => {
-            println!("Warning: Didn't find any devices for {:?}", binding);
+            warn!("Didn't find any devices for {:?}", binding);
             Ok(None)
         }
     };
