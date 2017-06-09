@@ -10,6 +10,7 @@ pub enum GaCmdOut {
         key: String,
     },
     ReleaseModifiers,
+    Suspend,
 }
 
 pub enum GaCmdIn {
@@ -79,6 +80,7 @@ impl Encoder for Codec {
                 buf.extend(key.bytes());
             }
             GaCmdOut::ReleaseModifiers => buf.put_u8(0x03),
+            GaCmdOut::Suspend => buf.put_u8(0x04),
         }
         Ok(())
     }

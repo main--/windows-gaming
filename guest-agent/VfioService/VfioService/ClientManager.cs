@@ -6,6 +6,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 
 namespace VfioService
 {
@@ -46,6 +47,9 @@ namespace VfioService
                         break;
                     case CommandIn.ReleaseModifiers:
                         StuckKeyFix.ReleaseModifiers();
+                        break;
+                    case CommandIn.Suspend:
+                        Application.SetSuspendState(PowerState.Suspend, false, false);
                         break;
                     }
                 }

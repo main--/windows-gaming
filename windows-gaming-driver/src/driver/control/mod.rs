@@ -41,6 +41,10 @@ pub fn create<'a>(socket: StdUnixListener, handle: &'a Handle, controller: Rc<Re
                     info!("IO exit!");
                     controller.borrow_mut().io_detach();
                 }
+                ControlCmdIn::Suspend => {
+                    info!("Suspending guest!");
+                    controller.borrow_mut().suspend();
+                }
             }
             Ok(())
         }).then(|_| Ok(())));

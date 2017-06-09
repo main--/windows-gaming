@@ -38,7 +38,6 @@ pub struct Controller {
     clientpipe: UnboundedSender<GaCmd>,
 }
 
-
 impl Controller {
     fn write_ga(&mut self, cmd: GaCmd) {
         (&self.clientpipe).send(cmd).unwrap();
@@ -186,6 +185,11 @@ impl Controller {
             }
         }
         self.io_attached = true;
+    }
+
+    /// Suspends Windows
+    pub fn suspend(&mut self) {
+        self.write_ga(GaCmd::Suspend);
     }
 
     /// Detaches all configured devices
