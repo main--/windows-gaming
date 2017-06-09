@@ -44,6 +44,9 @@ namespace VfioService
                             }
                         }
                         break;
+                    case CommandIn.ReleaseModifiers:
+                        StuckKeyFix.ReleaseModifiers();
+                        break;
                     }
                 }
             }).Start();

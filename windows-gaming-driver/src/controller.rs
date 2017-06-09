@@ -58,6 +58,7 @@ enum QmpCommand {
 enum GaCmd {
     Ping = 0x01,
     RegisterHotKey = 0x02,
+    ReleaseModifiers = 0x03,
 }
 
 fn writemon(monitor: &mut UnixStream, command: &QmpCommand) {
@@ -192,6 +193,9 @@ impl Controller {
         if self.io_attached {
             return;
         }
+
+        // might still be holding keyboard modifiers - release them
+        self.write_ga(GaCmd::ReleaseModifiers);
 
         let mut udev = Context::new().expect("Failed to create udev context");
 
