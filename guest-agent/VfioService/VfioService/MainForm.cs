@@ -25,7 +25,7 @@ namespace VfioService
             NoRepeat = 0x4000,
         }
 
-        [DllImport("User32.dll")]
+        [DllImport("User32.dll", SetLastError = true)]
         private static extern bool RegisterHotKey(IntPtr hwnd, int id, HotkeyModifiers modifiers, Keys vk);
 
         public ClientManager ClientManager { get; set; }
@@ -61,7 +61,13 @@ namespace VfioService
                 return "parse error: no key";
 
             if (!RegisterHotKey(Handle, id, modifiers, key.Value))
-                return "bind error: " + new Win32Exception().ToString();
+            {
+                var exception = new Win32Exception();
+                if ((uint)exception.HResult == 0x80004005)
+                    // Hot key is already registered, so we can ignore.
+                    return null;
+                return "bind error: " + exception;
+            }
 
             return null;
         }
