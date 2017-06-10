@@ -10,8 +10,7 @@ pub fn init() -> Result<(), SetLoggerError> {
         let time = time::strftime("%Y-%m-%d %H:%M:%S", &now).unwrap();
         format!("[{},{:03}] {}: {}", time, now.tm_nsec / 1_000_000, record.level(), record.args())
     });
-    if env::var("RUST_LOG").is_ok() {
-        builder.parse(&env::var("RUST_LOG").unwrap());
-    }
+    let config = env::var("RUST_LOG").unwrap_or("warn,windows_gaming_driver=info".to_string());
+    builder.parse(&config);
     builder.init()
 }
