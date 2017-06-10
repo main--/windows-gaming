@@ -1,7 +1,6 @@
 extern crate nix;
 extern crate users;
 extern crate toml;
-extern crate timerfd;
 extern crate libudev;
 extern crate num_cpus;
 extern crate xdg;
@@ -14,13 +13,17 @@ extern crate libc;
 #[macro_use]
 extern crate lazy_static;
 extern crate itertools;
-extern crate byteorder;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
 extern crate time;
 extern crate mio;
-extern crate mio_uds;
+extern crate bytes;
+extern crate futures;
+extern crate tokio_core;
+extern crate tokio_io;
+extern crate tokio_uds;
+extern crate tokio_timer;
 
 mod logger;
 mod mainloop;
@@ -34,6 +37,12 @@ mod hwid;
 mod qemu;
 mod util;
 mod my_io;
+
+mod signalfd;
+
+mod clientpipe_codec;
+mod control_codec;
+mod monitor_codec;
 
 use std::iter::Iterator;
 use std::path::Path;
