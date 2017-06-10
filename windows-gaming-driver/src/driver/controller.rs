@@ -1,16 +1,16 @@
-use std::os::unix::net::UnixStream;
-use std::io::prelude::*;
 use std::mem;
 use std::ffi::OsStr;
 use std::process::Command;
 
 use itertools::Itertools;
-use serde_json;
 use libudev::{Result as UdevResult, Context, Enumerator};
-use byteorder::{WriteBytesExt, LittleEndian};
+use futures::unsync::mpsc::UnboundedSender;
 
 use config::{DeviceId, UsbBinding, MachineConfig, HotKeyAction, Action};
 use util;
+use driver::clientpipe::GaCmdOut as GaCmd;
+use driver::monitor::QmpCommand;
+use driver::sd_notify;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 /// States the state machine of this Controller can have
@@ -34,52 +34,20 @@ pub struct Controller {
     io_attached: bool,
 
     // write-only
-    monitor: UnixStream,
-    clientpipe: UnixStream,
+    monitor: UnboundedSender<QmpCommand>,
+    clientpipe: UnboundedSender<GaCmd>,
 }
 
-#[derive(Serialize)]
-#[serde(tag = "execute", content = "arguments", rename_all = "snake_case")]
-enum QmpCommand {
-    QmpCapabilities,
-    DeviceAdd {
-        driver: &'static str,
-        id: String,
-        bus: String,
-        port: usize,
-        hostbus: String,
-        hostaddr: String,
-    },
-    DeviceDel { id: String },
-    SystemPowerdown,
-    SystemWakeup,
-}
-
-enum GaCmd {
-    Ping = 0x01,
-    RegisterHotKey = 0x02,
-    ReleaseModifiers = 0x03,
-}
-
-fn writemon(monitor: &mut UnixStream, command: &QmpCommand) {
-    let cmd = serde_json::to_string(command).unwrap();
-    writeln!(monitor, "{}", cmd).expect("Failed to write to monitor");
-}
 
 impl Controller {
     fn write_ga(&mut self, cmd: GaCmd) {
-        self.clientpipe.write_all(&[cmd as u8]).expect("Failed to write to clientpipe");
-    }
-    fn write_ga_buf(&mut self, cmd: GaCmd, buf: &[u8]) {
-        self.write_ga(cmd);
-        self.clientpipe.write_all(buf).expect("Failed to write to clientpipe");
+        (&self.clientpipe).send(cmd).unwrap();
     }
 
     pub fn new(machine_config: MachineConfig,
-               monitor: &UnixStream,
-               clientpipe: &UnixStream) -> Controller {
-        let mut monitor = monitor.try_clone().unwrap();
-        writemon(&mut monitor, &QmpCommand::QmpCapabilities);
+               monitor: UnboundedSender<QmpCommand>,
+               clientpipe: UnboundedSender<GaCmd>) -> Controller {
+        (&monitor).send(QmpCommand::QmpCapabilities).unwrap();
         Controller {
             machine_config,
 
@@ -87,7 +55,7 @@ impl Controller {
             io_attached: false,
 
             monitor,
-            clientpipe: clientpipe.try_clone().unwrap(),
+            clientpipe,
         }
     }
 
@@ -117,15 +85,14 @@ impl Controller {
     }
 
     pub fn ga_hello(&mut self) -> bool {
-        ::sd_notify::notify_systemd(true, "Ready");
+        sd_notify::notify_systemd(true, "Ready");
 
         // send GA all hotkeys we want to register
         for (i, hotkey) in self.machine_config.hotkeys.clone().iter().enumerate() {
-            let mut buf = Vec::new();
-            buf.write_u32::<LittleEndian>(i as u32).unwrap();
-            buf.write_u32::<LittleEndian>(hotkey.key.len() as u32).unwrap();
-            buf.extend(hotkey.key.bytes());
-            self.write_ga_buf(GaCmd::RegisterHotKey, &buf);
+            self.write_ga(GaCmd::RegisterHotKey {
+                id: i as u32,
+                key: hotkey.key.clone(),
+            });
         }
 
         // Whenever a ga_hello message arrives, we know that the GA just started.
@@ -180,7 +147,7 @@ impl Controller {
             State::Down | State::Resuming => (),
             State::Suspending => {
                 // make them wake up
-                writemon(&mut self.monitor, &QmpCommand::SystemWakeup);
+                (&self.monitor).send(QmpCommand::SystemWakeup).unwrap();
                 // can't enter now - gotta wait for GA to get ready
                 self.ga = State::Resuming;
             },
@@ -208,14 +175,14 @@ impl Controller {
                     .expect("Failed to resolve usb binding") {
                 let bus = dev.bus;
                 let usable_ports = util::usable_ports(bus);
-                writemon(&mut self.monitor, &QmpCommand::DeviceAdd {
+                (&self.monitor).send(QmpCommand::DeviceAdd {
                     driver: "usb-host",
                     bus: format!("{}{}.0", bus, port / usable_ports),
                     port: (port % usable_ports) + 1,
                     id: format!("usb{}", i),
                     hostbus: hostbus,
                     hostaddr: hostaddr,
-                });
+                }).unwrap();
             }
         }
         self.io_attached = true;
@@ -229,13 +196,13 @@ impl Controller {
         }
         for i in self.machine_config.usb_devices.iter().enumerate()
             .filter(|&(_, dev)| !dev.permanent).map(|(i, _)| i) {
-            writemon(&mut self.monitor, &QmpCommand::DeviceDel { id: format!("usb{}", i) });
+            (&self.monitor).send(QmpCommand::DeviceDel { id: format!("usb{}", i) }).unwrap();
         }
         self.io_attached = false;
     }
 
     pub fn shutdown(&mut self) {
-        writemon(&mut self.monitor, &QmpCommand::SystemPowerdown);
+        (&self.monitor).send(QmpCommand::SystemPowerdown).unwrap();
     }
 }
 

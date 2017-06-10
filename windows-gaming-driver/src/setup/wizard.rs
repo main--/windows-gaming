@@ -5,7 +5,6 @@ use std::iter::Iterator;
 
 use libudev::{Result as UdevResult, Context, Enumerator};
 use config::{Config, SetupConfig};
-use qemu;
 use setup::ask;
 use setup::iommu;
 use setup::usb;
@@ -13,6 +12,7 @@ use setup::vfio;
 use setup::initramfs;
 use setup::vm;
 use pci_device::PciDevice;
+use driver;
 
 struct Wizard;
 
@@ -105,7 +105,7 @@ impl Wizard {
                 return;
             }
 
-            qemu::run(&config, workdir, datadir);
+            driver::run(&config, workdir, datadir);
 
             // TODO:
             // * ask if it worked, offer to retry or abort

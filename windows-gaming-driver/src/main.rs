@@ -1,7 +1,6 @@
 extern crate nix;
 extern crate users;
 extern crate toml;
-extern crate timerfd;
 extern crate libudev;
 extern crate num_cpus;
 extern crate xdg;
@@ -14,23 +13,26 @@ extern crate libc;
 #[macro_use]
 extern crate lazy_static;
 extern crate itertools;
-extern crate byteorder;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
 extern crate time;
+extern crate mio;
+extern crate bytes;
+extern crate futures;
+extern crate tokio_core;
+extern crate tokio_io;
+extern crate tokio_uds;
+extern crate tokio_timer;
 
 mod logger;
-mod mainloop;
 mod config;
-mod sd_notify;
-mod samba;
-mod controller;
 mod pci_device;
 mod setup;
 mod hwid;
-mod qemu;
 mod util;
+
+mod driver;
 
 use std::iter::Iterator;
 use std::path::Path;
@@ -39,6 +41,7 @@ use std::env;
 use nix::unistd;
 
 use config::Config;
+use driver::qemu;
 
 enum RunMode {
     System,
@@ -86,7 +89,7 @@ fn main() {
     trace!("Successfully loaded configuration file.");
 
     match cfg {
-        Some(ref cfg) if cfg.setup.is_none() => qemu::run(cfg, &workdir_path, Path::new(DATA_FOLDER)),
+        Some(ref cfg) if cfg.setup.is_none() => driver::run(cfg, &workdir_path, Path::new(DATA_FOLDER)),
         cfg => setup::run(cfg, &config_path, &workdir_path, Path::new(DATA_FOLDER)),
     }
 }
