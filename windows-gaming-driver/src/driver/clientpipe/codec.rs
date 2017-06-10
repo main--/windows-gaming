@@ -20,9 +20,9 @@ pub enum GaCmdIn {
     HotKeyBindingFailed(String),
 }
 
-pub struct ClientpipeCodec;
+pub struct Codec;
 
-impl Decoder for ClientpipeCodec {
+impl Decoder for Codec {
     type Item = GaCmdIn;
     type Error = io::Error;
 
@@ -63,7 +63,7 @@ impl Decoder for ClientpipeCodec {
     }
 }
 
-impl Encoder for ClientpipeCodec {
+impl Encoder for Codec {
     type Item = GaCmdOut;
     type Error = io::Error;
 

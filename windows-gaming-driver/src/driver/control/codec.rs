@@ -14,9 +14,9 @@ pub enum ControlCmdIn {
     IoExit,
 }
 
-pub struct ControlCodec;
+pub struct Codec;
 
-impl Decoder for ControlCodec {
+impl Decoder for Codec {
     type Item = ControlCmdIn;
     type Error = io::Error;
 
@@ -39,7 +39,7 @@ impl Decoder for ControlCodec {
     }
 }
 
-impl Encoder for ControlCodec {
+impl Encoder for Codec {
     type Item = ControlCmdOut;
     type Error = io::Error;
 

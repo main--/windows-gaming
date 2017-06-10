@@ -1,17 +1,14 @@
-use std::process::{Command, Stdio};
-use std::fs::{copy, create_dir, remove_dir_all, set_permissions, Permissions};
+use std::process::{Command, Stdio, Child};
 use std::path::{Path};
-use std::os::unix::net::UnixListener;
-use std::os::unix::fs::PermissionsExt;
 use std::iter::Iterator;
+use std::fs;
 
 use itertools::Itertools;
 
 use config::{Config, SoundBackend, AlsaUnit, UsbBus};
-use controller;
-use sd_notify::notify_systemd;
-use samba;
-use mainloop;
+use driver::controller;
+use driver::sd_notify::notify_systemd;
+use driver::samba;
 use util;
 
 const QEMU: &str = "/usr/bin/qemu-system-x86_64";
@@ -26,37 +23,16 @@ pub fn has_gtk_support() -> bool {
     supports_display("gtk")
 }
 
-pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
+pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monitor_path: &Path) -> Child {
     trace!("qemu::run");
     let machine = &cfg.machine;
 
-    let _ = remove_dir_all(tmp); // may fail - we dont care
-    create_dir(tmp).expect("Failed to create TMP_FOLDER"); // may not fail - has to be new
-    trace!("created tmp dir");
-
     let efivars_file = tmp.join("efivars.fd");
-    copy(data.join("ovmf-vars.fd"), &efivars_file).expect("Failed to copy efivars image");
+    fs::copy(data.join("ovmf-vars.fd"), &efivars_file).expect("Failed to copy efivars image");
     trace!("copied efivars file");
 
-    let monitor_socket_file = tmp.join("monitor.sock");
-    let monitor_socket = UnixListener::bind(&monitor_socket_file)
-        .expect("Failed to create monitor socket");
-    debug!("Started Monitor");
-
-    let clientpipe_socket_file = tmp.join("clientpipe.sock");
-    let clientpipe_socket = UnixListener::bind(&clientpipe_socket_file)
-        .expect("Failed to create clientpipe socket");
-    debug!("Started Clientpipe");
-
-    let control_socket_file = tmp.join("control.sock");
-    let control_socket = UnixListener::bind(&control_socket_file)
-        .expect("Failed to create control socket");
-    set_permissions(control_socket_file, Permissions::from_mode(0o777))
-        .expect("Failed to set permissions on control socket");
-    debug!("Started Control socket");
-
     let mut usernet = format!("user,id=unet,restrict=on,guestfwd=tcp:10.0.2.1:31337-unix:{}",
-                              clientpipe_socket_file.display());
+                              clientpipe_path.display());
 
     if let Some(ref samba) = cfg.samba {
         trace!("setting up samba");
@@ -80,7 +56,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
                 "none",
                 "-display", "none", "-vga", "none",
                 "-qmp",
-                &format!("unix:{}", monitor_socket_file.display()),
+                &format!("unix:{}", monitor_path.display()),
                 "-drive",
                 &format!("if=pflash,format=raw,readonly,file={}",
                          data.join("ovmf-code.fd").display()),
@@ -257,22 +233,9 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
 
     qemu.stdin(Stdio::null());
 
-    let mut qemu = qemu.spawn().expect("Failed to start qemu");
+    let qemu = qemu.spawn().expect("Failed to start qemu");
     trace!("qemu spawned");
-
-    let (monitor_stream, _) = monitor_socket.accept().expect("Failed to get monitor");
-    drop(monitor_socket);
-
-    let (clientpipe_stream, _) = clientpipe_socket.accept().expect("Failed to get clientpipe");
-    drop(clientpipe_socket);
-
-    notify_systemd(false, "Booting ...");
-    debug!("Windows is starting");
-
-    mainloop::run(cfg, monitor_stream, clientpipe_stream, control_socket);
-
-    qemu.wait().unwrap();
-    info!("windows-gaming-driver down.");
+    return qemu;
 }
 
 fn option2env(cmd: &mut Command, name: &str, val: &Option<String>) {

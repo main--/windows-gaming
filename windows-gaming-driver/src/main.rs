@@ -26,23 +26,13 @@ extern crate tokio_uds;
 extern crate tokio_timer;
 
 mod logger;
-mod mainloop;
 mod config;
-mod sd_notify;
-mod samba;
-mod controller;
 mod pci_device;
 mod setup;
 mod hwid;
-mod qemu;
 mod util;
-mod my_io;
 
-mod signalfd;
-
-mod clientpipe_codec;
-mod control_codec;
-mod monitor_codec;
+mod driver;
 
 use std::iter::Iterator;
 use std::path::Path;
@@ -51,6 +41,7 @@ use std::env;
 use nix::unistd;
 
 use config::Config;
+use driver::qemu;
 
 enum RunMode {
     System,
@@ -98,7 +89,7 @@ fn main() {
     trace!("Successfully loaded configuration file.");
 
     match cfg {
-        Some(ref cfg) if cfg.setup.is_none() => qemu::run(cfg, &workdir_path, Path::new(DATA_FOLDER)),
+        Some(ref cfg) if cfg.setup.is_none() => driver::run(cfg, &workdir_path, Path::new(DATA_FOLDER)),
         cfg => setup::run(cfg, &config_path, &workdir_path, Path::new(DATA_FOLDER)),
     }
 }
