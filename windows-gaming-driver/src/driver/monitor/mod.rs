@@ -11,11 +11,11 @@ use tokio_core::reactor::Handle;
 use tokio_io::AsyncRead;
 use tokio_uds::UnixStream as TokioUnixStream;
 
-use self::codec::Codec;
+use self::codec::{Codec, Message};
 
 type Send = UnboundedSender<QmpCommand>;
 type Sender = Box<Future<Item=(), Error=Error>>;
-type Read = Box<Stream<Item=String, Error=Error>>;
+type Read = Box<Stream<Item=Message, Error=Error>>;
 type Handler = Box<Future<Item=(), Error=Error>>;
 
 pub struct Monitor {
@@ -48,7 +48,7 @@ impl Monitor {
     }
 
     pub fn take_handler(&mut self) -> Handler {
-        let handler = self.read.take().unwrap().for_each(|line| { println!("{}", line); Ok(()) });
+        let handler = self.read.take().unwrap().for_each(|line| { println!("{:?}", line); Ok(()) });
         Box::new(handler)
     }
 }
