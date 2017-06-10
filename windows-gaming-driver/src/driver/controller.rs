@@ -8,8 +8,9 @@ use futures::unsync::mpsc::UnboundedSender;
 
 use config::{DeviceId, UsbBinding, MachineConfig, HotKeyAction, Action};
 use util;
-use clientpipe_codec::GaCmdOut as GaCmd;
-use monitor_codec::QmpCommand;
+use driver::clientpipe::GaCmdOut as GaCmd;
+use driver::monitor::QmpCommand;
+use driver::sd_notify;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 /// States the state machine of this Controller can have
@@ -84,7 +85,7 @@ impl Controller {
     }
 
     pub fn ga_hello(&mut self) -> bool {
-        ::sd_notify::notify_systemd(true, "Ready");
+        sd_notify::notify_systemd(true, "Ready");
 
         // send GA all hotkeys we want to register
         for (i, hotkey) in self.machine_config.hotkeys.clone().iter().enumerate() {

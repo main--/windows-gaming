@@ -21,9 +21,9 @@ pub enum QmpCommand {
     SystemWakeup,
 }
 
-pub struct MonitorCodec;
+pub struct Codec;
 
-impl Decoder for MonitorCodec {
+impl Decoder for Codec {
     type Item = String;
     type Error = io::Error;
 
@@ -47,7 +47,7 @@ impl Decoder for MonitorCodec {
     }
 }
 
-impl Encoder for MonitorCodec {
+impl Encoder for Codec {
     type Item = QmpCommand;
     type Error = io::Error;
 

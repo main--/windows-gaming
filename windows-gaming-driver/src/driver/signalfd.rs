@@ -2,7 +2,7 @@ use std::os::unix::io::AsRawFd;
 use nix::sys::signalfd::{SigSet, SignalFd as Underlying, SFD_CLOEXEC, SFD_NONBLOCK};
 pub use nix::sys::signalfd::siginfo;
 pub use nix::sys::signal;
-use my_io::MyIo;
+use driver::my_io::MyIo;
 use futures::{Async, Poll, Stream};
 use tokio_core::reactor::{Handle, PollEvented};
 
