@@ -8,6 +8,8 @@ mod my_io;
 mod signalfd;
 mod sd_notify;
 mod samba;
+mod dbus;
+mod sleep_inhibitor;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -60,6 +62,9 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
+    let sysbus = sleep_inhibitor::system_dbus();
+    let inhibitor = sleep_inhibitor::sleep_inhibitor(&sysbus, || Ok(()), &handle);
+
     let mut monitor = Monitor::new(monitor_stream, &handle);
     let mut clientpipe = Clientpipe::new(clientpipe_stream, &handle);
 
@@ -75,6 +80,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     }).then(|_| Ok(()));
 
     let joined = future::join_all(vec![
+        inhibitor,
         clientpipe.take_handler(controller.clone(), &handle),
         clientpipe.take_sender(),
         control_handler,
