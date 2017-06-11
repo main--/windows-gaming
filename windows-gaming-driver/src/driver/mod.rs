@@ -20,6 +20,7 @@ use std::path::Path;
 
 use tokio_core::reactor::Core;
 use futures::{Future, Stream, future};
+
 use driver::controller::Controller;
 use config::Config;
 use driver::signalfd::{SignalFd, signal};
@@ -62,14 +63,15 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
-    let sysbus = sleep_inhibitor::system_dbus();
-    let inhibitor = sleep_inhibitor::sleep_inhibitor(&sysbus, || Ok(()), &handle);
-
     let mut monitor = Monitor::new(monitor_stream, &handle);
     let mut clientpipe = Clientpipe::new(clientpipe_stream, &handle);
 
     let ctrl = Controller::new(cfg.machine.clone(), monitor.take_send(), clientpipe.take_send());
     let controller = Rc::new(RefCell::new(ctrl));
+
+    let sysbus = sleep_inhibitor::system_dbus();
+    let ctrl = controller.clone();
+    let inhibitor = sleep_inhibitor::sleep_inhibitor(&sysbus, move || ctrl.borrow_mut().suspend(), &handle);
 
     let control_handler = control::create(control_socket, &handle, controller.clone());
 
@@ -84,7 +86,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
         clientpipe.take_handler(controller.clone(), &handle),
         clientpipe.take_sender(),
         control_handler,
-        monitor.take_handler(),
+        monitor.take_handler(controller.clone()),
         monitor.take_sender(),
         Box::new(catch_sigterm),
     ]);

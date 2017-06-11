@@ -41,9 +41,9 @@ pub fn sleep_inhibitor<'a, R, F>(bus: &'a Connection, mut callback: F, handle: &
     Box::new(items.for_each(move |ci| {
         match ci {
             ConnectionItem::Signal(ref s) if &*s.interface().unwrap() == "org.freedesktop.login1.Manager"
-                && &*s.member().unwrap() == "PrepareForSleep" => {
+                    && &*s.member().unwrap() == "PrepareForSleep" => {
                 let starting: bool = s.get1().unwrap();
-                println!("got signal");
+                debug!("dbus reports PrepareForSleep");
                 if starting {
                     // run callback, then drop
                     let myfd = fd.clone();
