@@ -68,10 +68,12 @@ impl Encoder for Codec {
     type Error = io::Error;
 
     fn encode(&mut self, cmd: GaCmdOut, buf: &mut BytesMut) -> io::Result<()> {
+        buf.reserve(1);
         match cmd {
             GaCmdOut::Ping => buf.put_u8(0x01),
             GaCmdOut::RegisterHotKey { id, key } => {
                 buf.put_u8(0x02);
+                buf.reserve(4 + 4 + key.len());
                 buf.put_u32::<LittleEndian>(id);
                 buf.put_u32::<LittleEndian>(key.len() as u32);
                 buf.extend(key.bytes());
