@@ -1,9 +1,22 @@
 mod codec;
 
-pub use self::codec::QmpCommand;
+pub use self::codec::{
+    QmpCommand,
+    Message,
+    Event,
+    Ret,
+    DeviceDeleted,
+    RtcChange,
+    Timestamp,
+    Qmp,
+    QmpVersion,
+    Version,
+};
 
 use std::os::unix::net::{UnixStream as StdUnixStream};
 use std::io::{Error, ErrorKind};
+use std::rc::Rc;
+use std::cell::RefCell;
 
 use futures::unsync::mpsc::{self, UnboundedSender};
 use futures::{Stream, Sink, Future};
@@ -11,11 +24,12 @@ use tokio_core::reactor::Handle;
 use tokio_io::AsyncRead;
 use tokio_uds::UnixStream as TokioUnixStream;
 
+use super::controller::Controller;
 use self::codec::Codec;
 
 type Send = UnboundedSender<QmpCommand>;
 type Sender = Box<Future<Item=(), Error=Error>>;
-type Read = Box<Stream<Item=String, Error=Error>>;
+type Read = Box<Stream<Item=Message, Error=Error>>;
 type Handler = Box<Future<Item=(), Error=Error>>;
 
 pub struct Monitor {
@@ -47,8 +61,14 @@ impl Monitor {
         self.sender.take().unwrap()
     }
 
-    pub fn take_handler(&mut self) -> Handler {
-        let handler = self.read.take().unwrap().for_each(|line| { println!("{}", line); Ok(()) });
+    pub fn take_handler(&mut self, controller: Rc<RefCell<Controller>>) -> Handler {
+        let handler = self.read.take().unwrap().for_each(move |msg| {
+            info!("{:?}", msg);
+            if let Message::Event(Event::Suspend { .. }) = msg {
+                controller.borrow_mut().qemu_suspended();
+            }
+            Ok(())
+        });
         Box::new(handler)
     }
 }

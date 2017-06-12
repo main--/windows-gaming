@@ -12,6 +12,7 @@ pub enum ControlCmdIn {
     Shutdown,
     ForceIoEntry,
     IoExit,
+    Suspend,
 }
 
 pub struct Codec;
@@ -26,6 +27,7 @@ impl Decoder for Codec {
             Some(&2) => ControlCmdIn::Shutdown,
             Some(&3) => ControlCmdIn::ForceIoEntry,
             Some(&4) => ControlCmdIn::IoExit,
+            Some(&5) => ControlCmdIn::Suspend,
             Some(x) => {
                 warn!("control sent invalid request {}", x);
                 // no idea how to proceed as the request might have payload

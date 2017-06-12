@@ -1,5 +1,6 @@
 language: csharp
 mono: latest
+dist: trusty
 env:
  - RUST_TOOLCHAIN=stable
  - RUST_TOOLCHAIN=beta
@@ -15,6 +16,7 @@ addons:
     - genisoimage
     - bsdtar
     - libudev-dev
+    - libdbus-1-dev
 matrix:
   allow_failures:
     - env: RUST_TOOLCHAIN=nightly

@@ -232,6 +232,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
     }
 
     qemu.stdin(Stdio::null());
+    trace!("qemu: {:?}", qemu);
 
     let qemu = qemu.spawn().expect("Failed to start qemu");
     trace!("qemu spawned");

@@ -8,6 +8,8 @@ mod my_io;
 mod signalfd;
 mod sd_notify;
 mod samba;
+mod dbus;
+mod sleep_inhibitor;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -18,6 +20,7 @@ use std::path::Path;
 
 use tokio_core::reactor::Core;
 use futures::{Future, Stream, future};
+
 use driver::controller::Controller;
 use config::Config;
 use driver::signalfd::{SignalFd, signal};
@@ -66,6 +69,10 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     let ctrl = Controller::new(cfg.machine.clone(), monitor.take_send(), clientpipe.take_send());
     let controller = Rc::new(RefCell::new(ctrl));
 
+    let sysbus = sleep_inhibitor::system_dbus();
+    let ctrl = controller.clone();
+    let inhibitor = sleep_inhibitor::sleep_inhibitor(&sysbus, move || ctrl.borrow_mut().suspend(), &handle);
+
     let control_handler = control::create(control_socket, &handle, controller.clone());
 
     let signals = SignalFd::new(vec![signal::SIGTERM, signal::SIGINT], &handle);
@@ -75,10 +82,11 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     }).then(|_| Ok(()));
 
     let joined = future::join_all(vec![
+        inhibitor,
         clientpipe.take_handler(controller.clone(), &handle),
         clientpipe.take_sender(),
         control_handler,
-        monitor.take_handler(),
+        monitor.take_handler(controller.clone()),
         monitor.take_sender(),
         Box::new(catch_sigterm),
     ]);

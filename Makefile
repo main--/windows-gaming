@@ -42,6 +42,7 @@ install: all
 	install -D -m644 misc/windows.service $(DESTDIR)/lib/systemd/system/windows.service
 	install -D -m644 misc/windows.service $(DESTDIR)/lib/systemd/user/windows.service
 	install -D -m644 misc/80-vfio.rules $(DESTDIR)/lib/udev/rules.d/80-vfio.rules
+	install -D -m644 misc/logind.conf $(DESTDIR)/lib/systemd/logind.conf.d/windows-gaming.conf
 
 
 

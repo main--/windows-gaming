@@ -5,6 +5,9 @@ use std::process::Command;
 use itertools::Itertools;
 use libudev::{Result as UdevResult, Context, Enumerator};
 use futures::unsync::mpsc::UnboundedSender;
+use futures::unsync::oneshot::{self, Sender};
+use futures::Future;
+use futures::future;
 
 use config::{DeviceId, UsbBinding, MachineConfig, HotKeyAction, Action};
 use util;
@@ -23,6 +26,8 @@ enum State {
     Pinging,
     /// Windows is currently suspending
     Suspending,
+    /// Windows is suspended
+    Suspended,
     /// Windows is currently waking up from suspend
     Resuming,
 }
@@ -32,12 +37,12 @@ pub struct Controller {
 
     ga: State,
     io_attached: bool,
+    suspend_senders: Vec<Sender<()>>,
 
     // write-only
     monitor: UnboundedSender<QmpCommand>,
     clientpipe: UnboundedSender<GaCmd>,
 }
-
 
 impl Controller {
     fn write_ga(&mut self, cmd: GaCmd) {
@@ -53,6 +58,7 @@ impl Controller {
 
             ga: State::Down,
             io_attached: false,
+            suspend_senders: Vec::new(),
 
             monitor,
             clientpipe,
@@ -108,7 +114,7 @@ impl Controller {
         let ga = mem::replace(&mut self.ga, State::Up);
         match ga {
             State::Pinging | State::Up => false,
-            State::Down => true,
+            State::Down | State::Suspended => true,
             State::Resuming => {
                 self.io_attach();
                 true
@@ -120,6 +126,14 @@ impl Controller {
     pub fn ga_suspending(&mut self) {
         self.io_detach();
         self.ga = State::Suspending;
+    }
+
+    pub fn qemu_suspended(&mut self) {
+        info!("Windows is now suspended");
+        self.ga = State::Suspended;
+        for sender in self.suspend_senders.drain(..) {
+            let _ = sender.send(());
+        }
     }
 
     pub fn ga_hotkey(&mut self, index: u32) {
@@ -144,8 +158,8 @@ impl Controller {
     /// Attaches all configured devices if GA is up and wakes the host up if it's suspended
     pub fn io_attach(&mut self) {
         match self.ga {
-            State::Down | State::Resuming => (),
-            State::Suspending => {
+            State::Down | State::Resuming | State::Suspending => (),
+            State::Suspended => {
                 // make them wake up
                 (&self.monitor).send(QmpCommand::SystemWakeup).unwrap();
                 // can't enter now - gotta wait for GA to get ready
@@ -188,9 +202,27 @@ impl Controller {
         self.io_attached = true;
     }
 
+    /// Suspends Windows
+    pub fn suspend(&mut self) -> Box<Future<Item=(), Error=()>> {
+        if self.ga == State::Suspended {
+            // we are already suspended, return a resolved future
+            return Box::new(future::ok(()));
+        }
+
+        if self.ga != State::Suspending {
+            // only need to write suspend command to qemu if the system is not already suspending
+            self.write_ga(GaCmd::Suspend);
+        }
+
+        let (sender, receiver) = oneshot::channel();
+        self.suspend_senders.push(sender);
+        Box::new(receiver.map_err(|_| ()))
+    }
+
     /// Detaches all configured devices
     pub fn io_detach(&mut self) {
-        assert!(self.ga != State::Suspending, "trying to exit from a suspended vm?");
+        assert!(self.ga != State::Suspending, "trying to exit from a suspending vm?");
+        assert!(self.ga != State::Suspended, "trying to exit from a suspended vm?");
         if !self.io_attached {
             return;
         }
