@@ -59,8 +59,8 @@ mod test {
     use bytes::BytesMut;
     use tokio_io::codec::Decoder;
 
-    macro_rules! test {
-        (fn $name:ident, with $data:expr, expect $expected:expr, len $len:expr) => (
+    macro_rules! please {
+        (create a test function named $name:ident, which creates and passes BytesMut containing $data:expr, asserts the result $expected:expr, and a remaining length of $len:expr) => (
             #[test]
             fn $name() {
                 let mut bytes = BytesMut::new();
@@ -71,13 +71,13 @@ mod test {
         )
     }
 
-    test!(fn none, with &[], expect None, len 0);
-    test!(fn invalid, with &[0], expect None, len 1);
-    test!(fn io_entry, with &[1], expect Some(ControlCmdIn::IoEntry), len 0);
-    test!(fn shutdown, with &[2], expect Some(ControlCmdIn::Shutdown), len 0);
-    test!(fn force_io_entry, with &[3], expect Some(ControlCmdIn::ForceIoEntry), len 0);
-    test!(fn io_exit, with &[4], expect Some(ControlCmdIn::IoExit), len 0);
-    test!(fn suspend, with &[5], expect Some(ControlCmdIn::Suspend), len 0);
+    please!(create a test function named none, which creates and passes BytesMut containing &[], asserts the result None, and a remaining length of 0);
+    please!(create a test function named invalid, which creates and passes BytesMut containing &[0], asserts the result None, and a remaining length of 1);
+    please!(create a test function named io_entry, which creates and passes BytesMut containing &[1], asserts the result Some(ControlCmdIn::IoEntry), and a remaining length of 0);
+    please!(create a test function named shutdown, which creates and passes BytesMut containing &[2], asserts the result Some(ControlCmdIn::Shutdown), and a remaining length of 0);
+    please!(create a test function named force_io_entry, which creates and passes BytesMut containing &[3], asserts the result Some(ControlCmdIn::ForceIoEntry), and a remaining length of 0);
+    please!(create a test function named io_exit, which creates and passes BytesMut containing &[4], asserts the result Some(ControlCmdIn::IoExit), and a remaining length of 0);
+    please!(create a test function named suspend, which creates and passes BytesMut containing &[5], asserts the result Some(ControlCmdIn::Suspend), and a remaining length of 0);
 
     #[test]
     fn multiple() {
