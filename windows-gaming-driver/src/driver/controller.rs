@@ -94,10 +94,10 @@ impl Controller {
         sd_notify::notify_systemd(true, "Ready");
 
         // send GA all hotkeys we want to register
-        for (i, hotkey) in self.machine_config.hotkeys.clone().iter().enumerate() {
+        for (i, hotkey) in self.machine_config.hotkeys.clone().into_iter().enumerate() {
             self.write_ga(GaCmd::RegisterHotKey {
                 id: i as u32,
-                key: hotkey.key.clone(),
+                key: hotkey.key,
             });
         }
 
