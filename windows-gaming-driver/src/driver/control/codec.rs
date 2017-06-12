@@ -3,10 +3,12 @@ use std::str;
 use bytes::BytesMut;
 use tokio_io::codec::{Encoder, Decoder};
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum ControlCmdOut {
     // none yet
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum ControlCmdIn {
     IoEntry,
     Shutdown,
@@ -22,12 +24,12 @@ impl Decoder for Codec {
     type Error = io::Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<ControlCmdIn>> {
-        let ret = match buf.get(0) {
-            Some(&1) => ControlCmdIn::IoEntry,
-            Some(&2) => ControlCmdIn::Shutdown,
-            Some(&3) => ControlCmdIn::ForceIoEntry,
-            Some(&4) => ControlCmdIn::IoExit,
-            Some(&5) => ControlCmdIn::Suspend,
+        let ret = match buf.get(0).cloned() {
+            Some(1) => ControlCmdIn::IoEntry,
+            Some(2) => ControlCmdIn::Shutdown,
+            Some(3) => ControlCmdIn::ForceIoEntry,
+            Some(4) => ControlCmdIn::IoExit,
+            Some(5) => ControlCmdIn::Suspend,
             Some(x) => {
                 warn!("control sent invalid request {}", x);
                 // no idea how to proceed as the request might have payload
@@ -48,5 +50,42 @@ impl Encoder for Codec {
     fn encode(&mut self, cmd: ControlCmdOut, _buf: &mut BytesMut) -> io::Result<()> {
         match cmd {
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use bytes::BytesMut;
+    use tokio_io::codec::Decoder;
+
+    macro_rules! test {
+        (fn $name:ident, with $data:expr, expect $expected:expr, len $len:expr) => (
+            #[test]
+            fn $name() {
+                let mut bytes = BytesMut::new();
+                bytes.extend($data);
+                assert_eq!(Codec.decode(&mut bytes).unwrap(), $expected);
+                assert_eq!(bytes.len(), $len);
+            }
+        )
+    }
+
+    test!(fn none, with &[], expect None, len 0);
+    test!(fn invalid, with &[0], expect None, len 1);
+    test!(fn io_entry, with &[1], expect Some(ControlCmdIn::IoEntry), len 0);
+    test!(fn shutdown, with &[2], expect Some(ControlCmdIn::Shutdown), len 0);
+    test!(fn force_io_entry, with &[3], expect Some(ControlCmdIn::ForceIoEntry), len 0);
+    test!(fn io_exit, with &[4], expect Some(ControlCmdIn::IoExit), len 0);
+    test!(fn suspend, with &[5], expect Some(ControlCmdIn::Suspend), len 0);
+
+    #[test]
+    fn multiple() {
+        let mut bytes = BytesMut::new();
+        bytes.extend(&[1,2]);
+        assert_eq!(Codec.decode(&mut bytes).unwrap(), Some(ControlCmdIn::IoEntry));
+        assert_eq!(bytes.len(), 1);
+        assert_eq!(Codec.decode(&mut bytes).unwrap(), Some(ControlCmdIn::Shutdown));
+        assert_eq!(bytes.len(), 0);
     }
 }
