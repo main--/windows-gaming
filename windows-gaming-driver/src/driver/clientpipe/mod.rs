@@ -60,9 +60,13 @@ impl Clientpipe {
 
                     if controller.borrow_mut().ga_hello() {
                         let controller = controller.clone();
-                        let timer = Timer::default().interval(Duration::new(1, 0));
-                        handle.spawn(timer.take_while(move |&()| Ok(controller.borrow_mut().ga_ping()))
-                            .for_each(|()| Ok(())).then(|_| Ok(()))); // lmao
+                        let timer = Timer::default().interval(Duration::new(1, 0))
+                            .map_err(|_| ())
+                            .for_each(move |()| match controller.borrow_mut().ga_ping() {
+                                true => Ok(()),
+                                false => Err(()),
+                            });
+                        handle.spawn(timer);
                     }
                 }
                 GaCmdIn::Suspending => {
