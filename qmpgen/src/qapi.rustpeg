@@ -73,7 +73,7 @@ desc_example -> String
     = "#" __ "Example:" __ eol s:$((comment_block)) { s.to_string() }
 
 desc_multiline -> String
-    = doc:$((!eol .)*) eol nexts:desc_multiline_next* { doc.to_string() + &nexts.join("") }
+    = doc:$((!eol .)*) eol nexts:desc_multiline_next* { doc.to_string() + " " + &nexts.join(" ") }
 
 desc_multiline_next -> String
     = !desc_blank "#" __ doc:$((!eol .)*) eol { doc.to_string() }
