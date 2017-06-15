@@ -1,0 +1,105 @@
+pub parse -> Vec<Part>
+    = blank* sections:section* parse:( eof { Vec::new() } / parse:(comment_block parse:parse { parse }) { parse }) {
+        let mut sections = sections.clone();
+        sections.extend(parse);
+        sections
+    }
+
+section -> Part
+    = doc:doc obj:object { Part { doc: doc, object: obj } }
+
+object -> Object
+    = blank* obj:block __ comment? blank* {
+        let obj = obj.replace('\'', "\"");
+        println!("{}", obj);
+        serde_json::from_str(&obj).unwrap()
+    }
+
+block -> String
+    = "{" inner:block_inner* "}" {
+        inner.iter().fold("{".to_string(), |s, t| s + &t) + "}"
+    }
+
+block_inner -> String
+    = s:block { s }
+    / comment { "".to_string() }
+    / s:$((!"}" .)) { s.to_string() }
+
+doc -> Doc
+    = desc:description { Doc::Description(desc) }
+     / s:$(comment_block)? { Doc::Unparsed(s.to_string()) }
+
+description -> Description
+    = desc_start desc_blank* name:desc_name desc_blank* desc:desc_doc desc_blank* args:desc_args desc_blank*
+      returns:desc_returns? desc_blank* since:desc_since comment_block ex:desc_example? {
+        Description {
+            name: name,
+            documentation: desc,
+            parameters: args,
+            since: since,
+            example: ex,
+        }
+    }
+
+desc_start = "##" __ eol
+
+desc_name -> String
+    = "#" __ "@" name:name ":" __ eol { name }
+
+desc_blank = ("#"* __ eol)
+
+desc_doc -> String
+    = doc:(!desc_blank doc:desc_doc_line { doc })* { doc.join("") }
+
+desc_doc_line -> String
+    = "#" __ !"@" doc:$((!eol .)*) eol { doc.to_string() }
+
+desc_args -> Vec<(String, String)>
+    = args:(arg:desc_argument desc_blank* { arg })* { args }
+
+desc_argument -> (String, String)
+    = arg:desc_arg doc:(!desc_blank line:desc_arg_line { line })* {
+        let mut doc = doc.iter().fold(String::new(), |s, t| s + &t) + &arg.1;
+        (arg.0, doc)
+    }
+
+desc_arg -> (String, String)
+    = "#" __ "@" name:name ":" __ doc:$((!eol .)*) eol { (name.to_string(), doc.to_string()) }
+
+desc_arg_line -> String
+    = "#" __ !"@" __ line:$((!eol .)*) eol { line.to_string() }
+
+desc_returns -> String
+    = "#" __ "Returns" ":"? __ returns:$((!eol .)*) eol { returns.to_string() }
+
+desc_since -> String
+    = "#" __ "Since" ":"? __ since:$([0-9]+ "." [0-9]+ ("." [0-9]+)*) __ eol { since.to_string() }
+
+// TODO: Parse examples
+desc_example -> String
+    = "#" __ "Example:" __ eol s:$((comment_block)) { s.to_string() }
+
+// TODO: Parse note
+
+name -> String = s:$([a-zA-Z_][a-zA-Z_0-9\-]*) { s.to_string() }
+
+comment_block = comment+
+comment = "#" line
+
+line = (!eol .)* eol
+blank = __ eol
+__ = #quiet<whitespace*>
+
+/* Modeled after ECMA-262, 5th ed., 7.3. */
+eol
+    = "\n"
+    / "\r\n"
+    / "\r"
+    / "\u{2028}"
+    / "\u{2029}"
+
+/* Modeled after ECMA-262, 5th ed., 7.2. */
+whitespace
+    = [ \t\u{00A0}\u{FEFF}\u{1680}\u{180E}\u{2000}-\u{200A}\u{202F}\u{205F}\u{3000}] // \v\f removed
+
+eof = !.
