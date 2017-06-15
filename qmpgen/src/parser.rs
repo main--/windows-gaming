@@ -6,13 +6,13 @@ use serde_json::value::Value;
 
 #[derive(Debug, Clone)]
 pub struct Part {
-    pub doc: Doc,
+    pub description: Doc,
     pub object: Object,
 }
 
 #[derive(Debug, Clone)]
 pub enum Doc {
-    Description(Description),
+    Parsed(Description),
     Unparsed(String),
 }
 
@@ -20,9 +20,16 @@ pub enum Doc {
 pub struct Description {
     pub name: String,
     pub documentation: String,
-    pub parameters: Vec<(String, String)>,
-    pub since: String,
-    pub example: Option<String>,
+    pub example: String,
+    pub rest: Vec<Rest>,
+}
+
+#[derive(Debug, Clone)]
+pub enum Rest {
+    Parameter((String, String)),
+    Since(String),
+    Note(String),
+    Returns(String),
 }
 
 #[derive(Deserialize, Debug, Clone)]

@@ -4,19 +4,31 @@ use serde_json::Value;
 
 use parser::{
     Part,
+    Description,
     Doc,
-    Description as Documentation,
     Object,
     Enum,
     Struct,
     Union,
     Event,
+    Rest,
 };
+
+#[derive(Clone, Debug)]
+pub struct Documentation {
+    name: String,
+    documentation: String,
+    example: String,
+    parameters: Vec<(String, String)>,
+    since: String,
+    notes: Vec<String>,
+    returns: Option<String>,
+}
 
 #[derive(Clone, Debug)]
 pub struct Section {
     name: String,
-    doc: Option<Documentation>,
+    doc: Documentation,
     typ: Type,
 }
 
@@ -30,9 +42,33 @@ pub enum Type {
     Bool,
     Enum(Vec<String>),
     Union((Option<String>, Vec<(String, Type)>)),
-    Type(String),
     List(Box<Type>),
     Map(Vec<(String, Type)>)
+}
+
+fn parse_desc(desc: Description) -> Documentation {
+    let Description { name, documentation, example, rest } = desc;
+    let mut params = Vec::new();
+    let mut since = None;
+    let mut notes = Vec::new();
+    let mut returns = None;
+    for rest in rest {
+        match rest {
+            Rest::Parameter((name, doc)) => params.push((name, doc)),
+            Rest::Since(s) => since = Some(s),
+            Rest::Note(note) => notes.push(note),
+            Rest::Returns(ret) => returns = Some(ret),
+        }
+    }
+    Documentation {
+        name: name,
+        documentation: documentation,
+        example: example,
+        parameters: params,
+        since: since.expect("since"),
+        notes: notes,
+        returns: returns,
+    }
 }
 
 pub fn to_sections(parts: Vec<Part>, types: &mut HashMap<String, Type>) -> Vec<Section> {
@@ -40,13 +76,10 @@ pub fn to_sections(parts: Vec<Part>, types: &mut HashMap<String, Type>) -> Vec<S
 
     to_types(parts.clone(), types);
 
-    for Part { doc, object } in parts {
-        let doc = match doc {
-            Doc::Description(doc) => Some(doc),
-            Doc::Unparsed(u) => {
-                println!("Got unparsed doc: {:?}", u);
-                None
-            }
+    for Part { description: desc, object } in parts {
+        let doc = match desc {
+            Doc::Parsed(desc) => parse_desc(desc),
+            Doc::Unparsed(s) => panic!("Got unparsed doc: {}", s)
         };
 
         match object_to_type(object, &types) {
@@ -77,15 +110,7 @@ pub fn to_types(parts: Vec<Part>, types: &mut HashMap<String, Type>) {
 
     let mut todo = VecDeque::new();
 
-    for Part { doc, object } in parts {
-//        let doc = match doc {
-//            Doc::Description(doc) => Some(doc),
-//            Doc::Unparsed(u) => {
-//                println!("Got unparsed doc: {:?}", u);
-//                None
-//            }
-//        };
-
+    for Part { description: _, object } in parts {
         match object_to_type(object, &types) {
             Ok(Some((name, typ))) => { println!("Add {}", name); types.insert(name, typ); },
             Err(object) => todo.push_back(object),
@@ -191,7 +216,7 @@ fn value_to_type(val: Value, types: &HashMap<String, Type>) -> Result<Type, Valu
         Value::Array(mut vec) => {
             assert!(vec.len() == 1);
             if let Value::String(s) = vec.remove(0) {
-                let res = types.get(&s).map(|t| t.clone()).ok_or(Value::Array(vec![Value::String(s)]));
+                let res = types.get(&s).map(|t| Type::List(Box::new(t.clone()))).ok_or(Value::Array(vec![Value::String(s)]));
                 if let Err(Value::Array(ref a)) = res {
                     if let Value::String(ref s) = a[0] {
                         println!("Missing {}", s);

@@ -1,12 +1,12 @@
 pub parse -> Vec<Part>
-    = blank* sections:section* parse:( eof { Vec::new() } / parse:(comment_block parse:parse { parse }) { parse }) {
+    = blank* sections:section* parse:(eof { Vec::new() } / parse:(comment_block parse:parse { parse }) { parse }) {
         let mut sections = sections.clone();
         sections.extend(parse);
         sections
     }
 
 section -> Part
-    = doc:doc obj:object { Part { doc: doc, object: obj } }
+    = doc:doc obj:object { Part { description: doc, object: obj } }
 
 object -> Object
     = blank* obj:block __ comment? blank* {
@@ -26,18 +26,17 @@ block_inner -> String
     / s:$((!"}" .)) { s.to_string() }
 
 doc -> Doc
-    = desc:description { Doc::Description(desc) }
-     / s:$(comment_block)? { Doc::Unparsed(s.to_string()) }
+    = desc:description { Doc::Parsed(desc) }
+    / desc:$(comment_block) { Doc::Unparsed(desc.to_string()) }
 
 description -> Description
-    = desc_start desc_blank* name:desc_name desc_blank* desc:desc_doc desc_blank* args:desc_args desc_blank*
-      returns:desc_returns? desc_blank* since:desc_since comment_block ex:desc_example? {
+    = desc_start desc_blank* name:desc_name desc_blank* desc:desc_doc desc_blank* rest:(rest:desc_rest desc_blank { rest })* desc_blank*
+      ex:desc_example {
         Description {
             name: name,
             documentation: desc,
-            parameters: args,
-            since: since,
             example: ex,
+            rest: rest,
         }
     }
 
@@ -49,37 +48,35 @@ desc_name -> String
 desc_blank = ("#"* __ eol)
 
 desc_doc -> String
-    = doc:(!desc_blank doc:desc_doc_line { doc })* { doc.join("") }
+    = doc:(!desc_rest "#" __ doc:desc_multiline desc_blank { doc })* { doc.join("") }
 
-desc_doc_line -> String
-    = "#" __ !"@" doc:$((!eol .)*) eol { doc.to_string() }
+desc_rest -> Rest
+    = arg:desc_arg { arg }
+    / ret:desc_returns { ret }
+    / since:desc_since { since }
+    / note:desc_note { note }
 
-desc_args -> Vec<(String, String)>
-    = args:(arg:desc_argument desc_blank* { arg })* { args }
+desc_arg -> Rest
+    = "#" __ "@" name:name ":" __ doc:desc_multiline { Rest::Parameter((name.to_string(), doc.to_string())) }
 
-desc_argument -> (String, String)
-    = arg:desc_arg doc:(!desc_blank line:desc_arg_line { line })* {
-        let mut doc = doc.iter().fold(String::new(), |s, t| s + &t) + &arg.1;
-        (arg.0, doc)
-    }
+desc_returns -> Rest
+    = "#" __ "Returns" ":"? __ returns:desc_multiline { Rest::Returns(returns.to_string()) }
 
-desc_arg -> (String, String)
-    = "#" __ "@" name:name ":" __ doc:$((!eol .)*) eol { (name.to_string(), doc.to_string()) }
+desc_since -> Rest
+    = "#" __ "Since" ":"? __ since:$([0-9]+ "." [0-9]+ ("." [0-9]+)*) __ eol { Rest::Since(since.to_string()) }
 
-desc_arg_line -> String
-    = "#" __ !"@" __ line:$((!eol .)*) eol { line.to_string() }
+desc_note -> Rest
+    = "#" __ "Note" ":"? __ note:desc_multiline { Rest::Note(note) }
 
-desc_returns -> String
-    = "#" __ "Returns" ":"? __ returns:$((!eol .)*) eol { returns.to_string() }
-
-desc_since -> String
-    = "#" __ "Since" ":"? __ since:$([0-9]+ "." [0-9]+ ("." [0-9]+)*) __ eol { since.to_string() }
-
-// TODO: Parse examples
+// TODO: Parse example
 desc_example -> String
     = "#" __ "Example:" __ eol s:$((comment_block)) { s.to_string() }
 
-// TODO: Parse note
+desc_multiline -> String
+    = doc:$((!eol .)*) eol nexts:desc_multiline_next* { doc.to_string() + &nexts.join("") }
+
+desc_multiline_next -> String
+    = !desc_blank "#" __ doc:$((!eol .)*) eol { doc.to_string() }
 
 name -> String = s:$([a-zA-Z_][a-zA-Z_0-9\-]*) { s.to_string() }
 
