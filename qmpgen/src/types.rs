@@ -40,6 +40,7 @@ pub enum Type {
     U8, U16, U32, U64,
     Bool,
     Existing(String),
+    Option(Box<Type>),
     Enum(Vec<String>),
     Union(Option<String>, Vec<(String, Type)>),
     List(Box<Type>),
@@ -116,7 +117,10 @@ pub fn to_types(parts: Vec<Part>, types: &mut HashMap<String, Type>) {
 
     for Part { description: _, object } in parts {
         match object_to_type(object, &types) {
-            Ok(Some((name, typ))) => { println!("Add {}", name); types.insert(name, typ); },
+            Ok(Some((mut name, typ))) => {
+                println!("Add {}", name);
+                types.insert(name, typ);
+            },
             Err(object) => todo.push_back(object),
             _ => ()
         }
@@ -162,7 +166,13 @@ fn object_to_type(object: Object, types: &HashMap<String, Type>) -> Result<Optio
                 match typ {
                     Ok(res) => {
                         if let Type::Map(m) = res {
-                            map.extend(m);
+                            map.extend(m.into_iter().map(|(name, typ)|{
+                                if name.starts_with("*") {
+                                    (name[1..].to_string(), Type::Option(Box::new(typ)))
+                                } else {
+                                    (name, typ)
+                                }
+                            }));
                         } else {
                             panic!("Got data which is not a map for struct {}: {:?}", name, res)
                         }
@@ -239,7 +249,11 @@ fn value_to_type(val: Value, types: &HashMap<String, Type>) -> Result<Type, Valu
                     Ok(v) => v,
                     Err(val) => return Err(Value::Object(backup))
                 };
-                res.push((k, v));
+                if k.starts_with("*") {
+                    res.push((k[1..].to_string(), Type::Option(Box::new(v))));
+                } else {
+                    res.push((k, v));
+                }
             }
             Ok(Type::Map(res))
         },

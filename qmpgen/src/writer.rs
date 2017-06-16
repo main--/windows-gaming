@@ -141,6 +141,7 @@ fn simple_type(typ: Type, todos: &mut Vec<Todo>) -> Option<String> {
             todos.push(Todo::Existing(name.clone()));
             Some(name)
         },
+        Type::Option(typ) => Some(format!("Option<{}>", simple_type(*typ, todos).unwrap())),
         Type::List(typ) => Some(format!("Vec<{}>", simple_type(*typ, todos).unwrap())),
         _ => None
     }
