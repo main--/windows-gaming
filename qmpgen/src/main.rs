@@ -6,6 +6,7 @@ extern crate curl;
 
 mod parser;
 mod types;
+mod writer;
 
 use std::env;
 use std::collections::HashMap;
@@ -15,7 +16,7 @@ use curl::easy::Easy;
 fn main() {
     let mut args = env::args();
     let name = args.next().unwrap();
-    let (version, folder) = match (args.next(), args.next()) {
+    let (version, path) = match (args.next(), args.next()) {
         (Some(v), Some(f)) => (v,f),
         _ => {
             println!("Usage: {} [qemu-version] [export-path]", name);
@@ -37,6 +38,7 @@ fn main() {
     let sections = types::to_sections(res, &mut types);
     println!("\n\n\n");
     println!("{:?}", sections);
+    writer::write(path, sections, types).unwrap();
 }
 
 fn download(url: &str) -> String {

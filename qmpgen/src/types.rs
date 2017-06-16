@@ -16,20 +16,20 @@ use parser::{
 
 #[derive(Clone, Debug)]
 pub struct Documentation {
-    name: String,
-    documentation: String,
-    example: String,
-    parameters: Vec<(String, String)>,
-    since: String,
-    notes: Vec<String>,
-    returns: Option<String>,
+    pub name: String,
+    pub documentation: String,
+    pub example: String,
+    pub parameters: Vec<(String, String)>,
+    pub since: String,
+    pub notes: Vec<String>,
+    pub returns: Option<String>,
 }
 
 #[derive(Clone, Debug)]
 pub struct Section {
-    name: String,
-    doc: Documentation,
-    typ: Type,
+    pub name: String,
+    pub doc: Documentation,
+    pub typ: Type,
 }
 
 #[derive(Clone, Debug)]
@@ -208,7 +208,7 @@ fn object_to_type(object: Object, types: &HashMap<String, Type>) -> Result<Optio
 fn value_to_type(val: Value, types: &HashMap<String, Type>) -> Result<Type, Value> {
     match val {
         Value::String(s) => {
-            let res = string_to_type(s, types).map_err(|_| Value::String(s));
+            let res = string_to_type(s.clone(), types).map_err(|_| Value::String(s));
             if let Err(Value::String(ref s)) = res {
                 println!("Missing {}", s);
             }
@@ -217,7 +217,7 @@ fn value_to_type(val: Value, types: &HashMap<String, Type>) -> Result<Type, Valu
         Value::Array(mut vec) => {
             assert!(vec.len() == 1);
             if let Value::String(s) = vec.remove(0) {
-                let res = string_to_type(s, types).map(|t| Type::List(Box::new(t))).map_err(|_| Value::Array(vec![Value::String(s)]));
+                let res = string_to_type(s.clone(), types).map(|t| Type::List(Box::new(t))).map_err(|_| Value::Array(vec![Value::String(s)]));
                 if let Err(Value::Array(ref a)) = res {
                     if let Value::String(ref s) = a[0] {
                         println!("Missing {}", s);
@@ -247,6 +247,6 @@ fn value_to_type(val: Value, types: &HashMap<String, Type>) -> Result<Type, Valu
 fn string_to_type(s: String, types: &HashMap<String, Type>) -> Result<Type, ()> {
     types.get(&s).map(|t| match *t {
         Type::Union(_) | Type::Enum(_) | Type::List(_) | Type::Map(_) => Type::Existing(s),
-        t => t.clone()
+        ref t => t.clone()
     }).ok_or(())
 }
