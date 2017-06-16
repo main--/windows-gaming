@@ -40,6 +40,7 @@ pub enum Type {
     I8, I16, I32, I64,
     U8, U16, U32, U64,
     Bool,
+    Existing(String),
     Enum(Vec<String>),
     Union((Option<String>, Vec<(String, Type)>)),
     List(Box<Type>),
@@ -207,7 +208,7 @@ fn object_to_type(object: Object, types: &HashMap<String, Type>) -> Result<Optio
 fn value_to_type(val: Value, types: &HashMap<String, Type>) -> Result<Type, Value> {
     match val {
         Value::String(s) => {
-            let res = types.get(&s).map(|t| t.clone()).ok_or(Value::String(s));
+            let res = string_to_type(s, types).map_err(|_| Value::String(s));
             if let Err(Value::String(ref s)) = res {
                 println!("Missing {}", s);
             }
@@ -216,7 +217,7 @@ fn value_to_type(val: Value, types: &HashMap<String, Type>) -> Result<Type, Valu
         Value::Array(mut vec) => {
             assert!(vec.len() == 1);
             if let Value::String(s) = vec.remove(0) {
-                let res = types.get(&s).map(|t| Type::List(Box::new(t.clone()))).ok_or(Value::Array(vec![Value::String(s)]));
+                let res = string_to_type(s, types).map(|t| Type::List(Box::new(t))).map_err(|_| Value::Array(vec![Value::String(s)]));
                 if let Err(Value::Array(ref a)) = res {
                     if let Value::String(ref s) = a[0] {
                         println!("Missing {}", s);
@@ -241,4 +242,11 @@ fn value_to_type(val: Value, types: &HashMap<String, Type>) -> Result<Type, Valu
         },
         _ => unreachable!()
     }
+}
+
+fn string_to_type(s: String, types: &HashMap<String, Type>) -> Result<Type, ()> {
+    types.get(&s).map(|t| match *t {
+        Type::Union(_) | Type::Enum(_) | Type::List(_) | Type::Map(_) => Type::Existing(s),
+        t => t.clone()
+    }).ok_or(())
 }
