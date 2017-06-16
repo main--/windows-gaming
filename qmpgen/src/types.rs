@@ -32,9 +32,8 @@ pub struct Section {
     pub typ: Type,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Type {
-    Empty,
     String,
     F64,
     I8, I16, I32, I64,
@@ -42,7 +41,7 @@ pub enum Type {
     Bool,
     Existing(String),
     Enum(Vec<String>),
-    Union((Option<String>, Vec<(String, Type)>)),
+    Union(Option<String>, Vec<(String, Type)>),
     List(Box<Type>),
     Map(Vec<(String, Type)>)
 }
@@ -108,6 +107,10 @@ pub fn to_types(parts: Vec<Part>, types: &mut HashMap<String, Type>) {
     types.insert("bool".to_string(), Type::Bool);
     types.insert("any".to_string(), Type::String);
     types.insert("QType".to_string(), Type::String);
+    types.insert("Timestamp".to_string(), Type::Map(vec![
+        ("seconds".to_string(), Type::U64),
+        ("microseconds".to_string(), Type::U32),
+    ]));
 
     let mut todo = VecDeque::new();
 
@@ -187,19 +190,19 @@ fn object_to_type(object: Object, types: &HashMap<String, Type>) -> Result<Optio
                  };
                  vec.push((k, typ));
              }
-            Ok(Some((union, Type::Union((discriminator, vec)))))
+            Ok(Some((union, Type::Union(discriminator, vec))))
         },
         Object::Event(evt) => {
             let backup = evt.clone();
             let Event { event, data } = evt;
+            let mut vec = vec![("timestamp".to_string(), Type::Existing("Timestamp".to_string()))];
             if let Some(val) = data {
                 match value_to_type(val, types) {
-                    Ok(t) => Ok(Some((event, t))),
-                    _ => Err(Object::Event(backup))
+                    Ok(t) => vec.push(("data".to_string(), t)),
+                    _ => return Err(Object::Event(backup))
                 }
-            } else {
-                Ok(Some((event, Type::Empty)))
             }
+            Ok(Some((event, Type::Map(vec))))
         }
         _ => Ok(None)
     }
@@ -246,7 +249,7 @@ fn value_to_type(val: Value, types: &HashMap<String, Type>) -> Result<Type, Valu
 
 fn string_to_type(s: String, types: &HashMap<String, Type>) -> Result<Type, ()> {
     types.get(&s).map(|t| match *t {
-        Type::Union(_) | Type::Enum(_) | Type::List(_) | Type::Map(_) => Type::Existing(s),
+        Type::Union(..) | Type::Enum(_) | Type::List(_) | Type::Map(_) => Type::Existing(s),
         ref t => t.clone()
     }).ok_or(())
 }
