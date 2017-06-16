@@ -4,6 +4,8 @@ use std::fs::File;
 use std::iter;
 use std::collections::HashMap;
 
+use inflections::Inflect;
+
 use types::{Section, Documentation, Type};
 
 macro_rules! w {
@@ -49,7 +51,7 @@ fn write_internal<W: Write>(w: &mut W, sections: Vec<Section>, types: &mut HashM
             w!(w, i, "///")?;
         }
         for (name, doc) in params {
-            w!(w, i, "/// * {}: {}", name, doc)?;
+            w!(w, i, "/// * {}: {}", name.to_snake_case(), doc)?;
         }
         if write_params {
             w!(w, i, "///")?;
@@ -93,27 +95,36 @@ fn write_complex_type<W: Write>(w: &mut W, type_name: String, typ: Type, indent:
     let mut todos = Vec::new();
     match typ {
         Type::Enum(variants) => {
-            w!(w, indent, "pub enum {} {{", type_name)?;
+            w!(w, indent, "#[derive(Deserialize, Debug, PartialEq, Clone)]")?;
+            w!(w, indent, "#[serde(rename = \"{}\")]", type_name)?;
+            w!(w, indent, "pub enum {} {{", type_name.to_pascal_case())?;
             for variant in variants {
-                w!(w, indent+4, "{},", variant)?;
+                w!(w, indent+4, "#[serde(rename = \"{}\")]", variant)?;
+                w!(w, indent+4, "{},", variant.to_pascal_case())?;
             }
             w!(w, indent, "}")?;
         },
         Type::Union(_, variants) => {
-            w!(w, indent, "pub enum {} {{", type_name)?;
+            w!(w, indent, "#[derive(Deserialize, Debug, PartialEq, Clone)]")?;
+            w!(w, indent, "#[serde(rename = \"{}\")]", type_name)?;
+            w!(w, indent, "pub enum {} {{", type_name.to_pascal_case())?;
             for (name, typ) in variants {
-                w!(w, indent+4, "{}({}),", name, simple_type(typ, &mut todos).unwrap())?;
+                w!(w, indent+4, "#[serde(rename = \"{}\")]", name)?;
+                w!(w, indent+4, "{}({}),", name.to_pascal_case(), simple_type(typ, &mut todos).unwrap())?;
             }
             w!(w, indent, "}")?;
         },
         Type::Map(map) => {
-            w!(w, indent, "pub struct {} {{", type_name)?;
+            w!(w, indent, "#[derive(Deserialize, Debug, PartialEq, Clone)]")?;
+            w!(w, indent, "#[serde(rename = \"{}\")]", type_name)?;
+            w!(w, indent, "pub struct {} {{", type_name.to_pascal_case())?;
             for (name, typ) in map {
+                w!(w, indent+4, "#[serde(rename = \"{}\")]", name)?;
                 if let Some(typ) = simple_type(typ.clone(), &mut todos) {
-                    w!(w, indent+4, "{}: {},", name, typ)?;
+                    w!(w, indent+4, "{}: {},", name.to_snake_case(), typ)?;
                 } else {
-                    let new_name = type_name.clone() + "_" + &name.to_uppercase();
-                    w!(w, indent+4, "{}: {},", name, new_name)?;
+                    let new_name = type_name.to_pascal_case() + &name.to_pascal_case();
+                    w!(w, indent+4, "{}: {},", name.to_snake_case(), new_name)?;
                     todos.push(Todo::New(new_name, typ));
                 }
             }
@@ -139,7 +150,7 @@ fn simple_type(typ: Type, todos: &mut Vec<Todo>) -> Option<String> {
         Type::String => Some("String".to_string()),
         Type::Existing(name) => {
             todos.push(Todo::Existing(name.clone()));
-            Some(name)
+            Some(name.to_pascal_case())
         },
         Type::Option(typ) => Some(format!("Option<{}>", simple_type(*typ, todos).unwrap())),
         Type::List(typ) => Some(format!("Vec<{}>", simple_type(*typ, todos).unwrap())),
