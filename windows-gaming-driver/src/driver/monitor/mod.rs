@@ -2,6 +2,7 @@ mod codec;
 
 pub use self::codec::{
     QmpCommand,
+    InputEvent,
     Message,
     Event,
     Ret,

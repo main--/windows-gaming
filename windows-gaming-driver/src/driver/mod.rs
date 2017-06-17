@@ -10,6 +10,7 @@ mod sd_notify;
 mod samba;
 mod dbus;
 mod sleep_inhibitor;
+pub mod libinput;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -19,7 +20,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 use tokio_core::reactor::Core;
-use futures::{Future, Stream, future};
+use futures::{Future, Stream, Sink, future};
 
 use driver::controller::Controller;
 use config::Config;
@@ -66,12 +67,33 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     let mut monitor = Monitor::new(monitor_stream, &handle);
     let mut clientpipe = Clientpipe::new(clientpipe_stream, &handle);
 
-    let ctrl = Controller::new(cfg.machine.clone(), monitor.take_send(), clientpipe.take_send());
+    let monitor_sender = monitor.take_send();
+    let ctrl = Controller::new(cfg.machine.clone(), monitor_sender.clone(), clientpipe.take_send());
     let controller = Rc::new(RefCell::new(ctrl));
 
     let sysbus = sleep_inhibitor::system_dbus();
     let ctrl = controller.clone();
     let inhibitor = sleep_inhibitor::sleep_inhibitor(&sysbus, move || ctrl.borrow_mut().suspend(), &handle);
+
+    let (input, input_events) = libinput::Input::new(&handle);
+    let input = RefCell::new(input);
+    let input_listener = libinput::InputListener(&input);
+    let input_handler = input_events.filter_map(|event| {
+        use input::event::Event;
+        use input::event::pointer::PointerEvent;
+        match event {
+            Event::Pointer(PointerEvent::Motion(m)) => {
+                use self::monitor::*;
+                println!("move {} {}", m.dx(), m.dy());
+                return Some(QmpCommand::InputSendEvent { events: vec![
+                    InputEvent::Rel { axis: "x", value: m.dx() as u32 },
+                    InputEvent::Rel { axis: "y", value: m.dy() as u32 },
+                ] });
+            }
+            event => println!("{:?}", event),
+        }
+        None
+    }).forward(monitor_sender.sink_map_err(|_| ())).then(|_| Ok(()));
 
     let control_handler = control::create(control_socket, &handle, controller.clone());
 
@@ -89,6 +111,8 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
         monitor.take_handler(controller.clone()),
         monitor.take_sender(),
         Box::new(catch_sigterm),
+        Box::new(input_listener),
+        Box::new(input_handler),
     ]);
     core.run(joined).unwrap();
 

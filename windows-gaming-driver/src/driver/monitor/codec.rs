@@ -19,6 +19,19 @@ pub enum QmpCommand {
     DeviceDel { id: String },
     SystemPowerdown,
     SystemWakeup,
+    #[serde(rename = "input-send-event")]
+    InputSendEvent {
+        events: Vec<InputEvent>,
+    },
+}
+
+#[derive(Serialize)]
+#[serde(tag = "type", content = "data", rename_all = "snake_case")]
+pub enum InputEvent {
+    Rel {
+        axis: &'static str,
+        value: u32,
+    },
 }
 
 #[derive(Deserialize, Debug, PartialEq, Eq)]
