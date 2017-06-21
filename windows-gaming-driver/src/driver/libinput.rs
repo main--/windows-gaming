@@ -1,5 +1,4 @@
 use std::io;
-use std::collections::VecDeque;
 use std::cell::RefCell;
 
 use tokio_core::reactor::{Handle, PollEvented};
@@ -7,21 +6,19 @@ use futures::{Async, Poll, Future, Stream};
 use futures::unsync::mpsc::{UnboundedSender, UnboundedReceiver, unbounded};
 use input::{Libinput, LibinputInterface};
 use input::event::Event;
-use input::event::pointer::PointerEvent;
 use libc::{open, close, ioctl, c_char, c_int, c_ulong, c_void};
-use mio::Ready;
 
 use super::my_io::MyIo;
 
 const EVIOCGRAB: c_ulong = 1074021776;
 
-unsafe extern "C" fn do_open(x: *const c_char, y: c_int, z: *mut c_void) -> c_int {
-    let fd = open(x, y);
+unsafe extern "C" fn do_open(path: *const c_char, mode: c_int, _: *mut c_void) -> c_int {
+    let fd = open(path, mode);
     ioctl(fd, EVIOCGRAB, 1);
     fd
 }
 
-unsafe extern "C" fn do_close(fd: c_int, y: *mut c_void) {
+unsafe extern "C" fn do_close(fd: c_int, _: *mut c_void) {
     ioctl(fd, EVIOCGRAB, 0);
     close(fd);
 }
@@ -39,6 +36,7 @@ impl Input {
             close_restricted: Some(do_close),
         }, Some(()));
         li.path_add_device("/dev/input/by-id/usb-Logitech_USB_Receiver-if01-event-mouse").unwrap();
+        li.path_add_device("/dev/input/by-id/usb-Razer_Razer_BlackWidow_Ultimate_2013-event-kbd").unwrap();
         let (send, recv) = unbounded();
         (Input {
             io: PollEvented::new(MyIo { fd: unsafe { li.fd() } }, handle).unwrap(),
@@ -79,3 +77,29 @@ impl<'a> Future for InputListener<'a> {
         Ok(Async::NotReady)
     }
 }
+
+/*
+For key event testing:
+
+pub fn main() {
+    use tokio_core::reactor::*;
+    use input::event::*;
+    use input::event::keyboard::KeyboardEventTrait;
+    let mut core = Core::new().unwrap();
+    let handle = core.handle();
+
+    let (input, input_events) = Input::new(&handle);
+    let input = RefCell::new(input);
+    let input_listener = InputListener(&input);
+    let input_handler = input_events.for_each(|event| {
+        match event {
+            Event::Keyboard(k) => println!("key {} {:?}", k.key(), k.key_state()),
+            Event::Pointer(m) => unreachable!(),
+            _ => (),
+        }
+        Ok(())
+    }).then(|_| Ok(()));
+
+    core.run(input_listener.join(input_handler)).unwrap();
+}
+ */

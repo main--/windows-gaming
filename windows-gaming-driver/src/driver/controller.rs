@@ -1,5 +1,7 @@
 use std::mem;
+use std::rc::Rc;
 use std::ffi::OsStr;
+use std::cell::RefCell;
 use std::process::Command;
 
 use itertools::Itertools;
@@ -14,6 +16,7 @@ use util;
 use driver::clientpipe::GaCmdOut as GaCmd;
 use driver::monitor::QmpCommand;
 use driver::sd_notify;
+use driver::libinput::Input;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 /// States the state machine of this Controller can have
@@ -39,6 +42,8 @@ pub struct Controller {
     io_attached: bool,
     suspend_senders: Vec<Sender<()>>,
 
+    input: Rc<RefCell<Input>>,
+
     // write-only
     monitor: UnboundedSender<QmpCommand>,
     clientpipe: UnboundedSender<GaCmd>,
@@ -51,7 +56,8 @@ impl Controller {
 
     pub fn new(machine_config: MachineConfig,
                monitor: UnboundedSender<QmpCommand>,
-               clientpipe: UnboundedSender<GaCmd>) -> Controller {
+               clientpipe: UnboundedSender<GaCmd>,
+               input: Rc<RefCell<Input>>) -> Controller {
         (&monitor).send(QmpCommand::QmpCapabilities).unwrap();
         Controller {
             machine_config,
@@ -62,6 +68,7 @@ impl Controller {
 
             monitor,
             clientpipe,
+            input,
         }
     }
 
@@ -175,6 +182,7 @@ impl Controller {
             return;
         }
 
+        /*
         // might still be holding keyboard modifiers - release them
         self.write_ga(GaCmd::ReleaseModifiers);
 
@@ -199,6 +207,10 @@ impl Controller {
                 }).unwrap();
             }
         }
+         */
+
+        self.input.borrow_mut().resume();
+
         self.io_attached = true;
     }
 
@@ -226,10 +238,16 @@ impl Controller {
         if !self.io_attached {
             return;
         }
+
+        /*
         for i in self.machine_config.usb_devices.iter().enumerate()
             .filter(|&(_, dev)| !dev.permanent).map(|(i, _)| i) {
             (&self.monitor).send(QmpCommand::DeviceDel { id: format!("usb{}", i) }).unwrap();
         }
+         */
+
+        self.input.borrow_mut().suspend();
+
         self.io_attached = false;
     }
 

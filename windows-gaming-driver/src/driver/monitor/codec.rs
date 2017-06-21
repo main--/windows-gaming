@@ -25,13 +25,40 @@ pub enum QmpCommand {
     },
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 #[serde(tag = "type", content = "data", rename_all = "snake_case")]
 pub enum InputEvent {
     Rel {
         axis: &'static str,
         value: u32,
     },
+    Btn {
+        button: InputButton,
+        down: bool,
+    },
+    Key {
+        key: KeyValue,
+        down: bool,
+    },
+}
+
+#[derive(Serialize, Clone, Copy)]
+#[serde(tag = "type", content = "data", rename_all = "snake_case")]
+pub enum KeyValue {
+    // Number(u32),
+    Qcode(&'static str),
+}
+
+#[derive(Serialize, Clone, Copy)]
+#[serde(rename_all = "kebab-case")]
+pub enum InputButton {
+    Left,
+    Middle,
+    Right,
+    WheelUp,
+    WheelDown,
+    Side,
+    Extra,
 }
 
 #[derive(Deserialize, Debug, PartialEq, Eq)]
