@@ -1,9 +1,11 @@
-use std::process::{Command, Stdio, Child};
+use std::process::{Command, Stdio};
 use std::path::{Path};
 use std::iter::Iterator;
 use std::fs;
 
 use itertools::Itertools;
+use tokio_core::reactor::Handle;
+use tokio_process::{CommandExt, Child};
 
 use config::{Config, SoundBackend, AlsaUnit, UsbBus};
 use driver::controller;
@@ -23,7 +25,8 @@ pub fn has_gtk_support() -> bool {
     supports_display("gtk")
 }
 
-pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monitor_path: &Path) -> Child {
+pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monitor_path: &Path,
+           handle: &Handle) -> Child {
     trace!("qemu::run");
     let machine = &cfg.machine;
 
@@ -234,7 +237,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
     qemu.stdin(Stdio::null());
     trace!("qemu: {:?}", qemu);
 
-    let qemu = qemu.spawn().expect("Failed to start qemu");
+    let qemu = qemu.spawn_async(handle).expect("Failed to start qemu");
     trace!("qemu spawned");
     return qemu;
 }
