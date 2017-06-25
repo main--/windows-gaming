@@ -24,7 +24,7 @@ pub fn select(setup: &mut SetupConfig, machine: &mut MachineConfig) -> Result<()
     let mut related_devices: Vec<_> = pci_devs.iter().filter(|x| x.pci_device() == selected.pci_device()).collect();
     let gpu_index = related_devices.iter().position(|dev| dev == &selected).unwrap();
     related_devices.swap(0, gpu_index);
-    setup.vfio_devs = related_devices.iter().map(|dev| dev.id.into()).collect();
+    setup.vfio_devs = related_devices.iter().map(|dev| dev.id).collect();
     machine.vfio_slots = related_devices.iter().map(|dev| dev.pci_slot.clone()).collect();
     Ok(())
 }

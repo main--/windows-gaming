@@ -30,6 +30,7 @@ extern crate dbus;
 mod logger;
 mod config;
 mod pci_device;
+mod usb_device;
 mod setup;
 mod hwid;
 mod util;
