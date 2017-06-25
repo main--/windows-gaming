@@ -24,6 +24,7 @@ extern crate tokio_core;
 extern crate tokio_io;
 extern crate tokio_uds;
 extern crate tokio_timer;
+extern crate tokio_process;
 extern crate dbus;
 
 mod logger;

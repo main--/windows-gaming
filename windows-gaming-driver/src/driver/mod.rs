@@ -49,7 +49,15 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
         .expect("Failed to set permissions on control socket");
     debug!("Started Control socket");
 
-    let mut qemu = qemu::run(cfg, tmp, data, &clientpipe_socket_file, &monitor_socket_file);
+    let mut core = Core::new().unwrap();
+    let handle = core.handle();
+
+    let qemu = qemu::run(cfg, tmp, data, &clientpipe_socket_file, &monitor_socket_file, &handle)
+        .map(|code| {
+            if !code.success() {
+                warn!("QEMU returned with an error code: {}", code);
+            }
+        });
 
     let (monitor_stream, _) = monitor_socket.accept().expect("Failed to get monitor");
     drop(monitor_socket);
@@ -59,9 +67,6 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
 
     sd_notify::notify_systemd(false, "Booting ...");
     debug!("Windows is starting");
-
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
 
     let mut monitor = Monitor::new(monitor_stream, &handle);
     let mut clientpipe = Clientpipe::new(clientpipe_stream, &handle);
@@ -89,9 +94,12 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
         monitor.take_handler(controller.clone()),
         monitor.take_sender(),
         Box::new(catch_sigterm),
-    ]);
-    core.run(joined).unwrap();
+    ]).map(|_| ());
 
-    qemu.wait().unwrap();
+    match core.run(qemu.select(joined)) {
+        Ok(((), _)) => (), // one (*hopefully* qemu) is done, so the other is too
+        Err((e, _)) => panic!("Unexpected error: {}", e),
+    }
+
     info!("windows-gaming-driver down.");
 }
