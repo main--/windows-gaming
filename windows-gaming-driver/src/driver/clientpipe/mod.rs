@@ -60,7 +60,7 @@ impl Clientpipe {
 
                     if controller.borrow_mut().ga_hello() {
                         let controller = controller.clone();
-                        let timer = Timer::default().interval(Duration::new(1, 0))
+                        let timer = Timer::default().interval(Duration::new(5, 0))
                             .map_err(|_| ())
                             .for_each(move |()| match controller.borrow_mut().ga_ping() {
                                 true => Ok(()),
