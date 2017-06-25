@@ -12,12 +12,15 @@ install:
 script: if [ "$RUST_TOOLCHAIN" = "nightly" ]; then make all clippy test; else make all test; fi
 addons:
   apt:
+    sources:
+    - sourceline: 'ppa:jonathonf/gtk3.18'
     packages:
     - rpm2cpio
     - genisoimage
     - bsdtar
     - libudev-dev
     - libdbus-1-dev
+    - libinput-dev
 matrix:
   fast_finsh: true
   allow_failures:
