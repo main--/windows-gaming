@@ -1,14 +1,14 @@
-use std::ffi::OsStr;
 use std::fmt::Display;
 use std::cmp::Ordering;
 use std::fmt::{Formatter, Error as FmtError};
 
 use libudev::Device;
-use util::parse_hex;
+use util;
+use config::PciId;
 
 pub struct PciDevice<'a> {
     pub dev: Device<'a>,
-    pub id: (u16, u16),
+    pub id: PciId,
 
     pub vendor: Option<String>,
     pub model: Option<String>,
@@ -38,7 +38,8 @@ impl<'a> Ord for PciDevice<'a> {
 
 impl<'a> Display for PciDevice<'a> {
     fn fmt(&self, fmt: &mut Formatter) -> Result<(), FmtError> {
-        write!(fmt, "{} {} [{:04x}:{:04x}]", self.vendor.as_ref().unwrap_or(&"Unknown vendor".to_owned()), self.model.as_ref().unwrap_or(&"Unknown model".to_owned()), self.id.0, self.id.1)
+        write!(fmt, "{} {} [{}]", self.vendor.as_ref().unwrap_or(&"Unknown vendor".to_owned()),
+               self.model.as_ref().unwrap_or(&"Unknown model".to_owned()), self.id)
     }
 }
 
@@ -48,7 +49,7 @@ impl<'a> PciDevice<'a> {
         let mut model_id = None;
 
         for attr in dev.attributes() {
-            if let Some(val) = attr.value().and_then(OsStr::to_str).and_then(parse_hex) {
+            if let Some(val) = attr.value().and_then(util::parse_hex) {
                 if attr.name() == "vendor" {
                     vendor_id = Some(val);
                 } else if attr.name() == "device" {
@@ -78,7 +79,7 @@ impl<'a> PciDevice<'a> {
 
         PciDevice {
             dev: dev,
-            id: (vendor_id.unwrap(), model_id.unwrap()),
+            id: PciId { vendor: vendor_id.unwrap(), device: model_id.unwrap() },
 
             vendor: vendor,
             model: model,
