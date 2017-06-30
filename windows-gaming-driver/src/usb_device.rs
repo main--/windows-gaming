@@ -54,8 +54,8 @@ impl UsbDevice {
 
     pub fn port(&self) -> Option<UsbPort> {
         match self.binding {
-            Binding::Port(port) => Some(port),
-            Binding::Id(_) | Binding::IdAndPort(..) => None,
+            Binding::Port(port) | Binding::IdAndPort(_, port) => Some(port),
+            Binding::Id(_) => None,
         }
     }
 }
