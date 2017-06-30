@@ -128,8 +128,10 @@ fn pick(special: Option<HidKind>, blacklist: &[UsbDevice], extended_questions: b
     // TODO: let user choose between id and rt binding
     let infos = list_devices(special).expect("Can't read connected usb devices");
     let mut devs: Vec<_> = infos.into_iter()
-        .filter(|info| !blacklist.iter().any(|dev| dev.binding == UsbBinding::ById(info.id().unwrap()))
-            && !blacklist.iter().any(|dev| dev.binding == UsbBinding::ByPort(info.port().unwrap().clone())))
+        .filter(|info| !blacklist.iter().any(|dev| match dev.binding {
+            UsbBinding::ById(id) => id == info.id().unwrap(),
+            UsbBinding::ByPort(ref port) => port == info.port().unwrap(),
+        }))
         .map(|info| Some(info))
         .collect();
     for (i, dev) in devs.iter().enumerate() {
