@@ -18,13 +18,13 @@ pub struct UsbId {
     pub product: u16,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct UsbPort {
     pub bus: u16,
-    pub port: u16,
+    pub port: String,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Copy)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub enum UsbBinding {
     ById(UsbId),
     ByPort(UsbPort),

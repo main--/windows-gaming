@@ -35,8 +35,14 @@ impl UsbDevice {
             .map(|s| s.to_string_lossy().into_owned());
         let product_name = dev.property_value("ID_MODEL_FROM_DATABASE")
             .map(|s| s.to_string_lossy().into_owned());
-        let busnum = dev.attribute_value("busnum").and_then(util::parse_hex).unwrap();
-        let devpath = dev.attribute_value("devpath").and_then(util::parse_hex).unwrap();
+        let busnum = dev.attribute_value("busnum")
+            .and_then(|s| s.to_str())
+            .and_then(|s| s.parse().ok())
+            .unwrap();
+        let devpath = dev.attribute_value("devpath")
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_string())
+            .unwrap();
         let id = UsbId { vendor, product };
         let port = UsbPort { bus: busnum, port: devpath };
         UsbDevice {
@@ -52,9 +58,9 @@ impl UsbDevice {
         }
     }
 
-    pub fn port(&self) -> Option<UsbPort> {
+    pub fn port(&self) -> Option<&UsbPort> {
         match self.binding {
-            Binding::Port(port) | Binding::IdAndPort(_, port) => Some(port),
+            Binding::Port(ref port) | Binding::IdAndPort(_, ref port) => Some(port),
             Binding::Id(_) => None,
         }
     }
@@ -69,8 +75,8 @@ impl Display for UsbDevice {
         }
         match self.binding {
             Binding::Id(id) => write!(f, "[{}]", id),
-            Binding::Port(port) => write!(f, "[Bus {}]", port),
-            Binding::IdAndPort(id, port) => write!(f, "[{}] [Bus {}]", id, port)
+            Binding::Port(ref port) => write!(f, "[Bus {}]", port),
+            Binding::IdAndPort(id, ref port) => write!(f, "[{}] [Bus {}]", id, port)
         }
     }
 }

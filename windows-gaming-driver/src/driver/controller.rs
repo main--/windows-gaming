@@ -251,7 +251,7 @@ pub fn udev_resolve_binding(udev: &Context, binding: &UsbBinding)
             iter.match_attribute("idVendor", format!("{:04x}", vendor))?;
             iter.match_attribute("idProduct", format!("{:04x}", product))?;
         }
-        &UsbBinding::ByPort(UsbPort { bus, port }) => {
+        &UsbBinding::ByPort(UsbPort { bus, ref port }) => {
             iter.match_attribute("busnum", bus.to_string())?;
             iter.match_attribute("devpath", port.to_string())?;
         }
