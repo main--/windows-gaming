@@ -35,17 +35,13 @@ pub fn select(machine: &mut MachineConfig) -> bool {
             machine.usb_devices.push(id);
         }
 
-        let mut keyboard;
-        {
-            let blacklist: Vec<_> = machine.usb_devices.iter().map(|dev| &dev.binding).collect();
-            keyboard = pick(Some(HidKind::Keyboard), &blacklist, false)
-                .expect("Failed to select Keyboard");
-            // if keyboard is not detected as such, ask again with all usb devices as choice
-            if keyboard.is_none() {
-                println!("No keyboard selected. Please select your keyboard from this complete list of connected devices:");
-                keyboard = pick(None, &blacklist, false)
-                    .expect("Failed to select keyboard from complete list");
-            }
+        let mut keyboard = pick(Some(HidKind::Keyboard), &machine.usb_devices, false)
+            .expect("Failed to select Keyboard");
+        // if keyboard is not detected as such, ask again with all usb devices as choice
+        if keyboard.is_none() {
+            println!("No keyboard selected. Please select your keyboard from this complete list of connected devices:");
+            keyboard = pick(None, &machine.usb_devices, false)
+                .expect("Failed to select keyboard from complete list");
         }
         if let Some(id) = keyboard {
             machine.usb_devices.push(id);
@@ -54,12 +50,7 @@ pub fn select(machine: &mut MachineConfig) -> bool {
 
     // additional devices
     while ask::yesno("Would you like to add additional devices?") {
-        let res;
-        {
-            let blacklist: Vec<_> = machine.usb_devices.iter().map(|dev| &dev.binding).collect();
-            res = pick(None, &blacklist, true);
-        }
-        if let Ok(Some(dev)) = res {
+        if let Ok(Some(dev)) = pick(None, &machine.usb_devices, true) {
             machine.usb_devices.push(dev);
         }
     }
@@ -133,13 +124,13 @@ fn remove(usb_devices: &mut Vec<UsbDevice>) {
     }
 }
 
-fn pick(special: Option<HidKind>, blacklist: &[&UsbBinding], extended_questions: bool) -> Result<Option<UsbDevice>> {
+fn pick(special: Option<HidKind>, blacklist: &[UsbDevice], extended_questions: bool) -> Result<Option<UsbDevice>> {
     // TODO: let user choose between id and rt binding
     let infos = list_devices(special).expect("Can't read connected usb devices");
     let mut devs: Vec<_> = infos.into_iter()
-        .filter(|dev| !blacklist.contains(&&UsbBinding::ById(dev.id().unwrap()))
-            && !blacklist.contains(&&UsbBinding::ByPort(dev.port().unwrap().clone())))
-        .map(|dev| Some(dev))
+        .filter(|info| !blacklist.iter().any(|dev| dev.binding == UsbBinding::ById(info.id().unwrap()))
+            && !blacklist.iter().any(|dev| dev.binding == UsbBinding::ByPort(info.port().unwrap().clone())))
+        .map(|info| Some(info))
         .collect();
     for (i, dev) in devs.iter().enumerate() {
         println!("[{}]\t{}", i, dev.as_ref().unwrap());
