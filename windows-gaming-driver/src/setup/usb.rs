@@ -35,12 +35,13 @@ pub fn select(machine: &mut MachineConfig) -> bool {
             machine.usb_devices.push(id);
         }
 
-        let mut keyboard = pick(Some(HidKind::Keyboard), &[], false)
+        let blacklist: Vec<_> = machine.usb_devices.iter().map(|dev| dev.binding).collect();
+        let mut keyboard = pick(Some(HidKind::Keyboard), &blacklist, false)
             .expect("Failed to select Keyboard");
         // if keyboard is not detected as such, ask again with all usb devices as choice
         if keyboard.is_none() {
             println!("No keyboard selected. Please select your keyboard from this complete list of connected devices:");
-            keyboard = pick(None, &[], false)
+            keyboard = pick(None, &blacklist, false)
                 .expect("Failed to select keyboard from complete list");
         }
         if let Some(id) = keyboard {
@@ -125,7 +126,7 @@ fn remove(usb_devices: &mut Vec<UsbDevice>) {
     }
 }
 
-fn pick(special: Option<HidKind>, blacklist: &[UsbBinding], allow_permanent: bool) -> Result<Option<UsbDevice>> {
+fn pick(special: Option<HidKind>, blacklist: &[UsbBinding], extended_questions: bool) -> Result<Option<UsbDevice>> {
     // TODO: let user choose between id and rt binding
     let infos = list_devices(special).expect("Can't read connected usb devices");
     let mut devs: Vec<_> = infos.into_iter()
@@ -147,12 +148,26 @@ fn pick(special: Option<HidKind>, blacklist: &[UsbBinding], allow_permanent: boo
     };
     let selection = ask::numeric(&format!("Please select the {} you would like to pass through", k),
                                  0..devs.len());
-    let permanent = allow_permanent && ask::yesno("Do you want this device to be attached permanently?");
-    Ok(devs[selection].as_ref().map(|dev| UsbDevice {
-        binding: UsbBinding::ById(dev.id().unwrap()),
-        permanent: permanent,
-        bus: config::default_usbdevice_bus(),
-    }))
+    if let Some(dev) = devs[selection].as_ref() {
+        let mut permanent = false;
+        let mut binding = UsbBinding::ById(dev.id().unwrap());
+        if extended_questions {
+            permanent = ask::yesno("Would you like this device to be attached permanently?");
+
+            println!("[0] By Id: {}", dev.id().unwrap());
+            println!("[1] By Bus/Port: {}", dev.port().unwrap());
+            if ask::numeric("How would you like to bind this device?", 0..2) == 1 {
+                binding = UsbBinding::ByPort(dev.port().unwrap());
+            }
+        }
+        Ok(Some(UsbDevice {
+            binding: binding,
+            permanent: permanent,
+            bus: config::default_usbdevice_bus(),
+        }))
+    } else {
+        Ok(None)
+    }
 }
 
 pub fn list_devices(kind: Option<HidKind>) -> Result<Vec<UsbDeviceInfo>> {
