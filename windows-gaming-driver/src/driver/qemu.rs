@@ -147,7 +147,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
             qemu.args(&["-device",
                 &format!("usb-host,hostbus={},hostaddr={},bus={}{}.0,port={}", hostbus, hostaddr,
                          bus, port / usable_ports, (port % usable_ports) + 1)]);
-            debug!("Connected {:?} to bus {}", dev.binding, bus);
+            debug!("Connected {:?} ({}:{}) to bus {}", dev.binding, hostbus, hostaddr, bus);
         }
     }
 
