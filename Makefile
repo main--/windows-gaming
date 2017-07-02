@@ -42,7 +42,7 @@ clean:
 
 install: all
 	install -D $(DRIVER) $(DESTDIR)/usr/bin/windows-gaming-driver
-	install -D -m4644 $(VFIO_UBIND) $(DESTDIR)/usr/lib/windows-gaming/vfio-ubind
+	install -D -m4755 $(VFIO_UBIND) $(DESTDIR)/usr/lib/windows-gaming/vfio-ubind
 	install -D -m644 ovmf-x64/OVMF_CODE-pure-efi.fd $(DESTDIR)/usr/lib/windows-gaming/ovmf-code.fd
 	install -D -m644 ovmf-x64/OVMF_VARS-pure-efi.fd $(DESTDIR)/usr/lib/windows-gaming/ovmf-vars.fd
 	install -D -m644 $(GA_ISO) $(DESTDIR)/usr/lib/windows-gaming/windows-gaming-ga.iso
