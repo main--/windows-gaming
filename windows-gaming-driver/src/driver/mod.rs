@@ -17,6 +17,7 @@ use std::os::unix::net::{UnixListener as StdUnixListener};
 use std::fs::{self, Permissions};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
+use std::process::Command;
 
 use tokio_core::reactor::Core;
 use futures::{Future, Stream, future};
@@ -96,10 +97,16 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
         Box::new(catch_sigterm),
     ]).map(|_| ());
 
-    match core.run(qemu.select(joined)) {
-        Ok(((), _)) => (), // one (*hopefully* qemu) is done, so the other is too
-        Err((e, _)) => panic!("Unexpected error: {}", e),
-    }
+    core.run(qemu.join(joined.or_else(|x| { error!("Unexpected error: {}", x); Ok(()) }))).expect("Unexpected error");
 
+	info!("unbinding resetable vfio-things");
+	
+    for slot in cfg.machine.vfio_slots.iter() {
+    	//check for unbound devices and if resettable vfioify them
+		let dev_reset = Path::new("/sys/bus/pci/devices/").join(&slot).join("reset");
+		if dev_reset.exists() {
+			Command::new(Path::new(::DATA_FOLDER).join("vfio-ubind")).arg(slot).arg("-r").spawn().expect("failed to run vfio-bind");			
+		}
+	}
     info!("windows-gaming-driver down.");
 }

@@ -11,6 +11,7 @@ use config::{Config, SoundBackend, AlsaUnit, UsbBus};
 use driver::controller;
 use driver::sd_notify::notify_systemd;
 use driver::samba;
+use std::fs::read_link;
 use util;
 
 const QEMU: &str = "/usr/bin/qemu-system-x86_64";
@@ -113,6 +114,20 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
     qemu.args(&["-netdev", &usernet, "-device", "e1000,netdev=unet"]);
 
     for slot in cfg.machine.vfio_slots.iter() {
+    	//check for unbound devices and if resettable vfioify them
+    	let dev_driver = Path::new("/sys/bus/pci/devices/").join(&slot).join("driver");
+    	if let Ok(driver) = read_link(dev_driver) {
+    		if !(driver.file_name().unwrap() == "vfio-pci") {
+    			let dev_reset = Path::new("/sys/bus/pci/devices/").join(&slot).join("reset");
+    			if dev_reset.exists() {
+					let mut child = Command::new(Path::new(::DATA_FOLDER).join("vfio-ubind")).arg(slot).spawn().expect("failed to run vfio-ubind");
+					if !child.wait().expect("failed to wait on child").success() {
+						error!("vfio-ubind failed, the device might not be bound to vfio-pci!");
+					}				
+    			}
+    		}
+    	}
+    	
         qemu.args(&["-device", &format!("vfio-pci,host={},multifunction=on", slot)]);
         debug!("Passed through {}", slot);
     }
