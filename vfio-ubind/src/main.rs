@@ -7,15 +7,13 @@ extern crate regex;
 use std::path::Path;
 use regex::Regex;
 use argparse::{ArgumentParser, StoreTrue, Store};
-use std::fs::OpenOptions;
-use std::fs::read_link;
+use std::fs::{OpenOptions, read_link};
 use std::io::prelude::*;
 
 fn pretty_write(path: &Path, content : &str, dryrun: bool) {
 	if dryrun {
 		println!("writing {} into {}", content, path.display());
-	}
-	else { 
+	} else { 
 		info!("writing {} into {}", content, path.display());
 	
 		let mut file = OpenOptions::new().write(true).open(&path).expect(&format!("Failed to open {}", path.display()));
@@ -50,16 +48,14 @@ fn main() {
 		if !bdf_regex.is_match(&device) {
 			println!("Please supply Domain:Bus:Device.Function of PCI device in form: dddd:bb:dd.f");
 			return;
-		}
-		else {
+		} else {
 			warn!("No PCI domain supplied, assuming PCI domain is 0000");
 			device = "0000:".to_string() + &device;
 		}
 	}
 	
-	let dev_sysfs = "/sys/bus/pci/devices/".to_string() + &device;
-	let dev_sysfs_path = Path::new(&dev_sysfs);
-	let dev_iommu = dev_sysfs_path.join("iommu");
+	let dev_sysfs = Path::new("/sys/bus/pci/devices/").join(&device);
+	let dev_iommu = dev_sysfs.join("iommu");
 	
 	if !dev_iommu.exists() {
 		println!("No signs of an IOMMU. Check your hardware and/or linux cmdline parameters.");
@@ -68,7 +64,7 @@ fn main() {
 		return;
 	}
 	
-	let dev_reset = dev_sysfs_path.join("reset");
+	let dev_reset = dev_sysfs.join("reset");
 	
 	if ! dev_reset.exists() {
 		error!("The device does no support resetting!");
@@ -76,7 +72,7 @@ fn main() {
 		return;
 	}
 	
-	let dev_driver_link = dev_sysfs_path.join("driver");
+	let dev_driver_link = dev_sysfs.join("driver");
 	let dev_driver = read_link(dev_driver_link);
 	
 	if let Ok(driver) = dev_driver {
@@ -85,13 +81,10 @@ fn main() {
 			return;
 		}
 		info!("Device already has a driver, unbinding");
-		if remove {
-			pretty_write(&dev_sysfs_path.join("driver_override"), "\n", dryrun);
-		}
-		else{
-			pretty_write(&dev_sysfs_path.join("driver_override"), "vfio-pci", dryrun);
-		}
-		pretty_write(&dev_sysfs_path.join("driver/unbind"), &device, dryrun);		
+		
+		let driver = if remove {"\n"} else {"vfio-pci"};
+		pretty_write(&dev_sysfs.join("driver_override"), driver, dryrun);
+		pretty_write(&dev_sysfs.join("driver/unbind"), &device, dryrun);		
 	}
 	
 	pretty_write(Path::new("/sys/bus/pci/drivers_probe"), &device, dryrun);
