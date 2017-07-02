@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Ediacairum <alex@thole.org>"]
 
 [dependencies]
-argparse = "*"
+argparse = "0.2.1"
 env_logger = "0.4.3"
 log = "0.3.8"
 regex = "0.2"
