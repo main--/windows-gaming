@@ -3,12 +3,15 @@
 extern crate argparse;
 extern crate env_logger;
 extern crate regex;
+extern crate users;
 
 use std::path::Path;
 use regex::Regex;
 use argparse::{ArgumentParser, StoreTrue, Store};
 use std::fs::{OpenOptions, read_link};
 use std::io::prelude::*;
+use users::{get_user_by_uid, get_effective_uid, get_current_uid, get_group_by_name};
+use users::os::unix::GroupExt;
 
 fn pretty_write(path: &Path, content : &str, dryrun: bool) {
 	if dryrun {
@@ -37,8 +40,26 @@ fn main() {
 		ap.refer(&mut remove).add_option(&["-r", "--remove"], StoreTrue, "Reattach the default Driver to the device");
 		ap.parse_args_or_exit();
 	}
-
+	
 	env_logger::init().unwrap();
+	
+	info!("effective uid: {} current uid: {}", get_effective_uid(), get_current_uid());
+	
+	if get_effective_uid() != 0 {
+		error!("This tool has no root permission. Is the setuid bit not set or do you need to execute this as root?");
+	}
+	if get_current_uid() != 0 {
+		let vfio_group = get_group_by_name("vfio").expect("Your system has no vfio group. You need to be part of it to run this tool!");
+		let user = get_user_by_uid(get_current_uid()).unwrap();
+		let user_name = user.name();
+		
+		if let None = vfio_group.members().iter().position(|gm| gm == user_name) {
+			panic!("You're not part of the vfio group. Apply there and run this tool again!");
+		}
+		else {
+			debug!("User is part of the vfio group...continuing");
+		}
+	}
 
 	debug!("Checking with Regexes");
 	let dbdf_regex = Regex::new(r"^[[:xdigit:]]{4}:[[:xdigit:]]{2}:[[:xdigit:]]{2}.[[:xdigit:]]$").unwrap();
