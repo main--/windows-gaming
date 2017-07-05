@@ -17,13 +17,13 @@ use std::os::unix::net::{UnixListener as StdUnixListener};
 use std::fs::{self, Permissions};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command};
 
 use tokio_core::reactor::Core;
 use futures::{Future, Stream, future};
 
 use driver::controller::Controller;
-use config::Config;
+use config::{Config, VfioDevice};
 use driver::signalfd::{SignalFd, signal};
 use self::monitor::Monitor;
 use self::clientpipe::Clientpipe;
@@ -101,14 +101,22 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
 
 	info!("unbinding resetable vfio-things");
 	
-    for slot in cfg.machine.vfio_slots.iter() {
     	//check for unbound devices and if resettable vfioify them
-		let dev_reset = Path::new("/sys/bus/pci/devices/").join(&slot).join("reset");
+		/*let dev_reset = Path::new("/sys/bus/pci/devices/").join(&slot).join("reset");
 		if dev_reset.exists() {
 			let mut child = Command::new(Path::new(::DATA_FOLDER).join("vfio-ubind")).arg(slot).arg("-r").spawn().expect("failed to run vfio-bind");	
 			if !child.wait().expect("failed to wait on child").success() {
 				error!("vfio-ubind failed, the device might still be bound to vfio-pci!");
 			}			
+		}*/
+    for slot in cfg.machine.vfio_slots.iter() {
+		if let &VfioDevice::Temporarily(ref device) = slot {
+			let mut child = Command::new(Path::new(::DATA_FOLDER).join("vfio-ubind")).arg(device).arg("-r").spawn().expect("failed to run vfio-ubind");
+			match child.wait() {
+				Ok(status) => error!("vfio-ubind failed with {}! The device might not be bound to the vfio-driver and therefor not functional", status),
+				Err(err) => error!("failed to wait on child. Got: {}", err)
+				
+			}
 		}
 	}
     info!("windows-gaming-driver down.");

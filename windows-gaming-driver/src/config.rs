@@ -218,7 +218,7 @@ pub struct MachineConfig {
     pub threads: Option<u32>,
 
     // convention: gpu is first
-    pub vfio_slots: Vec<String>,
+    pub vfio_slots: Vec<VfioDevice>,
     pub network: Option<NetworkConfig>,
     pub storage: Vec<StorageDevice>,
     pub usb_devices: Vec<UsbDevice>,
@@ -238,6 +238,21 @@ pub struct StorageDevice {
     pub path: String,
     pub cache: String,
     pub format: String,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub enum VfioDevice {
+	Permanent(String),
+	Temporarily(String)
+}
+
+impl Display for VfioDevice {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        f.write_str(match self {
+            &VfioDevice::Permanent(_) => "Permanent",
+            &VfioDevice::Temporarily(_) => "Temporarily",
+        })
+    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
