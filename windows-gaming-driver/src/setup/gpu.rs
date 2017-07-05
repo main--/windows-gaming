@@ -1,6 +1,6 @@
 use libudev::{Result, Context, Enumerator};
 
-use config::{SetupConfig, MachineConfig};
+use config::{SetupConfig, MachineConfig, VfioDevice};
 use pci_device::PciDevice;
 use setup::ask;
 
@@ -25,7 +25,7 @@ pub fn select(setup: &mut SetupConfig, machine: &mut MachineConfig) -> Result<()
     let gpu_index = related_devices.iter().position(|dev| dev == &selected).unwrap();
     related_devices.swap(0, gpu_index);
     setup.vfio_devs = related_devices.iter().map(|dev| dev.id).collect();
-    machine.vfio_slots = related_devices.iter().map(|dev| dev.pci_slot.clone()).collect();
+    machine.vfio_slots = related_devices.iter().map(|dev| VfioDevice::Permanent(dev.pci_slot.clone())).collect();
     Ok(())
 }
 

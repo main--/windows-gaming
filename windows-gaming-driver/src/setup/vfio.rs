@@ -2,11 +2,14 @@ use std::borrow::Cow;
 use std::path::Path;
 use std::fs::File;
 use std::io::{BufReader, BufRead, Write, Result};
+use std::fs::read_dir;
+use std::io::Read;
 
-use config::{SetupConfig, MachineConfig};
+use config::{SetupConfig, MachineConfig, VfioDevice, PciId};
 use setup::gpu;
 use setup::ask;
 use setup::wizard;
+
 
 const KERNEL_MODULES: &'static str = "vfio vfio_iommu_type1 vfio_pci vfio_virqfd";
 
@@ -28,6 +31,11 @@ pub fn setup(setup: &mut SetupConfig, machine: &mut MachineConfig) -> bool {
     gpu::select(setup, machine).expect("Failed to select GPU");
     println!("Success!");
     println!();
+    
+    println!("");
+
+	select_pci_devices_list(setup, machine);
+	println!("");
 
     let mut has_modconf = false;
     let mut skip_ask = false;
@@ -78,6 +86,101 @@ pub fn setup(setup: &mut SetupConfig, machine: &mut MachineConfig) -> bool {
     }
     true
 }
+
+fn select_pci_devices_list (setup: &mut SetupConfig, machine: &mut MachineConfig){
+	
+	const PCI_DEVICE_DIR: & 'static str = "/sys/bus/pci/devices/";
+	let mut resetable_devices = Vec::new();
+	let mut unresetable_devices = Vec::new();
+	
+	for device in read_dir(PCI_DEVICE_DIR).expect(&format!("Failed to query devices in {}", PCI_DEVICE_DIR)) {
+		if let Ok(dev) = device {
+			if dev.path().join("reset").exists() {
+				resetable_devices.push(dev.file_name().into_string().unwrap());
+			}
+			else {
+				let mut contents = String::new();
+				File::open(dev.path().join("device")).expect("Unable to find device id").read_to_string(&mut contents).expect("Unable to read device id");
+				debug!("Read deviceid {}", &contents);
+				let devid = u16::from_str_radix(&contents[2..6], 16).expect("Failed to convert device id");
+				
+				File::open(dev.path().join("vendor")).expect("Unable to find vendor id").read_to_string(&mut contents).expect("Unable to read device id");
+				let vendorid = u16::from_str_radix(&contents[2..6], 16).expect("Failed to convert vendor id");
+				debug!("Read vendorid {}", &contents);
+				
+				unresetable_devices.push((dev.file_name().into_string().unwrap(), devid, vendorid));
+			}
+		}
+	}	
+	
+	let resetable = ask_reset_pci_devices_list(&mut resetable_devices);
+	let permanent = ask_permanent_pci_devices_list(&mut unresetable_devices);
+	
+	machine.vfio_slots.extend(resetable);
+	machine.vfio_slots.extend(permanent.iter().map(|x| VfioDevice::Permanent(x.0.clone())));
+	
+	setup.vfio_devs.extend(permanent.iter().map(|device| PciId { device: device.1, vendor: device.2 }));
+}
+
+fn ask_reset_pci_devices_list(devices:&mut Vec<String>) -> Vec<VfioDevice> {
+	
+	println!("Add aditional resettable pci devices");
+	println!();
+	println!("Please choose aditional pci devices. These will be passed throught to qemu on boot.");
+	println!("NOTE: The devices listed here can be reset. They will be bound to the vfio-pci driver on qemu's start and unbound when it quits");
+	println!("This should usually work. If it doesn't ur on ur own.");
+	println!("You will not be able to use these devices while qemu is running.");
+	println!("MAKE SURE YOU DON'T PASS THROUGH YOUR USB-CONTROLLER TO WHICH YOUR KEYBOARD AND MOUSE IS CONNECTED!");
+	println!("Helpful tools to avoid this and figure out which numbers are what devices are lspci and lsusb with the -v, -t (lsusb only) and -nn (lspci only) command.");
+	println!();
+	
+	for (i, device) in devices.iter().enumerate() {
+		println!("[{}]: {}", i, device.as_str());
+	}
+	println!("[{}]: None.", devices.len());
+	
+	let number = ask::numeric("Enter the number you want to pass through", 0..devices.len()+1);
+	
+	if number >= devices.len() {
+		return Vec::new();
+	}
+	
+	let answer = devices.remove(number);
+	let mut ret = ask_reset_pci_devices_list(devices);
+	ret.push(VfioDevice::Temporarily(answer));
+	ret
+
+}
+
+fn ask_permanent_pci_devices_list(devices:&mut Vec<(String, u16, u16)>) -> Vec<(String, u16, u16)> {
+	println!("Add aditional pci devices");
+	println!("");
+	println!("If you don't know what you are doing, chose none here!");
+	println!("NOTE: EVERY PCI DEVICE LISTED HERE WILL BE PERMANENTLY BOUND TO VFIO-PCI!");
+	println!("ONLY ADD DEVICES HERE IF YOU KNOW WHAT YOU ARE DOING!");
+	println!("If you kill your system using this there is only one thing i can say to you:");
+	println!();
+	println!("U done goofed m8.");
+	println!("Ur on ur own :)");
+	println!();
+	
+	for (i, device) in devices.iter().enumerate() {
+		println!("[{}]: {}", i, &device.0.as_str());
+	}
+	println!("[{}]: None.", devices.len());
+	
+	let number = ask::numeric("Enter the number you want to pass through", 0..devices.len()+1);
+	
+	if number >= devices.len() {
+		return Vec::new();
+	}
+	
+	let answer = devices.remove(number);
+	let mut ret = ask_permanent_pci_devices_list(devices);
+	ret.push(answer);
+	ret
+}
+
 
 fn autoconfigure_mkinitcpio(has_modconf: &mut bool) -> Result<bool> {
     const MKINITCPIO_CONF: &'static str = "/etc/mkinitcpio.conf";
