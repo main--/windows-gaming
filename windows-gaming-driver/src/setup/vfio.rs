@@ -4,14 +4,18 @@ use std::fs::File;
 use std::io::{BufReader, BufRead, Write, Result};
 use std::fs::read_dir;
 use std::io::Read;
+use libudev::{Context, Enumerator};
 
 use config::{SetupConfig, MachineConfig, VfioDevice, PciId};
-use setup::gpu;
 use setup::ask;
 use setup::wizard;
+use pci_device::PciDevice;
+use util::PrettySplit;
+
 
 
 const KERNEL_MODULES: &'static str = "vfio vfio_iommu_type1 vfio_pci vfio_virqfd";
+const PCI_DEVS_PATH: &'static str = "/sys/bus/pci/devices/";
 
 pub fn setup(setup: &mut SetupConfig, machine: &mut MachineConfig) -> bool {
     println!("Step 3: Setting up the vfio driver");
@@ -28,14 +32,11 @@ pub fn setup(setup: &mut SetupConfig, machine: &mut MachineConfig) -> bool {
         println!();
     }
 
-    gpu::select(setup, machine).expect("Failed to select GPU");
+    select(setup, machine).expect("Failed to select PCI Devices");
     println!("Success!");
     println!();
     
     println!("");
-
-	select_pci_devices_list(setup, machine);
-	println!("");
 
     let mut has_modconf = false;
     let mut skip_ask = false;
@@ -87,75 +88,31 @@ pub fn setup(setup: &mut SetupConfig, machine: &mut MachineConfig) -> bool {
     true
 }
 
-fn select_pci_devices_list (setup: &mut SetupConfig, machine: &mut MachineConfig){
-	
-	const PCI_DEVICE_DIR: & 'static str = "/sys/bus/pci/devices/";
-	let mut resetable_devices = Vec::new();
-	let mut unresetable_devices = Vec::new();
-	
-	for device in read_dir(PCI_DEVICE_DIR).expect(&format!("Failed to query devices in {}", PCI_DEVICE_DIR)) {
-		if let Ok(dev) = device {
-			if dev.path().join("reset").exists() {
-				resetable_devices.push(dev.file_name().into_string().unwrap());
-			}
-			else {
-				let mut contents = String::new();
-				File::open(dev.path().join("device")).expect("Unable to find device id").read_to_string(&mut contents).expect("Unable to read device id");
-				debug!("Read deviceid {}", &contents);
-				let devid = u16::from_str_radix(&contents[2..6], 16).expect("Failed to convert device id");
-				
-				File::open(dev.path().join("vendor")).expect("Unable to find vendor id").read_to_string(&mut contents).expect("Unable to read device id");
-				let vendorid = u16::from_str_radix(&contents[2..6], 16).expect("Failed to convert vendor id");
-				debug!("Read vendorid {}", &contents);
-				
-				unresetable_devices.push((dev.file_name().into_string().unwrap(), devid, vendorid));
-			}
-		}
-	}	
-	
-	let resetable = ask_reset_pci_devices_list(&mut resetable_devices);
-	let permanent = ask_permanent_pci_devices_list(&mut unresetable_devices);
-	
-	machine.vfio_slots.extend(resetable);
-	machine.vfio_slots.extend(permanent.iter().map(|x| VfioDevice::Permanent(x.0.clone())));
-	
-	setup.vfio_devs.extend(permanent.iter().map(|device| PciId { device: device.1, vendor: device.2 }));
-}
+fn select(setup: &mut SetupConfig, machine: &mut MachineConfig) -> Result<()> {
+    let udev = Context::new().expect("Failed to create udev context");
+    let mut iter = Enumerator::new(&udev)?;
+    iter.match_subsystem("pci")?;
+    let pci_devs: Vec<_> = iter.scan_devices()?.map(PciDevice::new).collect();
 
-fn ask_reset_pci_devices_list(devices:&mut Vec<String>) -> Vec<VfioDevice> {
+    
+	// filter to the display controller class (0x03XXXX, udev drops the leading zero)
+	let (gpu_devices, gpu_dev_ids, pci_devs) = ask_selection("Which graphics card do you want to pass through?", &|x| x.pci_class.starts_with("3") && x.pci_class.len() == 5, pci_devs, true);
 	
-	println!("Add aditional resettable pci devices");
+	println!("Add aditional  pci devices(1/2)");
 	println!();
 	println!("Please choose aditional pci devices. These will be passed throught to qemu on boot.");
 	println!("NOTE: The devices listed here can be reset. They will be bound to the vfio-pci driver on qemu's start and unbound when it quits");
 	println!("This should usually work. If it doesn't ur on ur own.");
 	println!("You will not be able to use these devices while qemu is running.");
+	println!("If the device you want to pass through is not resettable it will show up in the next step.");
+	println!("If you want a device permanently bound to vfio-pci for some reason select it in the next step.");
 	println!("MAKE SURE YOU DON'T PASS THROUGH YOUR USB-CONTROLLER TO WHICH YOUR KEYBOARD AND MOUSE IS CONNECTED!");
 	println!("Helpful tools to avoid this and figure out which numbers are what devices are lspci and lsusb with the -v, -t (lsusb only) and -nn (lspci only) command.");
 	println!();
-	
-	for (i, device) in devices.iter().enumerate() {
-		println!("[{}]: {}", i, device.as_str());
-	}
-	println!("[{}]: None.", devices.len());
-	
-	let number = ask::numeric("Enter the number you want to pass through", 0..devices.len()+1);
-	
-	if number >= devices.len() {
-		return Vec::new();
-	}
-	
-	let answer = devices.remove(number);
-	let mut ret = ask_reset_pci_devices_list(devices);
-	ret.push(VfioDevice::Temporarily(answer));
-	ret
-
-}
-
-fn ask_permanent_pci_devices_list(devices:&mut Vec<(String, u16, u16)>) -> Vec<(String, u16, u16)> {
-	println!("Add aditional pci devices");
+	let (temp_devices, _, pci_devs) = ask_selection("Which PCI Devices do you want to pass through temporarily?", &|x| Path::new(PCI_DEVS_PATH).join(x.pci_slot.clone()).join("reset").exists(), pci_devs, false);
+	println!("Add aditional pci devices(2/2)");
 	println!("");
-	println!("If you don't know what you are doing, chose none here!");
+	println!("If you don't know what you are doing, chose None here!");
 	println!("NOTE: EVERY PCI DEVICE LISTED HERE WILL BE PERMANENTLY BOUND TO VFIO-PCI!");
 	println!("ONLY ADD DEVICES HERE IF YOU KNOW WHAT YOU ARE DOING!");
 	println!("If you kill your system using this there is only one thing i can say to you:");
@@ -163,23 +120,58 @@ fn ask_permanent_pci_devices_list(devices:&mut Vec<(String, u16, u16)>) -> Vec<(
 	println!("U done goofed m8.");
 	println!("Ur on ur own :)");
 	println!();
+	let (perm_devices, perm_dev_ids, pci_devs) = ask_selection("Which PCI Device do you want to pass through permanently?", &|x| true, pci_devs, true);
 	
-	for (i, device) in devices.iter().enumerate() {
-		println!("[{}]: {}", i, &device.0.as_str());
-	}
-	println!("[{}]: None.", devices.len());
+	println!("{} GPU Devices", gpu_devices.len());
+	println!("{} temp Devices", temp_devices.len());
+	println!("{} perm Devices", perm_devices.len());
 	
-	let number = ask::numeric("Enter the number you want to pass through", 0..devices.len()+1);
+	let mut all_perm_device_ids = Vec::new();
+	all_perm_device_ids.extend(gpu_dev_ids);
+	all_perm_device_ids.extend(perm_dev_ids);
 	
-	if number >= devices.len() {
-		return Vec::new();
-	}
+	let mut all_devices = Vec::new();
+	all_devices.extend(gpu_devices);
+	all_devices.extend(temp_devices);
+	all_devices.extend(perm_devices);
 	
-	let answer = devices.remove(number);
-	let mut ret = ask_permanent_pci_devices_list(devices);
-	ret.push(answer);
-	ret
+	setup.vfio_devs = all_perm_device_ids;
+	machine.vfio_slots = all_devices;
+	
+    Ok(())	
 }
+
+fn ask_selection<'a>(question: &str, filter: &Fn(&PciDevice) -> (bool), pci_devices: Vec<PciDevice<'a>>, permanent: bool) -> (Vec<VfioDevice>, Vec<PciId>, Vec<PciDevice<'a>>) {
+    
+    let (mut devices, remaining_pci_devices) = pci_devices.into_two(filter);
+    
+    println!();
+    
+    for (i, dev) in devices.iter().enumerate() {
+        println!("[{}]\t{}", i, dev);
+    }
+	println!("[{}]\tNone of the above.", devices.len());
+
+    let selection = ask::numeric(question, 0..devices.len()+1);
+    
+    if selection >= devices.len() {
+	    devices.extend(remaining_pci_devices);
+    	return (Vec::new(), Vec::new(), devices);
+    }
+    let selected = devices.remove(selection);
+
+	devices.extend(remaining_pci_devices);
+	
+	let (mut related_devices, unpassed_pci_devices) = devices.into_two(&|dev| dev.pci_device() == selected.pci_device());
+	related_devices.push(selected);
+	
+	let (mut ret_devices, mut ret_devids, ret_pci_devices) = ask_selection(question, filter, unpassed_pci_devices, permanent);
+	ret_devices.extend(related_devices.iter().map(|dev| if permanent {VfioDevice::Permanent(dev.pci_slot.clone())} else {VfioDevice::Temporarily(dev.pci_slot.clone())}));
+	ret_devids.extend(related_devices.iter().map(|dev| dev.id));
+	
+	(ret_devices, ret_devids, ret_pci_devices)
+}
+
 
 
 fn autoconfigure_mkinitcpio(has_modconf: &mut bool) -> Result<bool> {

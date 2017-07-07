@@ -23,3 +23,23 @@ pub fn usable_ports(bus: UsbBus) -> usize {
     }
 }
 
+pub trait PrettySplit<T>{
+	fn into_two(self, &Fn(&T) -> (bool)) -> (Vec<T>, Vec<T>);
+}
+
+impl<T> PrettySplit<T> for Vec<T> {
+	fn into_two(self, filter: &Fn(&T) -> (bool) ) -> (Vec<T>, Vec<T>){
+		let mut matched = Vec::new();
+		let mut remaining = Vec::new();
+	
+		for dev in self {
+			if filter(&dev) {
+				matched.push(dev);
+			}
+			else {
+				remaining.push(dev);
+			}
+		}
+		(matched, remaining)
+	}
+}

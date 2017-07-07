@@ -14,7 +14,6 @@ mod ask;
 mod iommu;
 mod usb;
 mod vfio;
-mod gpu;
 mod initramfs;
 mod vm;
 mod wizard;
