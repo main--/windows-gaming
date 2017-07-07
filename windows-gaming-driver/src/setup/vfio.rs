@@ -2,8 +2,6 @@ use std::borrow::Cow;
 use std::path::Path;
 use std::fs::File;
 use std::io::{BufReader, BufRead, Write, Result};
-use std::fs::read_dir;
-use std::io::Read;
 use libudev::{Context, Enumerator};
 
 use config::{SetupConfig, MachineConfig, VfioDevice, PciId};
@@ -120,7 +118,8 @@ fn select(setup: &mut SetupConfig, machine: &mut MachineConfig) -> Result<()> {
 	println!("U done goofed m8.");
 	println!("Ur on ur own :)");
 	println!();
-	let (perm_devices, perm_dev_ids, pci_devs) = ask_selection("Which PCI Device do you want to pass through permanently?", &|x| true, pci_devs, true);
+	//filter to everything except the PCI Bridges
+	let (perm_devices, perm_dev_ids, _) = ask_selection("Which PCI Device do you want to pass through permanently?", &|x| x.pci_class != "60400", pci_devs, true);
 	
 	println!("{} GPU Devices", gpu_devices.len());
 	println!("{} temp Devices", temp_devices.len());
