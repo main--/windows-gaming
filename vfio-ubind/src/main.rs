@@ -48,7 +48,8 @@ fn main() {
         error!("This tool requires root permissions. If the setuid bit is not set, you need to execute this as root!");
     }
     if users::get_current_uid() != 0 {
-        let vfio_group = users::get_group_by_name("vfio").expect("Your system has no vfio group. You need to be part of it to run this tool!");
+        let vfio_group = users::get_group_by_name("vfio")
+            .expect("Your system has no vfio group. You need to be part of it to run this tool!");
         let user = users::get_user_by_uid(users::get_current_uid()).unwrap();
         let user_name = user.name();
         
@@ -65,8 +66,10 @@ fn main() {
     let bdf_regex = Regex::new(r"^[[:xdigit:]]{2}:[[:xdigit:]]{2}.[[:xdigit:]]$").unwrap();
     
     match (dbdf_regex.is_match(&device), bdf_regex.is_match(&device)) {
-        (false, true) => {warn!("No PCI domain supplied, assuming PCI domain is 0000");	device = "0000:".to_string() + &device;},
-        (false, false) => {	panic!("Please supply Domain:Bus:Device.Function of PCI device in form: dddd:bb:dd.f");}
+        (false, true) => { 
+            warn!("No PCI domain supplied, assuming PCI domain is 0000");	device = "0000:".to_string() + &device; },
+        (false, false) => {	
+            panic!("Please supply Domain:Bus:Device.Function of PCI device in form: dddd:bb:dd.f"); }
         (true, _) => (),
     }
     
@@ -74,10 +77,8 @@ fn main() {
     let dev_iommu = dev_sysfs.join("iommu");
     
     if !dev_iommu.exists() {
-        println!("No signs of an IOMMU. Check your hardware and/or linux cmdline parameters.");
-        println!("Use intel_iommu=on or iommu=pt iommu=1");
         info!("File {} didn't exist", dev_iommu.display());
-        panic!();
+        panic!("No signs of an IOMMU. Check your hardware and/or linux cmdline parameters.Use intel_iommu=on or iommu=pt iommu=1");
     }
     
     let dev_reset = dev_sysfs.join("reset");

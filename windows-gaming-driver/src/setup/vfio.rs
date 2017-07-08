@@ -12,7 +12,6 @@ use pci_device::PciDevice;
 
 
 const KERNEL_MODULES: &'static str = "vfio vfio_iommu_type1 vfio_pci vfio_virqfd";
-const PCI_DEVS_PATH: &'static str = "/sys/bus/pci/devices/";
 
 pub fn setup(setup: &mut SetupConfig, machine: &mut MachineConfig) -> bool {
     println!("Step 3: Setting up the vfio driver");
@@ -105,7 +104,7 @@ fn select(setup: &mut SetupConfig, machine: &mut MachineConfig) -> Result<()> {
         println!("MAKE SURE YOU DON'T PASS THROUGH YOUR USB-CONTROLLER TO WHICH YOUR KEYBOARD AND MOUSE IS CONNECTED!");
         println!("Helpful tools to avoid this and figure out which numbers are which devices are lspci and lsusb with the -v, -t (lsusb only) and -nn (lspci only) command.");
         println!();
-        let resetable_devices = pci_devs.iter().filter(|x| Path::new(PCI_DEVS_PATH).join(x.pci_slot.clone()).join("reset").exists()).collect();
+        let resetable_devices = pci_devs.iter().filter(|x| x.resettable).collect();
         while let Ok(Some(())) = select_device(setup, machine, "Which device do you want to pass through?", &resetable_devices) {};
         
         println!("Add aditional pci devices (2/2)");
@@ -142,7 +141,7 @@ fn select_device(setup: &mut SetupConfig, machine: &mut MachineConfig, question:
     let selection = ask::numeric(question, 0..askable_devices.len()+1);
     
     if selection < askable_devices.len() {
-        let ref selected = askable_devices[selection];
+        let selected = &askable_devices[selection];
         for device in pci_devs.iter().filter(|x| x.pci_device() == selected.pci_device()) {
             let vfio_device = VfioDevice {
                 resettable: device.resettable,
