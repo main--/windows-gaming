@@ -118,7 +118,8 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
                 let mut child = Command::new(data.join("vfio-ubind")).arg(&device.slot).spawn().expect("failed to run vfio-ubind");
                 match child.wait() {
                     Ok(status) if !status.success() => 
-                        panic!("vfio-ubind failed with {}! The device might not be bound to the vfio-driver and therefore not function correctly", status),
+                        panic!("vfio-ubind failed with {}! \
+                                The device might not be bound to the vfio-driver and therefore not function correctly", status),
                     Err(err) => panic!("failed to wait on child. Got: {}", err),
                     _ => (),
                 }

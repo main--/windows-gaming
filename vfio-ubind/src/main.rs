@@ -67,9 +67,10 @@ fn main() {
     
     match (dbdf_regex.is_match(&device), bdf_regex.is_match(&device)) {
         (false, true) => { 
-            warn!("No PCI domain supplied, assuming PCI domain is 0000");	device = "0000:".to_string() + &device; },
-        (false, false) => {	
-            panic!("Please supply Domain:Bus:Device.Function of PCI device in form: dddd:bb:dd.f"); }
+            warn!("No PCI domain supplied, assuming PCI domain is 0000");	
+            device = "0000:".to_string() + &device; 
+        },
+        (false, false) => panic!("Please supply Domain:Bus:Device.Function of PCI device in form: dddd:bb:dd.f"),
         (true, _) => (),
     }
     
@@ -78,7 +79,9 @@ fn main() {
     
     if !dev_iommu.exists() {
         info!("File {} didn't exist", dev_iommu.display());
-        panic!("No signs of an IOMMU. Check your hardware and/or linux cmdline parameters.Use intel_iommu=on or iommu=pt iommu=1");
+        panic!("No signs of an IOMMU. \
+                Check your hardware and/or linux cmdline parameters. \
+                Use intel_iommu=on or iommu=pt iommu=1");
     }
     
     let dev_reset = dev_sysfs.join("reset");
@@ -92,7 +95,7 @@ fn main() {
     let dev_driver = fs::read_link(dev_driver_link);
     
     if let Ok(driver) = dev_driver {
-        if driver.file_name().unwrap() == "vfio-pci" && !remove{
+        if driver.file_name().unwrap() == "vfio-pci" && !remove {
             println!("Device already bound to vfio-pci driver, nothing to do here");
             return;
         }
