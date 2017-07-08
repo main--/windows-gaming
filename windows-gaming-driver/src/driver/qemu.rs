@@ -119,7 +119,11 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
                 match child.wait() {
                     Ok(status) if !status.success() => 
                         panic!("vfio-ubind failed with {}! \
-                                The device might not be bound to the vfio-driver and therefore not function correctly", status),
+                                The device might not be \
+                                bound to the \
+                                vfio-driver and \
+                                therefore not function \
+                                correctly", status),
                     Err(err) => panic!("failed to wait on child. Got: {}", err),
                     _ => (),
                 }
