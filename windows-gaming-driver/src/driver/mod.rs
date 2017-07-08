@@ -99,19 +99,19 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
 
     core.run(qemu.join(joined.or_else(|x| { error!("Unexpected error: {}", x); Ok(()) }))).expect("Unexpected error");
 
-	info!("unbinding resettable vfio-things");
-	
+    info!("unbinding resettable vfio-things");
+    
     for dev in cfg.machine.vfio_slots.iter() {
-		if dev.resettable {
-			let mut child = Command::new(data.join("vfio-ubind")).arg(&dev.slot).arg("-r").spawn().expect("failed to run vfio-ubind");
-			match child.wait() {
-				Ok(status) => 
-						if !status.success() {	
-						error!("vfio-ubind failed with {}! The device might still be bound to the vfio-driver!", status);
-						},
-				Err(err) => error!("failed to wait on child. Got: {}", err)
-			}
-		}
-	}
+        if dev.resettable {
+            let mut child = Command::new(data.join("vfio-ubind")).arg(&dev.slot).arg("-r").spawn().expect("failed to run vfio-ubind");
+            match child.wait() {
+                Ok(status) => 
+                        if !status.success() {	
+                        error!("vfio-ubind failed with {}! The device might still be bound to the vfio-driver!", status);
+                        },
+                Err(err) => error!("failed to wait on child. Got: {}", err)
+            }
+        }
+    }
     info!("windows-gaming-driver down.");
 }
