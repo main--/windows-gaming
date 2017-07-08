@@ -8,12 +8,11 @@ extern crate users;
 use std::path::Path;
 use regex::Regex;
 use argparse::{ArgumentParser, StoreTrue, Store};
-use std::fs::{OpenOptions, read_link};
+use std::fs::{OpenOptions, self};
 use std::io::prelude::*;
-use users::{get_user_by_uid, get_effective_uid, get_current_uid, get_group_by_name};
 use users::os::unix::GroupExt;
 
-fn pretty_write(path: &Path, content : &str, dryrun: bool) {
+fn pretty_write(path: &Path, content: &str, dryrun: bool) {
 	if dryrun {
 		println!("writing {} into {}", content, path.display());
 	} else { 
@@ -43,17 +42,17 @@ fn main() {
 	
 	env_logger::init().unwrap();
 	
-	info!("effective uid: {} current uid: {}", get_effective_uid(), get_current_uid());
+	debug!("effective uid: {} current uid: {}", users::get_effective_uid(), users::get_current_uid());
 	
-	if get_effective_uid() != 0 {
-		error!("This tool has no root permission. Is the setuid bit not set or do you need to execute this as root?");
+	if users::get_effective_uid() != 0 {
+		error!("This tool requires root permissions. If the setuid bit is not set, you need to execute this as root!");
 	}
-	if get_current_uid() != 0 {
-		let vfio_group = get_group_by_name("vfio").expect("Your system has no vfio group. You need to be part of it to run this tool!");
-		let user = get_user_by_uid(get_current_uid()).unwrap();
+	if users::get_current_uid() != 0 {
+		let vfio_group = users::get_group_by_name("vfio").expect("Your system has no vfio group. You need to be part of it to run this tool!");
+		let user = users::get_user_by_uid(users::get_current_uid()).unwrap();
 		let user_name = user.name();
 		
-		if let None = vfio_group.members().iter().position(|gm| gm == user_name) {
+		if !vfio_group.members().contains(&user_name.to_owned()) {
 			panic!("You're not part of the vfio group. Apply there and run this tool again!");
 		}
 		else {
@@ -65,14 +64,10 @@ fn main() {
 	let dbdf_regex = Regex::new(r"^[[:xdigit:]]{4}:[[:xdigit:]]{2}:[[:xdigit:]]{2}.[[:xdigit:]]$").unwrap();
 	let bdf_regex = Regex::new(r"^[[:xdigit:]]{2}:[[:xdigit:]]{2}.[[:xdigit:]]$").unwrap();
 	
-	if !dbdf_regex.is_match(&device) {
-		if !bdf_regex.is_match(&device) {
-			println!("Please supply Domain:Bus:Device.Function of PCI device in form: dddd:bb:dd.f");
-			return;
-		} else {
-			warn!("No PCI domain supplied, assuming PCI domain is 0000");
-			device = "0000:".to_string() + &device;
-		}
+	match (dbdf_regex.is_match(&device), bdf_regex.is_match(&device)) {
+		(false, true) => {warn!("No PCI domain supplied, assuming PCI domain is 0000");	device = "0000:".to_string() + &device;},
+		(false, false) => {	panic!("Please supply Domain:Bus:Device.Function of PCI device in form: dddd:bb:dd.f");}
+		(true, _) => (),
 	}
 	
 	let dev_sysfs = Path::new("/sys/bus/pci/devices/").join(&device);
@@ -82,19 +77,18 @@ fn main() {
 		println!("No signs of an IOMMU. Check your hardware and/or linux cmdline parameters.");
 		println!("Use intel_iommu=on or iommu=pt iommu=1");
 		info!("File {} didn't exist", dev_iommu.display());
-		return;
+		panic!();
 	}
 	
 	let dev_reset = dev_sysfs.join("reset");
 	
-	if ! dev_reset.exists() {
-		error!("The device does no support resetting!");
+	if !dev_reset.exists() {
 		info!("File {} didn't exist", dev_reset.display());
-		return;
+		panic!("The device does not support resetting!");
 	}
 	
 	let dev_driver_link = dev_sysfs.join("driver");
-	let dev_driver = read_link(dev_driver_link);
+	let dev_driver = fs::read_link(dev_driver_link);
 	
 	if let Ok(driver) = dev_driver {
 		if driver.file_name().unwrap() == "vfio-pci" && !remove{
@@ -106,6 +100,8 @@ fn main() {
 		let driver = if remove {"\n"} else {"vfio-pci"};
 		pretty_write(&dev_sysfs.join("driver_override"), driver, dryrun);
 		pretty_write(&dev_sysfs.join("driver/unbind"), &device, dryrun);		
+	} else if !remove {
+    	pretty_write(&dev_sysfs.join("driver_override"), "vfio-pci", dryrun);
 	}
 	
 	pretty_write(Path::new("/sys/bus/pci/drivers_probe"), &device, dryrun);

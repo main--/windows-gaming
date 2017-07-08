@@ -7,7 +7,7 @@ use itertools::Itertools;
 use tokio_core::reactor::Handle;
 use tokio_process::{CommandExt, Child};
 
-use config::{Config, SoundBackend, AlsaUnit, UsbBus, VfioDevice};
+use config::{Config, SoundBackend, AlsaUnit, UsbBus};
 use driver::controller;
 use driver::sd_notify::notify_systemd;
 use driver::samba;
@@ -112,26 +112,21 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
     trace!("setup usernet");
     qemu.args(&["-netdev", &usernet, "-device", "e1000,netdev=unet"]);
 
-    for slot in cfg.machine.vfio_slots.iter() {
-    	let vfio_device = match slot {
-			&VfioDevice::Temporarily(ref device) => {
-				let mut child = Command::new(Path::new(::DATA_FOLDER).join("vfio-ubind")).arg(device).spawn().expect("failed to run vfio-ubind");
+	//TODO: Check if the configured device is in the configured slot
+    for device in cfg.machine.vfio_slots.iter() {
+    	if device.resettable {
+				let mut child = Command::new(data.join("vfio-ubind")).arg(&device.slot).spawn().expect("failed to run vfio-ubind");
 				match child.wait() {
 					Ok(status) => 
 						if !status.success() {	
-						error!("vfio-ubind failed with {}! The device might not be bound to the vfio-driver and therefor not functional", status);
+						panic!("vfio-ubind failed with {}! The device might not be bound to the vfio-driver and therefore not function correctly", status);
 						},
-					Err(err) => error!("failed to wait on child. Got: {}", err)
-					
+					Err(err) => panic!("failed to wait on child. Got: {}", err)	
 				}
-				device
 			}
-    		&VfioDevice::Permanent(ref device) => 
-    			device
-			};
     	
-        qemu.args(&["-device", &format!("vfio-pci,host={},multifunction=on", vfio_device)]);
-        debug!("Passed through {}", slot);
+        qemu.args(&["-device", &format!("vfio-pci,host={},multifunction=on", device.slot)]);
+        debug!("Passed through {}", device.slot);
     }
 
     // create usb buses

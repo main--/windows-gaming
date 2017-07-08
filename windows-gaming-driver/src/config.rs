@@ -241,18 +241,10 @@ pub struct StorageDevice {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-pub enum VfioDevice {
-	Permanent(String),
-	Temporarily(String)
-}
-
-impl Display for VfioDevice {
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
-        f.write_str(match self {
-            &VfioDevice::Permanent(_) => "Permanent",
-            &VfioDevice::Temporarily(_) => "Temporarily",
-        })
-    }
+pub struct VfioDevice {
+    pub resettable: bool,
+    pub slot: String,
+    pub device: PciId,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

@@ -17,13 +17,13 @@ use std::os::unix::net::{UnixListener as StdUnixListener};
 use std::fs::{self, Permissions};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
-use std::process::{Command};
+use std::process::Command;
 
 use tokio_core::reactor::Core;
 use futures::{Future, Stream, future};
 
 use driver::controller::Controller;
-use config::{Config, VfioDevice};
+use config::Config;
 use driver::signalfd::{SignalFd, signal};
 use self::monitor::Monitor;
 use self::clientpipe::Clientpipe;
@@ -99,18 +99,17 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
 
     core.run(qemu.join(joined.or_else(|x| { error!("Unexpected error: {}", x); Ok(()) }))).expect("Unexpected error");
 
-	info!("unbinding resetable vfio-things");
+	info!("unbinding resettable vfio-things");
 	
-    for slot in cfg.machine.vfio_slots.iter() {
-		if let &VfioDevice::Temporarily(ref device) = slot {
-			let mut child = Command::new(Path::new(::DATA_FOLDER).join("vfio-ubind")).arg(device).arg("-r").spawn().expect("failed to run vfio-ubind");
+    for dev in cfg.machine.vfio_slots.iter() {
+		if dev.resettable {
+			let mut child = Command::new(data.join("vfio-ubind")).arg(&dev.slot).arg("-r").spawn().expect("failed to run vfio-ubind");
 			match child.wait() {
 				Ok(status) => 
 						if !status.success() {	
 						error!("vfio-ubind failed with {}! The device might still be bound to the vfio-driver!", status);
 						},
 				Err(err) => error!("failed to wait on child. Got: {}", err)
-				
 			}
 		}
 	}
