@@ -219,6 +219,13 @@ impl Controller {
         Box::new(receiver.map_err(|_| ()))
     }
 
+    /// Detaches all configured devices if the guest agent is down
+    pub fn io_soft_detach(&mut self) {
+        if self.ga == State::Down {
+            self.io_detach();
+        }
+    }
+
     /// Detaches all configured devices
     pub fn io_detach(&mut self) {
         assert!(self.ga != State::Suspending, "trying to exit from a suspending vm?");

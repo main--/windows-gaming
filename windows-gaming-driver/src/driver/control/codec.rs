@@ -15,6 +15,7 @@ pub enum ControlCmdIn {
     ForceIoEntry,
     IoExit,
     Suspend,
+    SoftIoExit,
 }
 
 pub struct Codec;
@@ -30,6 +31,7 @@ impl Decoder for Codec {
             Some(3) => ControlCmdIn::ForceIoEntry,
             Some(4) => ControlCmdIn::IoExit,
             Some(5) => ControlCmdIn::Suspend,
+            Some(6) => ControlCmdIn::SoftIoExit,
             Some(x) => {
                 warn!("control sent invalid request {}", x);
                 // no idea how to proceed as the request might have payload
@@ -78,6 +80,7 @@ mod test {
     please!(create a test function named force_io_entry, which creates and passes BytesMut containing &[3], asserts the result Some(ControlCmdIn::ForceIoEntry), and a remaining length of 0);
     please!(create a test function named io_exit, which creates and passes BytesMut containing &[4], asserts the result Some(ControlCmdIn::IoExit), and a remaining length of 0);
     please!(create a test function named suspend, which creates and passes BytesMut containing &[5], asserts the result Some(ControlCmdIn::Suspend), and a remaining length of 0);
+    please!(create a test function named soft_io_exit, which creates and passes BytesMut containing &[6], asserts the result Some(ControlCmdIn::SoftIoExit), and a remaining length of 0);
 
     #[test]
     fn multiple() {
