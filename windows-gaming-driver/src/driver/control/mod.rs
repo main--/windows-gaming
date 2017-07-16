@@ -28,22 +28,26 @@ pub fn create<'a>(socket: StdUnixListener, handle: &'a Handle, controller: Rc<Re
                 ControlCmdIn::IoEntry => {
                     info!("IO entry requested!");
                     controller.borrow_mut().io_attach();
-                }
+                },
                 ControlCmdIn::Shutdown => {
                     info!("Shutdown requested");
                     controller.borrow_mut().shutdown();
-                }
+                },
                 ControlCmdIn::ForceIoEntry => {
                     info!("IO entry FORCED!");
                     controller.borrow_mut().io_force_attach();
-                }
+                },
                 ControlCmdIn::IoExit => {
                     info!("IO exit!");
                     controller.borrow_mut().io_detach();
-                }
+                },
                 ControlCmdIn::Suspend => {
                     info!("Suspending guest!");
                     controller.borrow_mut().suspend();
+                },
+                ControlCmdIn::SoftIoExit => {
+                    info!("Soft IO exit");
+                    controller.borrow_mut().io_soft_detach();
                 }
             }
             Ok(())
