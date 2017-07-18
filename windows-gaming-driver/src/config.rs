@@ -3,6 +3,8 @@ use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
+use driver::hotkeys::{KeyBinding, Key, Modifier};
+
 use toml;
 use serde_yaml;
 
@@ -73,7 +75,7 @@ impl UsbDevice {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct HotKey {
-    pub key: String,
+    pub key: KeyBinding,
     pub action: HotKeyAction,
 }
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -227,8 +229,8 @@ pub struct MachineConfig {
 
 fn machineconfig_hotkeys_default() -> Vec<HotKey> {
     vec![HotKey {
-         key: "Ctrl+Alt+NoRepeat+Insert".to_string(),
-         action: HotKeyAction::Action(Action::IoExit),
+        key: KeyBinding::new(vec![Modifier::Ctrl, Modifier::Alt], Key::Insert, true),
+        action: HotKeyAction::Action(Action::IoExit),
     }]
 }
 

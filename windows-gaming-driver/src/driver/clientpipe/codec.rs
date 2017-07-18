@@ -8,7 +8,7 @@ pub enum GaCmdOut {
     Ping,
     RegisterHotKey {
         id: u32,
-        key: String,
+        key: (u32, u32),
     },
     ReleaseModifiers,
     Suspend,
@@ -76,12 +76,12 @@ impl Encoder for Codec {
         buf.reserve(1);
         match cmd {
             GaCmdOut::Ping => buf.put_u8(0x01),
-            GaCmdOut::RegisterHotKey { id, key } => {
-                buf.put_u8(0x02);
-                buf.reserve(4 + 4 + key.len());
+            GaCmdOut::RegisterHotKey { id, key: (m, k) } => {
+                buf.put_u8(0x05);
+                buf.reserve(3 * 4);
                 buf.put_u32::<LittleEndian>(id);
-                buf.put_u32::<LittleEndian>(key.len() as u32);
-                buf.extend(key.bytes());
+                buf.put_u32::<LittleEndian>(m);
+                buf.put_u32::<LittleEndian>(k);
             }
             GaCmdOut::ReleaseModifiers => buf.put_u8(0x03),
             GaCmdOut::Suspend => buf.put_u8(0x04),

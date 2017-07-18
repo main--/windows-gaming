@@ -104,7 +104,7 @@ impl Controller {
         for (i, hotkey) in self.machine_config.hotkeys.clone().into_iter().enumerate() {
             self.write_ga(GaCmd::RegisterHotKey {
                 id: i as u32,
-                key: hotkey.key,
+                key: hotkey.key.to_windows(),
             });
         }
 
@@ -144,9 +144,9 @@ impl Controller {
     }
 
     pub fn ga_hotkey(&mut self, index: u32) {
-        match self.machine_config.hotkeys.get(index as usize).cloned().map(|h| h.action) {
+        match self.machine_config.hotkeys.get(index as usize).map(|h| h.action.clone()) {
             None => warn!("Client sent invalid hotkey id"),
-            Some(HotKeyAction::Action(action) ) => self.action(action),
+            Some(HotKeyAction::Action(action)) => self.action(action),
             Some(HotKeyAction::Exec(cmd)) => {
                 Command::new("/bin/sh").arg("-c").arg(&cmd).spawn().unwrap();
             }

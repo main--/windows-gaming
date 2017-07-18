@@ -35,30 +35,10 @@ namespace VfioService
             InitializeComponent();
         }
 
-        public string RegisterHotKey(int id, string hotkey)
+        public string RegisterHotKey(int id, int mods, int keys)
         {
-            HotkeyModifiers modifiers = 0;
-            Keys? key = null;
-
-            foreach (var ele in hotkey.Split('+'))
-            {
-                HotkeyModifiers hkm;
-                Keys k;
-                if (Enum.TryParse(ele, true, out hkm))
-                    modifiers |= hkm;
-                else if (Enum.TryParse(ele, false, out k))
-                {
-                    if (key == null)
-                        key = k;
-                    else
-                        return "parse error: multiple keys";
-                }
-                else
-                    return "parse error: unknown key";
-            }
-
-            if (!key.HasValue)
-                return "parse error: no key";
+            HotkeyModifiers modifiers = (HotkeyModifiers)mods;
+            Keys? key = (Keys)keys;
 
             if (!RegisterHotKey(Handle, id, modifiers, key.Value))
             {

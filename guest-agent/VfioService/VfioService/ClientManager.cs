@@ -30,9 +30,9 @@ namespace VfioService
                         break;
                     case CommandIn.RegisterHotKey:
                         var id = ReadInt(Stream);
-                        var length = ReadInt(Stream);
-                        var hotkey = Encoding.UTF8.GetString(ReadBytes(Stream, length));
-                        var result = (string)MainForm.Invoke(new Func<int, string, string>(MainForm.RegisterHotKey), id, hotkey);
+                        var mods = ReadInt(Stream);
+                        var keys = ReadInt(Stream);
+                        var result = (string)MainForm.Invoke(new Func<int, int, int, string>(MainForm.RegisterHotKey), id, mods, keys);
                         if (result != null)
                         {
                             // report error

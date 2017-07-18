@@ -11,6 +11,7 @@ mod samba;
 mod dbus;
 mod sleep_inhibitor;
 pub mod libinput;
+pub mod hotkeys;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -87,6 +88,8 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
 
     let ref input_ref = *input;
     let input_listener = libinput::InputListener(input_ref);
+    let hotkey_bindings: Vec<_> = cfg.machine.hotkeys.iter().map(|x| x.key.clone()).collect();
+    let mut keyboard_state = self::hotkeys::KeyboardState::new(&hotkey_bindings);
     let input_handler = input_events.filter_map(|event| {
         use self::monitor::*;
         use std::iter;
@@ -136,13 +139,24 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
                     ]).take(steps.abs() as usize).collect(),
                 }
             },
-            Event::Keyboard(KeyboardEvent::Key(k)) =>
+            Event::Keyboard(KeyboardEvent::Key(k)) => {
+                let down = k.key_state() == KeyState::Pressed;
+                let (hotkeys, qcode) = match keyboard_state.input_linux(k.key(), down) {
+                    Some(x) => x,
+                    None => return None,
+                };
+
+                for hk in hotkeys {
+                    controller.borrow_mut().ga_hotkey(hk as u32);
+                }
+
                 QmpCommand::InputSendEvent {
                     events: vec![ InputEvent::Key {
-                        down: k.key_state() == KeyState::Pressed,
-                        key: KeyValue::Qcode(match key_convert(k.key()) { Some(x) => x, None => return None, }),//KeyValue::Number(k.key())
+                        down,
+                        key: KeyValue::Qcode(qcode),
                     }]
-                },
+                }
+            }
             event => {
                 info!("Unhandled input event {:?}", event);
                 return None;
@@ -173,252 +187,4 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
 
     qemu.wait().unwrap();
     info!("windows-gaming-driver down.");
-}
-
-
-// http://elixir.free-electrons.com/linux/latest/source/include/uapi/linux/input-event-codes.h
-// into
-// sed 's/#define /const /' | sed -E 's/[\t]+/: u32 = /' | awk '{ print $0 ";"; }'
-const KEY_ESC: u32 = 1;
-const KEY_1: u32 = 2;
-const KEY_2: u32 = 3;
-const KEY_3: u32 = 4;
-const KEY_4: u32 = 5;
-const KEY_5: u32 = 6;
-const KEY_6: u32 = 7;
-const KEY_7: u32 = 8;
-const KEY_8: u32 = 9;
-const KEY_9: u32 = 10;
-const KEY_0: u32 = 11;
-const KEY_MINUS: u32 = 12;
-const KEY_EQUAL: u32 = 13;
-const KEY_BACKSPACE: u32 = 14;
-const KEY_TAB: u32 = 15;
-const KEY_Q: u32 = 16;
-const KEY_W: u32 = 17;
-const KEY_E: u32 = 18;
-const KEY_R: u32 = 19;
-const KEY_T: u32 = 20;
-const KEY_Y: u32 = 21;
-const KEY_U: u32 = 22;
-const KEY_I: u32 = 23;
-const KEY_O: u32 = 24;
-const KEY_P: u32 = 25;
-const KEY_LEFTBRACE: u32 = 26;
-const KEY_RIGHTBRACE: u32 = 27;
-const KEY_ENTER: u32 = 28;
-const KEY_LEFTCTRL: u32 = 29;
-const KEY_A: u32 = 30;
-const KEY_S: u32 = 31;
-const KEY_D: u32 = 32;
-const KEY_F: u32 = 33;
-const KEY_G: u32 = 34;
-const KEY_H: u32 = 35;
-const KEY_J: u32 = 36;
-const KEY_K: u32 = 37;
-const KEY_L: u32 = 38;
-const KEY_SEMICOLON: u32 = 39;
-const KEY_APOSTROPHE: u32 = 40;
-const KEY_GRAVE: u32 = 41;
-const KEY_LEFTSHIFT: u32 = 42;
-const KEY_BACKSLASH: u32 = 43;
-const KEY_Z: u32 = 44;
-const KEY_X: u32 = 45;
-const KEY_C: u32 = 46;
-const KEY_V: u32 = 47;
-const KEY_B: u32 = 48;
-const KEY_N: u32 = 49;
-const KEY_M: u32 = 50;
-const KEY_COMMA: u32 = 51;
-const KEY_DOT: u32 = 52;
-const KEY_SLASH: u32 = 53;
-const KEY_RIGHTSHIFT: u32 = 54;
-const KEY_KPASTERISK: u32 = 55;
-const KEY_LEFTALT: u32 = 56;
-const KEY_SPACE: u32 = 57;
-const KEY_CAPSLOCK: u32 = 58;
-const KEY_F1: u32 = 59;
-const KEY_F2: u32 = 60;
-const KEY_F3: u32 = 61;
-const KEY_F4: u32 = 62;
-const KEY_F5: u32 = 63;
-const KEY_F6: u32 = 64;
-const KEY_F7: u32 = 65;
-const KEY_F8: u32 = 66;
-const KEY_F9: u32 = 67;
-const KEY_F10: u32 = 68;
-const KEY_NUMLOCK: u32 = 69;
-const KEY_SCROLLLOCK: u32 = 70;
-const KEY_KP7: u32 = 71;
-const KEY_KP8: u32 = 72;
-const KEY_KP9: u32 = 73;
-const KEY_KPMINUS: u32 = 74;
-const KEY_KP4: u32 = 75;
-const KEY_KP5: u32 = 76;
-const KEY_KP6: u32 = 77;
-const KEY_KPPLUS: u32 = 78;
-const KEY_KP1: u32 = 79;
-const KEY_KP2: u32 = 80;
-const KEY_KP3: u32 = 81;
-const KEY_KP0: u32 = 82;
-const KEY_KPDOT: u32 = 83;
-
-// const KEY_ZENKAKUHANKAKU: u32 = 85;
-const KEY_102ND: u32 = 86;
-const KEY_F11: u32 = 87;
-const KEY_F12: u32 = 88;
-// const KEY_RO: u32 = 89;
-// const KEY_KATAKANA: u32 = 90;
-// const KEY_HIRAGANA: u32 = 91;
-// const KEY_HENKAN: u32 = 92;
-// const KEY_KATAKANAHIRAGANA: u32 = 93;
-// const KEY_MUHENKAN: u32 = 94;
-// const KEY_KPJPCOMMA: u32 = 95;
-const KEY_KPENTER: u32 = 96;
-const KEY_RIGHTCTRL: u32 = 97;
-const KEY_KPSLASH: u32 = 98;
-const KEY_SYSRQ: u32 = 99;
-const KEY_RIGHTALT: u32 = 100;
-// const KEY_LINEFEED: u32 = 101;
-const KEY_HOME: u32 = 102;
-const KEY_UP: u32 = 103;
-const KEY_PAGEUP: u32 = 104;
-const KEY_LEFT: u32 = 105;
-const KEY_RIGHT: u32 = 106;
-const KEY_END: u32 = 107;
-const KEY_DOWN: u32 = 108;
-const KEY_PAGEDOWN: u32 = 109;
-const KEY_INSERT: u32 = 110;
-const KEY_DELETE: u32 = 111;
-// const KEY_MACRO: u32 = 112;
-// const KEY_MUTE: u32 = 113;
-// const KEY_VOLUMEDOWN: u32 = 114;
-// const KEY_VOLUMEUP: u32 = 115;
-// const KEY_POWER: u32 = 116	/* SC System Power Down */;
-const KEY_KPEQUAL: u32 = 117;
-// const KEY_KPPLUSMINUS: u32 = 118;
-const KEY_PAUSE: u32 = 119;
-// const KEY_SCALE: u32 = 120	/* AL Compiz Scale (Expose) */;
-
-const KEY_KPCOMMA: u32 = 121;
-// const KEY_HANGEUL: u32 = 122;
-// const KEY_HANGUEL: u32 = KEY_HANGEUL;
-// const KEY_HANJA: u32 = 123;
-// const KEY_YEN: u32 = 124;
-const KEY_LEFTMETA: u32 = 125;
-const KEY_RIGHTMETA: u32 = 126;
-const KEY_COMPOSE: u32 = 127;
-
-fn key_convert(code: u32) -> Option<&'static str> {
-    Some(match code {
-        KEY_LEFTSHIFT => "shift",
-        KEY_RIGHTSHIFT => "shift_r",
-        KEY_LEFTALT => "alt",
-        KEY_RIGHTALT => "alt_r",
-        KEY_LEFTCTRL => "ctrl",
-        KEY_RIGHTCTRL => "ctrl_r",
-        KEY_COMPOSE => "menu", // NOTE
-        KEY_ESC => "esc",
-        KEY_0 => "0",
-        KEY_1 => "1",
-        KEY_2 => "2",
-        KEY_3 => "3",
-        KEY_4 => "4",
-        KEY_5 => "5",
-        KEY_6 => "6",
-        KEY_7 => "7",
-        KEY_8 => "8",
-        KEY_9 => "9",
-        KEY_MINUS => "minus",
-        KEY_EQUAL => "equal",
-        KEY_BACKSPACE => "backspace",
-        KEY_TAB => "tab",
-        KEY_A => "a",
-        KEY_B => "b",
-        KEY_C => "c",
-        KEY_D => "d",
-        KEY_E => "e",
-        KEY_F => "f",
-        KEY_G => "g",
-        KEY_H => "h",
-        KEY_I => "i",
-        KEY_J => "j",
-        KEY_K => "k",
-        KEY_L => "l",
-        KEY_M => "m",
-        KEY_N => "n",
-        KEY_O => "o",
-        KEY_P => "p",
-        KEY_Q => "q",
-        KEY_R => "r",
-        KEY_S => "s",
-        KEY_T => "t",
-        KEY_U => "u",
-        KEY_V => "v",
-        KEY_W => "w",
-        KEY_X => "x",
-        KEY_Y => "y",
-        KEY_Z => "z",
-        KEY_ENTER => "ret",
-        KEY_SEMICOLON => "semicolon",
-        KEY_APOSTROPHE => "apostrophe",
-        KEY_GRAVE => "grave_accent",
-        KEY_BACKSLASH => "backslash",
-        KEY_COMMA => "comma",
-        KEY_DOT => "dot",
-        KEY_SLASH => "slash",
-        KEY_SPACE => "spc",
-        KEY_CAPSLOCK => "caps_lock",
-        KEY_F1 => "f1",
-        KEY_F2 => "f2",
-        KEY_F3 => "f3",
-        KEY_F4 => "f4",
-        KEY_F5 => "f5",
-        KEY_F6 => "f6",
-        KEY_F7 => "f7",
-        KEY_F8 => "f8",
-        KEY_F9 => "f9",
-        KEY_F10 => "f10",
-        KEY_F11 => "f11",
-        KEY_F12 => "f12",
-        KEY_NUMLOCK => "num_lock",
-        KEY_SCROLLLOCK => "scroll_lock",
-        KEY_KPSLASH => "kp_divide",
-        KEY_KPASTERISK => "kp_multiply",
-        KEY_KPMINUS => "kp_subtract",
-        KEY_KPPLUS => "kp_add",
-        KEY_KPENTER => "kp_enter",
-        KEY_KPDOT => "kp_decimal",
-        KEY_SYSRQ => "sysrq",
-        KEY_KP0 => "kp_0",
-        KEY_KP1 => "kp_1",
-        KEY_KP2 => "kp_2",
-        KEY_KP3 => "kp_3",
-        KEY_KP4 => "kp_4",
-        KEY_KP5 => "kp_5",
-        KEY_KP6 => "kp_6",
-        KEY_KP7 => "kp_7",
-        KEY_KP8 => "kp_8",
-        KEY_KP9 => "kp_9",
-        KEY_102ND => "less",
-        KEY_HOME => "home",
-        KEY_PAGEUP => "pgup",
-        KEY_PAGEDOWN => "pgdn",
-        KEY_END => "end",
-        KEY_LEFT => "left",
-        KEY_UP => "up",
-        KEY_DOWN => "down",
-        KEY_RIGHT => "right",
-        KEY_INSERT => "insert",
-        KEY_DELETE => "delete",
-        KEY_PAUSE => "pause",
-        KEY_KPCOMMA => "kp_comma",
-        KEY_KPEQUAL => "kp_equals",
-        KEY_LEFTMETA => "meta_l",
-        KEY_RIGHTMETA => "meta_r",
-        // KEY_POWER => "power",
-        KEY_LEFTBRACE => "bracket_left",
-        KEY_RIGHTBRACE => "bracket_right",
-        _ => return None,
-    })
 }
