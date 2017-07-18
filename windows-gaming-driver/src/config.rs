@@ -88,7 +88,7 @@ pub enum HotKeyAction {
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy)]
 pub enum Action {
-    IoEntry,
+    IoUpgrade,
     IoEntryForced,
     IoExit,
 }
@@ -229,11 +229,18 @@ pub struct MachineConfig {
 }
 
 fn machineconfig_hotkeys_default() -> Vec<HotKey> {
-    vec![HotKey {
-        key: KeyBinding::new(vec![Modifier::Ctrl, Modifier::Alt], Key::Insert, true),
-        action: HotKeyAction::Action(Action::IoExit),
-    }]
+    vec![
+        HotKey {
+            key: KeyBinding::new(vec![Modifier::Ctrl, Modifier::Alt], Key::Insert, true),
+            action: HotKeyAction::Action(Action::IoExit),
+        },
+        HotKey {
+            key: KeyBinding::new(vec![Modifier::Win], Key::Insert, true),
+            action: HotKeyAction::Action(Action::IoUpgrade),
+        },
+    ]
 }
+
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct StorageDevice {

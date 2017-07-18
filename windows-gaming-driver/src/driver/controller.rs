@@ -35,11 +35,19 @@ enum State {
     Resuming,
 }
 
+#[derive(PartialEq, Eq, Clone, Copy)]
+enum IoState {
+    Detached,
+    LightEntry,
+    LightFallback,
+    FullEntry,
+}
+
 pub struct Controller {
     machine_config: MachineConfig,
 
     ga: State,
-    io_attached: bool,
+    io_state: IoState,
     suspend_senders: Vec<Sender<()>>,
 
     input: Rc<RefCell<Input>>,
@@ -63,7 +71,7 @@ impl Controller {
             machine_config,
 
             ga: State::Down,
-            io_attached: false,
+            io_state: IoState::Detached,
             suspend_senders: Vec::new(),
 
             monitor,
@@ -119,6 +127,11 @@ impl Controller {
         // exists in that case so it would be a bug to create a second one.
 
         let ga = mem::replace(&mut self.ga, State::Up);
+
+        if self.io_state == IoState::LightFallback {
+            self.io_attach();
+        }
+
         match ga {
             State::Pinging | State::Up => false,
             State::Down | State::Suspended => true,
@@ -156,7 +169,7 @@ impl Controller {
     /// Executes given action
     pub fn action(&mut self, action: Action) {
         match action {
-            Action::IoEntry => self.io_attach(),
+            Action::IoUpgrade => self.io_attach(),
             Action::IoEntryForced => self.io_force_attach(),
             Action::IoExit => self.io_detach(),
         }
@@ -165,26 +178,50 @@ impl Controller {
     /// Attaches all configured devices if GA is up and wakes the host up if it's suspended
     pub fn io_attach(&mut self) {
         match self.ga {
-            State::Down | State::Resuming | State::Suspending => (),
+            State::Resuming | State::Suspending => (),
             State::Suspended => {
                 // make them wake up
                 (&self.monitor).send(QmpCommand::SystemWakeup).unwrap();
                 // can't enter now - gotta wait for GA to get ready
                 self.ga = State::Resuming;
             },
-            State::Up | State::Pinging => self.io_force_attach()
+            State::Down => {
+                self.light_attach();
+                self.io_state = IoState::LightFallback;
+            }
+            State::Up | State::Pinging => self.io_force_attach(),
+        }
+    }
+
+    pub fn try_attach(&mut self) {
+        match self.ga {
+            State::Up | State::Pinging => self.io_force_attach(),
+            _ => (),
+        }
+    }
+
+    pub fn light_attach(&mut self) {
+        match self.io_state {
+            IoState::Detached => {
+                self.input.borrow_mut().resume();
+                self.io_state = IoState::LightEntry;
+            }
+            IoState::LightFallback => self.io_state = IoState::LightEntry,
+            IoState::LightEntry | IoState::FullEntry => (),
         }
     }
 
     /// Attaches all configured devices regardless of GA state
     pub fn io_force_attach(&mut self) {
-        if self.io_attached {
-            return;
-        }
-
-        /*
         // might still be holding keyboard modifiers - release them
         self.write_ga(GaCmd::ReleaseModifiers);
+
+        // release light entry first so we don't mess things up
+        match self.io_state {
+            IoState::Detached => (),
+            IoState::LightFallback | IoState::LightEntry => self.input.borrow_mut().suspend(),
+            IoState::FullEntry => return,
+        }
 
         let mut udev = Context::new().expect("Failed to create udev context");
 
@@ -207,11 +244,8 @@ impl Controller {
                 }).unwrap();
             }
         }
-         */
 
-        self.input.borrow_mut().resume();
-
-        self.io_attached = true;
+        self.io_state = IoState::FullEntry;
     }
 
     /// Suspends Windows
@@ -235,20 +269,19 @@ impl Controller {
     pub fn io_detach(&mut self) {
         assert!(self.ga != State::Suspending, "trying to exit from a suspending vm?");
         assert!(self.ga != State::Suspended, "trying to exit from a suspended vm?");
-        if !self.io_attached {
-            return;
+
+        match self.io_state {
+            IoState::Detached => (),
+            IoState::LightFallback | IoState::LightEntry => self.input.borrow_mut().suspend(),
+            IoState::FullEntry => {
+                for i in self.machine_config.usb_devices.iter().enumerate()
+                    .filter(|&(_, dev)| !dev.permanent).map(|(i, _)| i) {
+                        (&self.monitor).send(QmpCommand::DeviceDel { id: format!("usb{}", i) }).unwrap();
+                    }
+            }
         }
 
-        /*
-        for i in self.machine_config.usb_devices.iter().enumerate()
-            .filter(|&(_, dev)| !dev.permanent).map(|(i, _)| i) {
-            (&self.monitor).send(QmpCommand::DeviceDel { id: format!("usb{}", i) }).unwrap();
-        }
-         */
-
-        self.input.borrow_mut().suspend();
-
-        self.io_attached = false;
+        self.io_state = IoState::Detached;
     }
 
     pub fn shutdown(&mut self) {
