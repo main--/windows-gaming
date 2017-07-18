@@ -22,6 +22,6 @@ addons:
     - libdbus-1-dev
     - libinput-dev
 matrix:
-  fast_finsh: true
+  fast_finish: true
   allow_failures:
     - env: RUST_TOOLCHAIN=nightly

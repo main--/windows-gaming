@@ -145,7 +145,7 @@ fn autoconfigure_mkinitcpio(has_modconf: &mut bool) -> Result<bool> {
 
 fn write_vfio_modconf(setup: &SetupConfig) {
     let vfio_params = setup.vfio_devs.iter().fold(String::new(),
-                                                  |s, i| s + &format!("{:04x}:{:04x},", i.vendor, i.product));
+                                                  |s, i| s + &format!("{:04x}:{:04x},", i.vendor, i.device));
     assert!(wizard::sudo_write_file("/etc/modprobe.d/vfio.conf", |x| {
         writeln!(x, "options vfio-pci ids={}", vfio_params)
     }).unwrap_or(false), "Failed to write modconf");

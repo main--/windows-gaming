@@ -8,16 +8,28 @@ use driver::hotkeys::{KeyBinding, Key, Modifier};
 use toml;
 use serde_yaml;
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Copy)]
-pub struct DeviceId {
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy)]
+pub struct PciId {
+    pub vendor: u16,
+    pub device: u16,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Copy)]
+pub struct UsbId {
     pub vendor: u16,
     pub product: u16,
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct UsbPort {
+    pub bus: u16,
+    pub port: String,
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub enum UsbBinding {
-    ById(DeviceId),
-    ByPort { bus: u16, port: u16 },
+    ById(UsbId),
+    ByPort(UsbPort),
 }
 
 // https://en.wikipedia.org/wiki/Host_controller_interface_(USB,_Firewire)#Open_Host_Controller_Interface_2
@@ -55,22 +67,12 @@ pub struct UsbDevice {
     pub bus: UsbBus,
 }
 
-fn default_usbdevice_permanent() -> bool {
+pub fn default_usbdevice_permanent() -> bool {
     false
 }
 
-fn default_usbdevice_bus() -> UsbBus {
+pub fn default_usbdevice_bus() -> UsbBus {
     UsbBus::Xhci
-}
-
-impl UsbDevice {
-    pub fn from_binding(binding: UsbBinding) -> Self {
-        UsbDevice {
-            binding: binding,
-            permanent: default_usbdevice_permanent(),
-            bus: default_usbdevice_bus(),
-        }
-    }
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -205,7 +207,7 @@ pub struct SetupConfig {
     // setup state
     pub iommu_commanded: bool,
     // convention: gpu must be first for iommu group checks
-    pub vfio_devs: Vec<DeviceId>,
+    pub vfio_devs: Vec<PciId>,
     pub reboot_commanded: bool,
 }
 
@@ -221,7 +223,6 @@ pub struct MachineConfig {
     pub vfio_slots: Vec<String>,
     pub network: Option<NetworkConfig>,
     pub storage: Vec<StorageDevice>,
-    // convention: first element is the mouse (for mouse only setup)
     pub usb_devices: Vec<UsbDevice>,
     #[serde(default = "machineconfig_hotkeys_default")]
     pub hotkeys: Vec<HotKey>,
@@ -252,18 +253,47 @@ pub struct SambaConfig {
     pub path: String,
 }
 
-impl From<(u16, u16)> for DeviceId {
-    fn from(old: (u16, u16)) -> DeviceId {
-        DeviceId {
-            vendor: old.0,
-            product: old.1,
+impl PartialEq<UsbId> for UsbBinding {
+    fn eq(&self, other: &UsbId) -> bool {
+        match self {
+            &UsbBinding::ById(ref id) => id == other,
+            _ => false
         }
     }
 }
+impl PartialEq<UsbBinding> for UsbId {
+    fn eq(&self, other: &UsbBinding) -> bool {
+        other.eq(self)
+    }
+}
 
-impl From<DeviceId> for (u16, u16) {
-    fn from(old: DeviceId) -> (u16, u16) {
-        (old.vendor, old.product)
+impl PartialEq<UsbPort> for UsbBinding {
+    fn eq(&self, other: &UsbPort) -> bool {
+        match self {
+            &UsbBinding::ByPort(ref port) => port == other,
+            _ => false
+        }
+    }
+}
+impl PartialEq<UsbBinding> for UsbPort {
+    fn eq(&self, other: &UsbBinding) -> bool {
+        other.eq(self)
+    }
+}
+
+impl Display for PciId {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        write!(f, "{:04x}:{:04x}", self.vendor, self.device)
+    }
+}
+impl Display for UsbId {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        write!(f, "{:04x}:{:04x}", self.vendor, self.product)
+    }
+}
+impl Display for UsbPort {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+        write!(f, "{}.{}", self.bus, self.port)
     }
 }
 

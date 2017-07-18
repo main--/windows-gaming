@@ -25,7 +25,7 @@ pub fn notify_systemd(ready: bool, status: &'static str) {
     trace!("Notifying systemd (ready={} status='{}')", ready, status);
     if let Some(sd_notify) = *SD_NOTIFY {
         let state = CString::new(format!("READY={}\nSTATUS={}", if ready { "1" } else { "0" }, status)).unwrap();
-        let ret = sd_notify(1, state.as_ptr());
+        let ret = sd_notify(0, state.as_ptr());
         debug!("systemd returned {}", ret);
     } else {
         debug!("No libsystemd found.");

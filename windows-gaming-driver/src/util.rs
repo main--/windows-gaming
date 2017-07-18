@@ -1,6 +1,12 @@
+use std::ffi::OsStr;
+
 use config::UsbBus;
 
-pub fn parse_hex(s: &str) -> Option<u16> {
+pub fn parse_hex(s: &OsStr) -> Option<u16> {
+    let s = match s.to_str() {
+        Some(s) => s,
+        None => return None
+    };
     if s.starts_with("0x") {
         u16::from_str_radix(&s[2..], 16).ok()
     } else {

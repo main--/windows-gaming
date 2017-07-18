@@ -4,7 +4,7 @@ use std::path::Path;
 use std::iter::Iterator;
 
 use libudev::{Result as UdevResult, Context, Enumerator};
-use config::{Config, SetupConfig};
+use config::{Config, SetupConfig, PciId};
 use setup::ask;
 use setup::iommu;
 use setup::usb;
@@ -122,7 +122,7 @@ impl Wizard {
     }
 }
 
-fn get_passthrough_devs() -> UdevResult<Vec<(u16, u16)>> {
+fn get_passthrough_devs() -> UdevResult<Vec<PciId>> {
     let udev = Context::new().expect("Failed to create udev context");
     let mut iter = Enumerator::new(&udev)?;
     iter.match_property("DRIVER", "vfio-pci")?;

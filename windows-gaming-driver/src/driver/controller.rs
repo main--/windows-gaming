@@ -11,7 +11,7 @@ use futures::unsync::oneshot::{self, Sender};
 use futures::Future;
 use futures::future;
 
-use config::{DeviceId, UsbBinding, MachineConfig, HotKeyAction, Action};
+use config::{UsbId, UsbPort, UsbBinding, MachineConfig, HotKeyAction, Action};
 use util;
 use driver::clientpipe::GaCmdOut as GaCmd;
 use driver::monitor::QmpCommand;
@@ -265,11 +265,11 @@ pub fn udev_resolve_binding(udev: &Context, binding: &UsbBinding)
     iter.match_property("DEVTYPE", "usb_device")?;
 
     match binding {
-        &UsbBinding::ById(DeviceId { vendor, product }) => {
+        &UsbBinding::ById(UsbId { vendor, product }) => {
             iter.match_attribute("idVendor", format!("{:04x}", vendor))?;
             iter.match_attribute("idProduct", format!("{:04x}", product))?;
         }
-        &UsbBinding::ByPort { bus, port } => {
+        &UsbBinding::ByPort(UsbPort { bus, ref port }) => {
             iter.match_attribute("busnum", bus.to_string())?;
             iter.match_attribute("devpath", port.to_string())?;
         }

@@ -44,7 +44,7 @@ pub fn check_grouping(setup: &SetupConfig) -> Result<bool> {
     let first_id = setup.vfio_devs[0];
     let mut iter = Enumerator::new(&udev)?;
     iter.match_subsystem("pci")?;
-    let mut iter = iter.scan_devices()?.map(PciDevice::new).filter(|x| x.id == first_id.into());
+    let mut iter = iter.scan_devices()?.map(PciDevice::new).filter(|x| x.id == first_id);
     let selected = iter.next().expect("PCI device is gone now?");
     assert!(iter.next().is_none());
 
@@ -90,7 +90,7 @@ pub fn check_grouping(setup: &SetupConfig) -> Result<bool> {
     related_devices.sort();
     related_devices.dedup();
 
-    assert!(setup.vfio_devs.iter().cloned().map::<(u16, u16), _>(From::from).eq(related_devices.iter().cloned()));
+    assert!(setup.vfio_devs.iter().cloned().eq(related_devices.iter().cloned()));
     Ok(true)
 }
 

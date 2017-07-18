@@ -24,12 +24,14 @@ extern crate tokio_core;
 extern crate tokio_io;
 extern crate tokio_uds;
 extern crate tokio_timer;
+extern crate tokio_process;
 extern crate dbus;
 extern crate input;
 
 mod logger;
 mod config;
 mod pci_device;
+mod usb_device;
 mod setup;
 mod hwid;
 mod util;
