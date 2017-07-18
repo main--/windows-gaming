@@ -119,12 +119,12 @@ const KEY_DELETE: u32 = 111;
 // const KEY_VOLUMEDOWN: u32 = 114;
 // const KEY_VOLUMEUP: u32 = 115;
 // const KEY_POWER: u32 = 116	/* SC System Power Down */;
-const KEY_KPEQUAL: u32 = 117;
+// const KEY_KPEQUAL: u32 = 117;
 // const KEY_KPPLUSMINUS: u32 = 118;
 const KEY_PAUSE: u32 = 119;
 // const KEY_SCALE: u32 = 120	/* AL Compiz Scale (Expose) */;
 
-const KEY_KPCOMMA: u32 = 121;
+// const KEY_KPCOMMA: u32 = 121;
 // const KEY_HANGEUL: u32 = 122;
 // const KEY_HANGUEL: u32 = KEY_HANGEUL;
 // const KEY_HANJA: u32 = 123;
@@ -237,7 +237,7 @@ pub fn key_convert(code: u32) -> Option<Key> {
         KEY_DELETE => Key::Delete,
         KEY_PAUSE => Key::Pause,
         // KEY_KPCOMMA => ,
-        KEY_KPEQUAL => Key::Separator,
+        // KEY_KPEQUAL => Key::Separator,
         KEY_LEFTMETA => Key::LWin,
         KEY_RIGHTMETA => Key::RWin,
         // KEY_POWER => "power",

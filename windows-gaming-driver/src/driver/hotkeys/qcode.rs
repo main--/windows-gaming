@@ -104,7 +104,7 @@ pub fn key_convert(key: Key) -> &'static str {
         Key::Delete => "delete",
         Key::Pause => "pause",
         //=> "kp_comma",
-        Key::Separator => "kp_equals",
+        //Key::Separator => "kp_equals",
         Key::LWin => "meta_l",
         Key::RWin => "meta_r",
         //"power" => "power",

@@ -2,7 +2,7 @@ use std::io;
 use std::cell::RefCell;
 
 use tokio_core::reactor::{Handle, PollEvented};
-use futures::{Async, Poll, Future, Stream};
+use futures::{Async, Poll, Future};
 use futures::unsync::mpsc::{UnboundedSender, UnboundedReceiver, unbounded};
 use input::{Libinput, LibinputInterface};
 use input::event::Event;
