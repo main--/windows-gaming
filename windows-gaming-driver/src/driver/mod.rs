@@ -10,7 +10,7 @@ mod sd_notify;
 mod samba;
 mod dbus;
 mod sleep_inhibitor;
-pub mod libinput;
+mod libinput;
 pub mod hotkeys;
 
 use std::cell::RefCell;
