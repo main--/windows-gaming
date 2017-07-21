@@ -139,10 +139,10 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
                 };
 
                 QmpCommand::InputSendEvent {
-                    events: iter::repeat(direction).flat_map(|b| vec![
+                    events: iter::repeat(direction).take(steps.abs() as usize).flat_map(|b| vec![
                         InputEvent::Btn { down: true, button: b },
                         InputEvent::Btn { down: false, button: b },
-                    ]).take(steps.abs() as usize).collect(),
+                    ]).collect(),
                 }
             },
             Event::Keyboard(KeyboardEvent::Key(k)) => {
