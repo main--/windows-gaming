@@ -44,7 +44,7 @@ impl KeyBinding {
 
     pub fn to_windows(&self) -> (u32, u32) {
         let base = if self.no_repeat { NOREPEAT } else { 0 };
-        (self.modifiers.iter().fold(base, |sum, &x| sum | (x as u32)), self.key as u32)
+        (self.modifiers.iter().fold(base, |sum, &x| (sum | (x as u32))), self.key as u32)
     }
 }
 
