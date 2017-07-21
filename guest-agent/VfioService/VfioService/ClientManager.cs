@@ -22,35 +22,39 @@ namespace VfioService
             TcpClient = new TcpClient("10.0.2.1", 31337);
             Stream = TcpClient.GetStream();
             MainForm = mainForm;
-            new Thread(() => {
-                while (true) {
-                    switch ((CommandIn)Stream.ReadByte()) {
-                    case CommandIn.Ping:
-                        SendCommand(CommandOut.Pong);
-                        break;
-                    case CommandIn.RegisterHotKey:
-                        var id = ReadInt(Stream);
-                        var length = ReadInt(Stream);
-                        var hotkey = Encoding.UTF8.GetString(ReadBytes(Stream, length));
-                        var result = (string)MainForm.Invoke(new Func<int, string, string>(MainForm.RegisterHotKey), id, hotkey);
-                        if (result != null)
-                        {
-                            // report error
-                            lock (WriteLock)
+            new Thread(() =>
+            {
+                while (true)
+                {
+                    var nextCommand = (CommandIn)Stream.ReadByte();
+                    switch (nextCommand)
+                    {
+                        case CommandIn.Ping:
+                            SendCommand(CommandOut.Pong);
+                            break;
+                        case CommandIn.RegisterHotKey:
+                            var id = ReadInt(Stream);
+                            var length = ReadInt(Stream);
+                            var hotkey = Encoding.UTF8.GetString(ReadBytes(Stream, length));
+                            var result = (string)MainForm.Invoke(new Func<int, string, string>(MainForm.RegisterHotKey), id, hotkey);
+                            if (result != null)
                             {
-                                SendCommand(CommandOut.HotKeyBindingFailed);
-                                var data = Encoding.UTF8.GetBytes(result);
-                                SendData(BitConverter.GetBytes(data.Length));
-                                SendData(data);
+                                // report error
+                                lock (WriteLock)
+                                {
+                                    SendCommand(CommandOut.HotKeyBindingFailed);
+                                    var data = Encoding.UTF8.GetBytes(result);
+                                    SendData(BitConverter.GetBytes(data.Length));
+                                    SendData(data);
+                                }
                             }
-                        }
-                        break;
-                    case CommandIn.ReleaseModifiers:
-                        StuckKeyFix.ReleaseModifiers();
-                        break;
-                    case CommandIn.Suspend:
-                        Application.SetSuspendState(PowerState.Suspend, false, false);
-                        break;
+                            break;
+                        case CommandIn.ReleaseModifiers:
+                            StuckKeyFix.ReleaseModifiers();
+                            break;
+                        case CommandIn.Suspend:
+                            Application.SetSuspendState(PowerState.Suspend, false, false);
+                            break;
                     }
                 }
             }).Start();
