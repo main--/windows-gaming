@@ -65,8 +65,44 @@ namespace VfioService
             return text;
         }
 
-        private class Bitmap
+        public static void Set(string data)
         {
+            Thread staThread = new Thread(
+                delegate ()
+                {
+                    try
+                    {
+                        Clipboard.SetText(data);
+
+                    }
+                    catch
+                    {
+                    }
+                });
+
+            staThread.SetApartmentState(ApartmentState.STA);
+            staThread.Start();
+            staThread.Join();
+        }
+
+        public static void Set(Image data)
+        {
+            Thread staThread = new Thread(
+                delegate ()
+                {
+                    try
+                    {
+                        Clipboard.SetImage(data);
+
+                    }
+                    catch
+                    {
+                    }
+                });
+
+            staThread.SetApartmentState(ApartmentState.STA);
+            staThread.Start();
+            staThread.Join();
         }
     }
 }

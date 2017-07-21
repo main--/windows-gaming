@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
@@ -86,6 +87,18 @@ namespace VfioService
                             }
 
                             break;
+                        case CommandIn.ClipboardText:
+                            var clipboarTextLength = ReadInt(Stream);
+                            var clipboardString = Encoding.UTF8.GetString(ReadBytes(Stream, clipboarTextLength));
+                            ClipboardManager.Set(clipboardString);
+                            break;
+                        case CommandIn.ClipboardPng:
+                            var clipboarImageLength = ReadInt(Stream);
+                            var clipboardImageStream = new MemoryStream(ReadBytes(Stream, clipboarImageLength));
+                            var decodedImage = Image.FromStream(clipboardImageStream);
+                            ClipboardManager.Set(decodedImage);
+                            break;
+
                     }
                 }
             }).Start();
