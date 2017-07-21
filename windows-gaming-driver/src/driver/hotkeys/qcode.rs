@@ -1,7 +1,7 @@
 use super::Key;
 
-pub fn key_convert(key: Key) -> &'static str {
-    match key {
+pub fn key_convert(key: Key) -> Option<&'static str> {
+    Some(match key {
         Key::LShiftKey => "shift",
         Key::RShiftKey => "shift_r",
         Key::LMenu => "alt",
@@ -102,6 +102,9 @@ pub fn key_convert(key: Key) -> &'static str {
         Key::Right => "right",
         Key::Insert => "insert",
         Key::Delete => "delete",
+        Key::VolumeMute => return None,
+        Key::VolumeDown => return None,
+        Key::VolumeUp => return None,
         Key::Pause => "pause",
         //=> "kp_comma",
         //Key::Separator => "kp_equals",
@@ -110,5 +113,9 @@ pub fn key_convert(key: Key) -> &'static str {
         //"power" => "power",
         Key::Oem4 => "bracket_left",
         Key::Oem6 => "bracket_right",
-    }
+        Key::MediaNextTrack => return None,
+        Key::MediaPreviousTrack => return None,
+        Key::MediaStop => return None,
+        Key::MediaPlayPause => return None,
+    })
 }

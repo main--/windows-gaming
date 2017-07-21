@@ -26,6 +26,7 @@ use futures::{Future, Stream, Sink, future};
 use driver::controller::Controller;
 use config::Config;
 use driver::signalfd::{SignalFd, signal};
+use driver::hotkeys::{KeyboardState, KeyResolution};
 use self::monitor::Monitor;
 use self::clientpipe::Clientpipe;
 
@@ -94,7 +95,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     let ref input_ref = *input;
     let input_listener = libinput::InputListener(input_ref);
     let hotkey_bindings: Vec<_> = cfg.machine.hotkeys.iter().map(|x| x.key.clone()).collect();
-    let mut keyboard_state = self::hotkeys::KeyboardState::new(&hotkey_bindings);
+    let mut keyboard_state = KeyboardState::new(&hotkey_bindings);
     let input_handler = input_events.filter_map(|event| {
         use self::monitor::*;
         use std::iter;
@@ -146,7 +147,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
             },
             Event::Keyboard(KeyboardEvent::Key(k)) => {
                 let down = k.key_state() == KeyState::Pressed;
-                let (hotkeys, qcode) = match keyboard_state.input_linux(k.key(), down) {
+                let KeyResolution { hotkeys, qcode } = match keyboard_state.input_linux(k.key(), down) {
                     Some(x) => x,
                     None => return None,
                 };
@@ -155,11 +156,14 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
                     controller.borrow_mut().ga_hotkey(hk as u32);
                 }
 
-                QmpCommand::InputSendEvent {
-                    events: vec![ InputEvent::Key {
-                        down,
-                        key: KeyValue::Qcode(qcode),
-                    }]
+                match qcode {
+                    Some(qcode) => QmpCommand::InputSendEvent {
+                        events: vec![ InputEvent::Key {
+                            down,
+                            key: KeyValue::Qcode(qcode),
+                        }]
+                    },
+                    None => return None
                 }
             }
             event => {

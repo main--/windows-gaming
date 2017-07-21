@@ -39,7 +39,6 @@ impl Input {
             open_restricted: Some(do_open),
             close_restricted: Some(do_close),
         }, Some(()));
-
         let (send, recv) = unbounded();
         (Input {
             io: PollEvented::new(MyIo { fd: unsafe { li.fd() } }, handle).unwrap(),
