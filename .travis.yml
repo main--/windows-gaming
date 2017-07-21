@@ -25,7 +25,6 @@ arch:
     - mono
     - cdrkit
   script:
-    - rustup install "$RUST_TOOLCHAIN"
     - rustup default "$RUST_TOOLCHAIN"
     - export PATH=$HOME/.cargo/bin:$PATH
     - make all test
