@@ -44,8 +44,13 @@ impl KeyBinding {
 
     pub fn to_windows(&self) -> (u32, u32) {
         let base = if self.no_repeat { NOREPEAT } else { 0 };
-        (self.modifiers.iter().fold(base, |sum, &x| sum | (x as u32)), self.key as u32)
+        (self.modifiers.iter().fold(base, |sum, &x| (sum | (x as u32))), self.key as u32)
     }
+}
+
+pub struct KeyResolution {
+    pub hotkeys: Vec<usize>,
+    pub qcode: Option<&'static str>,
 }
 
 pub struct KeyboardState<'a> {
@@ -61,7 +66,7 @@ impl<'a> KeyboardState<'a> {
         }
     }
 
-    pub fn input_linux(&mut self, code: u32, down: bool) -> Option<(Vec<usize>, &'static str)> {
+    pub fn input_linux(&mut self, code: u32, down: bool) -> Option<KeyResolution> {
         linux::key_convert(code).map(|k| {
             let mut bindings = Vec::new();
             if let Some(m) = k.modifier() {
@@ -80,7 +85,10 @@ impl<'a> KeyboardState<'a> {
                                 .map(|(i, _)| i));
             }
 
-            (bindings, qcode::key_convert(k))
+            KeyResolution {
+                hotkeys: bindings,
+                qcode: qcode::key_convert(k),
+            }
         })
     }
 }

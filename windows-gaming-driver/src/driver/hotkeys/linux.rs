@@ -115,9 +115,9 @@ const KEY_PAGEDOWN: u32 = 109;
 const KEY_INSERT: u32 = 110;
 const KEY_DELETE: u32 = 111;
 // const KEY_MACRO: u32 = 112;
-// const KEY_MUTE: u32 = 113;
-// const KEY_VOLUMEDOWN: u32 = 114;
-// const KEY_VOLUMEUP: u32 = 115;
+ const KEY_MUTE: u32 = 113;
+ const KEY_VOLUMEDOWN: u32 = 114;
+ const KEY_VOLUMEUP: u32 = 115;
 // const KEY_POWER: u32 = 116	/* SC System Power Down */;
 // const KEY_KPEQUAL: u32 = 117;
 // const KEY_KPPLUSMINUS: u32 = 118;
@@ -132,6 +132,10 @@ const KEY_PAUSE: u32 = 119;
 const KEY_LEFTMETA: u32 = 125;
 const KEY_RIGHTMETA: u32 = 126;
 const KEY_COMPOSE: u32 = 127;
+const KEY_NEXTSONG: u32 = 163;
+const KEY_PLAYPAUSE: u32 = 164;
+const KEY_PREVIOUSSONG: u32 = 165;
+const KEY_STOPCD: u32 = 166;
 
 pub fn key_convert(code: u32) -> Option<Key> {
     Some(match code {
@@ -235,6 +239,9 @@ pub fn key_convert(code: u32) -> Option<Key> {
         KEY_RIGHT => Key::Right,
         KEY_INSERT => Key::Insert,
         KEY_DELETE => Key::Delete,
+        KEY_MUTE => Key::VolumeMute,
+        KEY_VOLUMEDOWN => Key::VolumeDown,
+        KEY_VOLUMEUP => Key::VolumeUp,
         KEY_PAUSE => Key::Pause,
         // KEY_KPCOMMA => ,
         // KEY_KPEQUAL => Key::Separator,
@@ -243,6 +250,10 @@ pub fn key_convert(code: u32) -> Option<Key> {
         // KEY_POWER => "power",
         KEY_LEFTBRACE => Key::Oem4,
         KEY_RIGHTBRACE => Key::Oem6,
+        KEY_NEXTSONG => Key::MediaNextTrack,
+        KEY_PLAYPAUSE => Key::MediaPlayPause,
+        KEY_PREVIOUSSONG => Key::MediaPreviousTrack,
+        KEY_STOPCD => Key::MediaStop,
         _ => return None,
     })
 }

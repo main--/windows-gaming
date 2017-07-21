@@ -151,6 +151,7 @@ pub enum Keys {
     BrowserSearch = 0x000000AA,
     BrowserFavorites = 0x000000AB,
     BrowserHome = 0x000000AC,
+    */
     VolumeMute = 0x000000AD,
     VolumeDown = 0x000000AE,
     VolumeUp = 0x000000AF,
@@ -158,6 +159,7 @@ pub enum Keys {
     MediaPreviousTrack = 0x000000B1,
     MediaStop = 0x000000B2,
     MediaPlayPause = 0x000000B3,
+    /*
     LaunchMail = 0x000000B4,
     SelectMedia = 0x000000B5,
     LaunchApplication1 = 0x000000B6,
