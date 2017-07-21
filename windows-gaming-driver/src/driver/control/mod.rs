@@ -24,27 +24,16 @@ pub fn create<'a>(socket: StdUnixListener, handle: &'a Handle, controller: Rc<Re
 
         let controller = controller.clone();
         handle.spawn(reader.for_each(move |req| {
+            let mut controller = controller.borrow_mut();
+            info!("Control request: {:?}", req);
             match req {
-                ControlCmdIn::IoEntry => {
-                    info!("IO entry requested!");
-                    controller.borrow_mut().io_attach();
-                }
-                ControlCmdIn::Shutdown => {
-                    info!("Shutdown requested");
-                    controller.borrow_mut().shutdown();
-                }
-                ControlCmdIn::ForceIoEntry => {
-                    info!("IO entry FORCED!");
-                    controller.borrow_mut().io_force_attach();
-                }
-                ControlCmdIn::IoExit => {
-                    info!("IO exit!");
-                    controller.borrow_mut().io_detach();
-                }
-                ControlCmdIn::Suspend => {
-                    info!("Suspending guest!");
-                    controller.borrow_mut().suspend();
-                }
+                ControlCmdIn::IoEntry => controller.io_attach(),
+                ControlCmdIn::Shutdown => controller.shutdown(),
+                ControlCmdIn::ForceIoEntry => controller.io_force_attach(),
+                ControlCmdIn::IoExit => controller.io_detach(),
+                ControlCmdIn::Suspend => { controller.suspend(); }
+                ControlCmdIn::TryIoEntry => controller.try_attach(),
+                ControlCmdIn::LightEntry => controller.light_attach(),
             }
             Ok(())
         }).then(|_| Ok(())));
