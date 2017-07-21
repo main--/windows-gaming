@@ -58,50 +58,58 @@ namespace VfioService
                             Application.SetSuspendState(PowerState.Suspend, false, false);
                             break;
                         case CommandIn.GetClipboard:
-                            var clipboardText = ClipboardManager.GetText();
-                            if (clipboardText != null)
-                            {
-                                lock (WriteLock)
-                                {
-                                    SendCommand(CommandOut.ClipboardText);
-                                    // This removes formatting, which I think is a good idea.
-                                    var data = Encoding.UTF8.GetBytes(clipboardText);
-                                    SendData(BitConverter.GetBytes(data.Length));
-                                    SendData(data);
-                                }
-                            }
-
-                            var clipboardImage = ClipboardManager.GetImage();
-                            if (clipboardImage != null)
-                            {
-                                lock (WriteLock)
-                                {
-                                    MemoryStream ms = new MemoryStream();
-                                    clipboardImage.Save(ms, ImageFormat.Png);
-                                    var data = ms.ToArray();
-
-                                    SendCommand(CommandOut.ClipboardPng);
-                                    SendData(BitConverter.GetBytes(data.Length));
-                                    SendData(data);
-                                }
-                            }
-
+                            SendClipboardData();
                             break;
                         case CommandIn.ClipboardText:
                             var clipboarTextLength = ReadInt(Stream);
                             var clipboardString = Encoding.UTF8.GetString(ReadBytes(Stream, clipboarTextLength));
-                            ClipboardManager.Set(clipboardString);
+                            MainForm.Invoke(new Func<string, object>(MainForm.SetClipboradText), clipboardString);
                             break;
                         case CommandIn.ClipboardPng:
                             var clipboarImageLength = ReadInt(Stream);
                             var clipboardImageStream = new MemoryStream(ReadBytes(Stream, clipboarImageLength));
                             var decodedImage = Image.FromStream(clipboardImageStream);
-                            ClipboardManager.Set(decodedImage);
+                            MainForm.Invoke(new Func<Image, object>(MainForm.SetClipboardImage), decodedImage);
                             break;
-
                     }
                 }
             }).Start();
+        }
+
+        private void SendClipboardData()
+        {
+            var clipboardText = (string)MainForm.Invoke(new Func<string>(MainForm.GetClipboardText));
+            if (clipboardText != null)
+            {
+                lock (WriteLock)
+                {
+                    SendCommand(CommandOut.ClipboardText);
+                    // This removes formatting, which I think is a good idea.
+                    var data = Encoding.UTF8.GetBytes(clipboardText);
+                    SendData(BitConverter.GetBytes(data.Length));
+                    SendData(data);
+                }
+
+                return;
+            }
+
+            var clipboardImage = (Image)MainForm.Invoke(new Func<Image>(MainForm.GetClipboardImage));
+            if (clipboardImage != null)
+            {
+                lock (WriteLock)
+                {
+                    MemoryStream ms = new MemoryStream();
+                    clipboardImage.Save(ms, ImageFormat.Png);
+                    var data = ms.ToArray();
+
+                    SendCommand(CommandOut.ClipboardPng);
+                    SendData(BitConverter.GetBytes(data.Length));
+                    SendData(data);
+                }
+
+                return;
+            }
+
         }
 
         public void Dispose()

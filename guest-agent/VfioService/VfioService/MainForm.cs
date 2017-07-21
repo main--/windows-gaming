@@ -71,6 +71,34 @@ namespace VfioService
 
             return null;
         }
+        
+        public string GetClipboardText()
+        {
+            if (!Clipboard.ContainsText())
+                return null;
+
+            return Clipboard.GetText(TextDataFormat.UnicodeText);
+        }
+
+        public Image GetClipboardImage()
+        {
+            if (!Clipboard.ContainsImage())
+                return null;
+
+            return Clipboard.GetImage();
+        }
+
+        public object SetClipboradText(string data)
+        {
+            Clipboard.SetText(data);
+            return null;
+        }
+
+        public object SetClipboardImage(Image image)
+        {
+            Clipboard.SetImage(image);
+            return null;
+        }
 
         private const int WmPowerBroadcast = 0x0218;
         private const int WmHotkey = 0x0312;
