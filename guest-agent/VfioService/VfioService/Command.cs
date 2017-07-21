@@ -24,8 +24,8 @@ namespace VfioService
         RegisterHotKey = 0x05,
         ReleaseModifiers = 0x03,
         Suspend = 0x04,
-        GetClipboard = 0x05,
-        ClipboardText = 0x06,
-        ClipboardPng = 0x07,
+        GetClipboard = 0x06,
+        ClipboardText = 0x07,
+        ClipboardPng = 0x08,
     }
 }
