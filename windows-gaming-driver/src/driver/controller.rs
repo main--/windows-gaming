@@ -39,7 +39,7 @@ enum State {
 enum IoState {
     Detached,
     LightEntry,
-    LightFallback,
+    AwaitingUpgrade,
     FullEntry,
 }
 
@@ -128,7 +128,7 @@ impl Controller {
 
         let ga = mem::replace(&mut self.ga, State::Up);
 
-        if self.io_state == IoState::LightFallback {
+        if self.io_state == IoState::AwaitingUpgrade {
             self.io_attach();
         }
 
@@ -187,7 +187,7 @@ impl Controller {
             },
             State::Down => {
                 self.light_attach();
-                self.io_state = IoState::LightFallback;
+                self.io_state = IoState::AwaitingUpgrade;
             }
             State::Up | State::Pinging => self.io_force_attach(),
         }
@@ -206,7 +206,7 @@ impl Controller {
                 self.input.borrow_mut().resume();
                 self.io_state = IoState::LightEntry;
             }
-            IoState::LightFallback => self.io_state = IoState::LightEntry,
+            IoState::AwaitingUpgrade => self.io_state = IoState::LightEntry,
             IoState::LightEntry | IoState::FullEntry => (),
         }
     }
@@ -219,7 +219,7 @@ impl Controller {
         // release light entry first so we don't mess things up
         match self.io_state {
             IoState::Detached => (),
-            IoState::LightFallback | IoState::LightEntry => self.input.borrow_mut().suspend(),
+            IoState::AwaitingUpgrade | IoState::LightEntry => self.input.borrow_mut().suspend(),
             IoState::FullEntry => return,
         }
 
@@ -272,7 +272,7 @@ impl Controller {
 
         match self.io_state {
             IoState::Detached => (),
-            IoState::LightFallback | IoState::LightEntry => self.input.borrow_mut().suspend(),
+            IoState::AwaitingUpgrade | IoState::LightEntry => self.input.borrow_mut().suspend(),
             IoState::FullEntry => {
                 for i in self.machine_config.usb_devices.iter().enumerate()
                     .filter(|&(_, dev)| !dev.permanent).map(|(i, _)| i) {
