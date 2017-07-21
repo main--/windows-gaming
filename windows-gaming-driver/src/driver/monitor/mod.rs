@@ -2,6 +2,7 @@ mod codec;
 
 pub use self::codec::{
     QmpCommand,
+    InputEvent,
     Message,
     Event,
     Ret,
@@ -11,6 +12,8 @@ pub use self::codec::{
     Qmp,
     QmpVersion,
     Version,
+    KeyValue,
+    InputButton,
 };
 
 use std::os::unix::net::{UnixStream as StdUnixStream};
@@ -63,7 +66,12 @@ impl Monitor {
 
     pub fn take_handler(&mut self, controller: Rc<RefCell<Controller>>) -> Handler {
         let handler = self.read.take().unwrap().for_each(move |msg| {
-            info!("{:?}", msg);
+            if let Message::Return { .. } = msg {
+                trace!("{:?}", msg);
+            } else {
+                info!("{:?}", msg);
+            }
+
             if let Message::Event(Event::Suspend { .. }) = msg {
                 controller.borrow_mut().qemu_suspended();
             }

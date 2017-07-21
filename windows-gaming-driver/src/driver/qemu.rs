@@ -136,6 +136,9 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
         create_usb_buses("qemu-xhci", UsbBus::Xhci, ",p2=15,p3=15");
     }
 
+    qemu.args(&[                "-device", "usb-mouse,bus=xhci0.0,port=5", //FIXME
+                                  ]);
+
     let sorted = cfg.machine.usb_devices.iter().sorted_by(|a, b| a.bus.cmp(&b.bus));
     let groups = sorted.iter().group_by(|dev| dev.bus);
     for (port, dev) in groups.into_iter().flat_map(|(_, group)| group.enumerate())

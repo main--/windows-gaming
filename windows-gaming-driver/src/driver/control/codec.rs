@@ -11,6 +11,8 @@ pub enum ControlCmdOut {
 #[derive(Debug, PartialEq, Eq)]
 pub enum ControlCmdIn {
     IoEntry,
+    TryIoEntry,
+    LightEntry,
     Shutdown,
     ForceIoEntry,
     IoExit,
@@ -30,6 +32,8 @@ impl Decoder for Codec {
             Some(3) => ControlCmdIn::ForceIoEntry,
             Some(4) => ControlCmdIn::IoExit,
             Some(5) => ControlCmdIn::Suspend,
+            Some(6) => ControlCmdIn::TryIoEntry,
+            Some(7) => ControlCmdIn::LightEntry,
             Some(x) => {
                 warn!("control sent invalid request {}", x);
                 // no idea how to proceed as the request might have payload

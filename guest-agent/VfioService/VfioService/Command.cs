@@ -21,7 +21,7 @@ namespace VfioService
     public enum CommandIn : byte
     {
         Ping = 0x01,
-        RegisterHotKey = 0x02,
+        RegisterHotKey = 0x05,
         ReleaseModifiers = 0x03,
         Suspend = 0x04,
         GetClipboard = 0x05,
