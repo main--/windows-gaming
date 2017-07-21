@@ -241,7 +241,6 @@ fn machineconfig_hotkeys_default() -> Vec<HotKey> {
     ]
 }
 
-
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct StorageDevice {
     pub path: String,
