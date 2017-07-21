@@ -3,10 +3,10 @@ use std::cell::RefCell;
 
 use tokio_core::reactor::{Handle, PollEvented};
 use futures::{Async, Poll, Future};
-use futures::unsync::mpsc::{UnboundedSender, UnboundedReceiver, unbounded};
+use futures::unsync::mpsc::{UnboundedSender, UnboundedReceiver, self};
 use input::{Libinput, LibinputInterface, Device};
 use input::event::Event;
-use libc::{open, close, ioctl, c_char, c_int, c_ulong, c_void};
+use libc::{self, c_char, c_int, c_ulong, c_void};
 use libudev::{Result as UdevResult, Context, Enumerator};
 
 use super::my_io::MyIo;
@@ -15,14 +15,14 @@ use config::{UsbDevice, UsbBinding, UsbPort, UsbId};
 const EVIOCGRAB: c_ulong = 1074021776;
 
 unsafe extern "C" fn do_open(path: *const c_char, mode: c_int, _: *mut c_void) -> c_int {
-    let fd = open(path, mode);
-    ioctl(fd, EVIOCGRAB, 1);
+    let fd = libc::open(path, mode);
+    libc::ioctl(fd, EVIOCGRAB, 1);
     fd
 }
 
 unsafe extern "C" fn do_close(fd: c_int, _: *mut c_void) {
-    ioctl(fd, EVIOCGRAB, 0);
-    close(fd);
+    libc::ioctl(fd, EVIOCGRAB, 0);
+    libc::close(fd);
 }
 
 pub struct Input {
@@ -39,7 +39,7 @@ impl Input {
             open_restricted: Some(do_open),
             close_restricted: Some(do_close),
         }, Some(()));
-        let (send, recv) = unbounded();
+        let (send, recv) = mpsc::unbounded();
         (Input {
             io: PollEvented::new(MyIo { fd: unsafe { li.fd() } }, handle).unwrap(),
             li, usb_devs,
