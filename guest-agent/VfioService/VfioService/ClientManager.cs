@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
@@ -22,38 +24,92 @@ namespace VfioService
             TcpClient = new TcpClient("10.0.2.1", 31337);
             Stream = TcpClient.GetStream();
             MainForm = mainForm;
-            new Thread(() => {
-                while (true) {
-                    switch ((CommandIn)Stream.ReadByte()) {
-                    case CommandIn.Ping:
-                        SendCommand(CommandOut.Pong);
-                        break;
-                    case CommandIn.RegisterHotKey:
-                        var id = ReadInt(Stream);
-                        var mods = ReadInt(Stream);
-                        var keys = ReadInt(Stream);
-                        var result = (string)MainForm.Invoke(new Func<int, int, int, string>(MainForm.RegisterHotKey), id, mods, keys);
-                        if (result != null)
-                        {
-                            // report error
-                            lock (WriteLock)
+            new Thread(() =>
+            {
+                while (true)
+                {
+                    var nextCommand = (CommandIn)Stream.ReadByte();
+                    switch (nextCommand)
+                    {
+                        case CommandIn.Ping:
+                            SendCommand(CommandOut.Pong);
+                            break;
+                        case CommandIn.RegisterHotKey:
+                            var id = ReadInt(Stream);
+                            var mods = ReadInt(Stream);
+                            var keys = ReadInt(Stream);
+                            var result = (string)MainForm.Invoke(new Func<int, int, int, string>(MainForm.RegisterHotKey), id, mods, keys);
+                            if (result != null)
                             {
-                                SendCommand(CommandOut.HotKeyBindingFailed);
-                                var data = Encoding.UTF8.GetBytes(result);
-                                SendData(BitConverter.GetBytes(data.Length));
-                                SendData(data);
+                                // report error
+                                lock (WriteLock)
+                                {
+                                    SendCommand(CommandOut.HotKeyBindingFailed);
+                                    var data = Encoding.UTF8.GetBytes(result);
+                                    SendData(BitConverter.GetBytes(data.Length));
+                                    SendData(data);
+                                }
                             }
-                        }
-                        break;
-                    case CommandIn.ReleaseModifiers:
-                        StuckKeyFix.ReleaseModifiers();
-                        break;
-                    case CommandIn.Suspend:
-                        Application.SetSuspendState(PowerState.Suspend, false, false);
-                        break;
+                            break;
+                        case CommandIn.ReleaseModifiers:
+                            StuckKeyFix.ReleaseModifiers();
+                            break;
+                        case CommandIn.Suspend:
+                            Application.SetSuspendState(PowerState.Suspend, false, false);
+                            break;
+                        case CommandIn.GetClipboard:
+                            SendClipboardData();
+                            break;
+                        case CommandIn.ClipboardText:
+                            var clipboarTextLength = ReadInt(Stream);
+                            var clipboardString = Encoding.UTF8.GetString(ReadBytes(Stream, clipboarTextLength));
+                            MainForm.Invoke(new Func<string, object>(MainForm.SetClipboradText), clipboardString);
+                            break;
+                        case CommandIn.ClipboardPng:
+                            var clipboarImageLength = ReadInt(Stream);
+                            var clipboardImageStream = new MemoryStream(ReadBytes(Stream, clipboarImageLength));
+                            var decodedImage = Image.FromStream(clipboardImageStream);
+                            MainForm.Invoke(new Func<Image, object>(MainForm.SetClipboardImage), decodedImage);
+                            break;
                     }
                 }
             }).Start();
+        }
+
+        private void SendClipboardData()
+        {
+            var clipboardText = (string)MainForm.Invoke(new Func<string>(MainForm.GetClipboardText));
+            if (clipboardText != null)
+            {
+                lock (WriteLock)
+                {
+                    SendCommand(CommandOut.ClipboardText);
+                    // This removes formatting, which I think is a good idea.
+                    var data = Encoding.UTF8.GetBytes(clipboardText);
+                    SendData(BitConverter.GetBytes(data.Length));
+                    SendData(data);
+                }
+
+                return;
+            }
+
+            var clipboardImage = (Image)MainForm.Invoke(new Func<Image>(MainForm.GetClipboardImage));
+            if (clipboardImage != null)
+            {
+                lock (WriteLock)
+                {
+                    MemoryStream ms = new MemoryStream();
+                    clipboardImage.Save(ms, ImageFormat.Png);
+                    var data = ms.ToArray();
+
+                    SendCommand(CommandOut.ClipboardPng);
+                    SendData(BitConverter.GetBytes(data.Length));
+                    SendData(data);
+                }
+
+                return;
+            }
+
         }
 
         public void Dispose()

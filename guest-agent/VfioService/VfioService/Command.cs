@@ -14,6 +14,8 @@ namespace VfioService
         Pong = 0x04,
         HotKey = 0x05,
         HotKeyBindingFailed = 0x06,
+        ClipboardText = 0x07,
+        ClipboardPng = 0x08,
     }
 
     public enum CommandIn : byte
@@ -22,5 +24,8 @@ namespace VfioService
         RegisterHotKey = 0x05,
         ReleaseModifiers = 0x03,
         Suspend = 0x04,
+        GetClipboard = 0x06,
+        ClipboardText = 0x07,
+        ClipboardPng = 0x08,
     }
 }
