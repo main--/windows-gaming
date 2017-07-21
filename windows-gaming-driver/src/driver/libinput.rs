@@ -2,6 +2,7 @@ use std::io;
 use std::iter;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::os::unix::io::RawFd;
 
 use tokio_core::reactor::{Handle, PollEvented};
 use futures::{Async, Poll, Future, Stream, Sink};
@@ -24,13 +25,20 @@ const EVIOCGRAB: c_ulong = 1074021776;
 
 unsafe extern "C" fn do_open(path: *const c_char, mode: c_int, _: *mut c_void) -> c_int {
     let fd = libc::open(path, mode);
-    libc::ioctl(fd, EVIOCGRAB, 1);
+    grab_fd(fd, true);
     fd
 }
 
 unsafe extern "C" fn do_close(fd: c_int, _: *mut c_void) {
-    libc::ioctl(fd, EVIOCGRAB, 0);
+    grab_fd(fd, false);
     libc::close(fd);
+}
+
+unsafe fn grab_fd(fd: RawFd, grap: bool) {
+    let res = libc::ioctl(fd, EVIOCGRAB, grap as usize);
+    if res < 0 {
+        error!("Could not exclusively grap input device");
+    }
 }
 
 const BTN_LEFT: u32 = 0x110;
