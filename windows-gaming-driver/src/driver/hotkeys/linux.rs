@@ -132,10 +132,10 @@ const KEY_PAUSE: u32 = 119;
 const KEY_LEFTMETA: u32 = 125;
 const KEY_RIGHTMETA: u32 = 126;
 const KEY_COMPOSE: u32 = 127;
-const KEY_MEDIANEXTTRACK: u32 = 163;
-const KEY_MEDIAPLAYPAUSE: u32 = 164;
-const KEY_MEDIAPREVIOUSTRACK: u32 = 165;
-const KEY_MEDIASTOP: u32 = 166;
+const KEY_NEXTSONG: u32 = 163;
+const KEY_PLAYPAUSE: u32 = 164;
+const KEY_PREVIOUSSONG: u32 = 165;
+const KEY_STOPCD: u32 = 166;
 
 pub fn key_convert(code: u32) -> Option<Key> {
     Some(match code {
@@ -250,10 +250,10 @@ pub fn key_convert(code: u32) -> Option<Key> {
         // KEY_POWER => "power",
         KEY_LEFTBRACE => Key::Oem4,
         KEY_RIGHTBRACE => Key::Oem6,
-        KEY_MEDIANEXTTRACK => Key::MediaNextTrack,
-        KEY_MEDIAPLAYPAUSE => Key::MediaPlayPause,
-        KEY_MEDIAPREVIOUSTRACK => Key::MediaPreviousTrack,
-        KEY_MEDIASTOP => Key::MediaStop,
+        KEY_NEXTSONG => Key::MediaNextTrack,
+        KEY_PLAYPAUSE => Key::MediaPlayPause,
+        KEY_PREVIOUSSONG => Key::MediaPreviousTrack,
+        KEY_STOPCD => Key::MediaStop,
         _ => return None,
     })
 }
