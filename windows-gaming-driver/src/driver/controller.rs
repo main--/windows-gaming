@@ -275,9 +275,9 @@ impl Controller {
             IoState::AwaitingUpgrade | IoState::LightEntry => self.input.borrow_mut().suspend(),
             IoState::FullEntry => {
                 for i in self.machine_config.usb_devices.iter().enumerate()
-                    .filter(|&(_, dev)| !dev.permanent).map(|(i, _)| i) {
-                        (&self.monitor).send(QmpCommand::DeviceDel { id: format!("usb{}", i) }).unwrap();
-                    }
+                        .filter(|&(_, dev)| !dev.permanent).map(|(i, _)| i) {
+                    (&self.monitor).send(QmpCommand::DeviceDel { id: format!("usb{}", i) }).unwrap();
+                }
             }
         }
 
