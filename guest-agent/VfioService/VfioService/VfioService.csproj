@@ -67,6 +67,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ClientManager.cs" />
+    <Compile Include="ClipboardManager.cs" />
     <Compile Include="Command.cs" />
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>

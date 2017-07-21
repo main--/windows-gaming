@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
@@ -54,6 +55,36 @@ namespace VfioService
                             break;
                         case CommandIn.Suspend:
                             Application.SetSuspendState(PowerState.Suspend, false, false);
+                            break;
+                        case CommandIn.GetClipboard:
+                            var clipboardText = ClipboardManager.GetText();
+                            if (clipboardText != null)
+                            {
+                                lock (WriteLock)
+                                {
+                                    SendCommand(CommandOut.ClipboardText);
+                                    // This removes formatting, which I think is a good idea.
+                                    var data = Encoding.UTF8.GetBytes(clipboardText);
+                                    SendData(BitConverter.GetBytes(data.Length));
+                                    SendData(data);
+                                }
+                            }
+
+                            var clipboardImage = ClipboardManager.GetImage();
+                            if (clipboardImage != null)
+                            {
+                                lock (WriteLock)
+                                {
+                                    MemoryStream ms = new MemoryStream();
+                                    clipboardImage.Save(ms, ImageFormat.Png);
+                                    var data = ms.ToArray();
+
+                                    SendCommand(CommandOut.ClipboardPng);
+                                    SendData(BitConverter.GetBytes(data.Length));
+                                    SendData(data);
+                                }
+                            }
+
                             break;
                     }
                 }
