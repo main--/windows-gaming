@@ -24,6 +24,7 @@ arch:
     - rustup
     - mono
     - cdrkit
+    - libx11
   script:
     - rustup default "$RUST_TOOLCHAIN"
     - export PATH=$HOME/.cargo/bin:$PATH
