@@ -28,6 +28,7 @@ arch:
   script:
     - rustup default "$RUST_TOOLCHAIN"
     - export PATH=$HOME/.cargo/bin:$PATH
+    - if [ "$RUST_TOOLCHAIN" = "nightly" ]; then cargo install clippy; fi
     - make all test
     - if [ "$RUST_TOOLCHAIN" = "nightly" ]; then make clippy; fi
 
