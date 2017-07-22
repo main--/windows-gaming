@@ -219,6 +219,9 @@ pub struct MachineConfig {
     pub cores: usize,
     pub threads: Option<u32>,
 
+    #[serde(default)]
+    pub light_mouse_speed: f64,
+
     // convention: gpu is first
     pub vfio_slots: Vec<String>,
     pub network: Option<NetworkConfig>,

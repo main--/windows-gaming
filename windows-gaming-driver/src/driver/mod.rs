@@ -78,7 +78,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     let mut monitor = Monitor::new(monitor_stream, &handle);
     let mut clientpipe = Clientpipe::new(clientpipe_stream, &handle);
 
-    let (mut input, input_events) = Input::new(&handle, cfg.machine.usb_devices.clone(),);
+    let (mut input, input_events) = Input::new(&handle, cfg.machine.clone());
     input.suspend();
     let input = Rc::new(RefCell::new(input));
 

@@ -7,7 +7,7 @@ use std::os::unix::io::RawFd;
 use tokio_core::reactor::{Handle, PollEvented};
 use futures::{Async, Poll, Future, Stream, Sink};
 use futures::unsync::mpsc::{UnboundedSender, UnboundedReceiver, self};
-use input::{Libinput, LibinputInterface, Device};
+use input::{Libinput, LibinputInterface, Device, AccelProfile};
 use input::event::{Event, KeyboardEvent, PointerEvent};
 use input::event::pointer::{Axis, ButtonState};
 use input::event::keyboard::{KeyState, KeyboardEventTrait};
@@ -15,7 +15,7 @@ use libc::{self, c_char, c_int, c_ulong, c_void};
 use libudev::{Result as UdevResult, Context, Enumerator};
 
 use super::my_io::MyIo;
-use config::{UsbDevice, UsbBinding, UsbPort, UsbId};
+use config::{UsbBinding, UsbPort, UsbId, MachineConfig};
 use driver::controller::Controller;
 use driver::hotkeys::{KeyboardState, KeyResolution};
 use driver::monitor::{QmpCommand, InputEvent, InputButton, KeyValue};
@@ -48,7 +48,7 @@ const BTN_SIDE: u32 = 0x113;
 const BTN_EXTRA: u32 = 0x114;
 
 pub struct Input {
-    usb_devs: Vec<UsbDevice>,
+    machine: MachineConfig,
     li: Libinput,
     device_handles: Vec<Device>,
     io: PollEvented<MyIo>,
@@ -56,15 +56,16 @@ pub struct Input {
 }
 
 impl Input {
-    pub fn new(handle: &Handle, usb_devs: Vec<UsbDevice>) -> (Input, UnboundedReceiver<Event>) {
+    pub fn new(handle: &Handle, machine: MachineConfig) -> (Input, UnboundedReceiver<Event>) {
         let li = Libinput::new_from_path(LibinputInterface {
             open_restricted: Some(do_open),
             close_restricted: Some(do_close),
         }, Some(()));
         let (send, recv) = mpsc::unbounded();
         (Input {
+            machine,
             io: PollEvented::new(MyIo { fd: unsafe { li.fd() } }, handle).unwrap(),
-            li, usb_devs,
+            li,
             device_handles: Vec::new(),
             sender: send,
         }, recv)
@@ -83,7 +84,7 @@ impl Input {
     pub fn resume_inner(&mut self) -> UdevResult<()> {
         let ctx = Context::new()?;
 
-        for dev in self.usb_devs.iter().filter(|x| !x.permanent) {
+        for dev in self.machine.usb_devices.iter().filter(|x| !x.permanent) {
             // FIXME this is copy-pasta from controller's udev resolver
             let mut iter = Enumerator::new(&ctx).unwrap();
 
@@ -114,7 +115,16 @@ impl Input {
                     let dev_node = dev.devnode().expect("libinput device is missing a devnode");
                     let handle  = self.li.path_add_device(dev_node.as_os_str().to_str().unwrap()); // FIXME utf8???
                     match handle {
-                        Some(h) => self.device_handles.push(h),
+                        Some(mut h) => {
+                            // only set acceleration for devices which support it
+                            if h.config_accel_profiles().contains(&AccelProfile::Flat) {
+                                h.config_accel_set_profile(AccelProfile::Flat)
+                                    .expect("Error setting acceleration profile to flat");
+                                h.config_accel_set_speed(self.machine.light_mouse_speed)
+                                    .expect("Error setting acceleration speed");
+                            }
+                            self.device_handles.push(h);
+                        }
                         None => error!("Failed to open libinput device ({:?})!", dev.syspath()),
                     }
                 }
@@ -150,16 +160,18 @@ impl<'a> Future for InputListener<'a> {
 }
 
 pub fn create_handler<'a>(input_events: UnboundedReceiver<Event>, hotkey_bindings: &'a [KeyBinding],
-                      controller: Rc<RefCell<Controller>>, monitor_sender: UnboundedSender<QmpCommand>)
+                          controller: Rc<RefCell<Controller>>, monitor_sender: UnboundedSender<QmpCommand>)
             -> Box<Future<Item = (), Error = io::Error> + 'a> {
     let mut keyboard_state = KeyboardState::new(hotkey_bindings);
     let input_handler = input_events.filter_map(move |event| {
         Some(match event {
             Event::Pointer(PointerEvent::Motion(m)) =>
-                QmpCommand::InputSendEvent { events: vec![
-                    InputEvent::Rel { axis: "x", value: m.dx() as u32 },
-                    InputEvent::Rel { axis: "y", value: m.dy() as u32 },
-                ]},
+                QmpCommand::InputSendEvent {
+                    events: vec![
+                        InputEvent::Rel { axis: "x", value: m.dx() as u32 },
+                        InputEvent::Rel { axis: "y", value: m.dy() as u32 },
+                    ]
+                },
             Event::Pointer(PointerEvent::Button(b)) =>
                 QmpCommand::InputSendEvent {
                     events: vec![InputEvent::Btn {
