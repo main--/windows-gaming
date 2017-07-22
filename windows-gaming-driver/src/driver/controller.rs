@@ -207,6 +207,7 @@ impl Controller {
     }
 
     pub fn light_attach(&mut self) {
+        debug!("light entry");
         self.send_clipboard();
         match self.io_state {
             IoState::Detached => {
@@ -220,6 +221,7 @@ impl Controller {
 
     /// Attaches all configured devices regardless of GA state
     pub fn io_force_attach(&mut self) {
+        debug!("full entry");
         self.send_clipboard();
         // might still be holding keyboard modifiers - release them
         self.write_ga(GaCmd::ReleaseModifiers);
@@ -307,8 +309,12 @@ impl Controller {
 
         match self.io_state {
             IoState::Detached => (),
-            IoState::AwaitingUpgrade | IoState::LightEntry => self.input.borrow_mut().suspend(),
+            IoState::AwaitingUpgrade | IoState::LightEntry => {
+                debug!("detaching light entry");
+                self.input.borrow_mut().suspend()
+            },
             IoState::FullEntry => {
+                debug!("detaching full entry");
                 for i in self.machine_config.usb_devices.iter().enumerate()
                         .filter(|&(_, dev)| !dev.permanent).map(|(i, _)| i) {
                     (&self.monitor).send(QmpCommand::DeviceDel { id: format!("usb{}", i) }).unwrap();
