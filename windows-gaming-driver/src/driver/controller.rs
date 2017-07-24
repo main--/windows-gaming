@@ -208,9 +208,9 @@ impl Controller {
 
     pub fn light_attach(&mut self) {
         debug!("light entry");
-        self.send_clipboard();
         match self.io_state {
             IoState::Detached => {
+                self.prepare_entry();
                 self.input.borrow_mut().resume();
                 self.io_state = IoState::LightEntry;
             }
@@ -222,9 +222,6 @@ impl Controller {
     /// Attaches all configured devices regardless of GA state
     pub fn io_force_attach(&mut self) {
         debug!("full entry");
-        self.send_clipboard();
-        // might still be holding keyboard modifiers - release them
-        self.write_ga(GaCmd::ReleaseModifiers);
 
         // release light entry first so we don't mess things up
         match self.io_state {
@@ -232,6 +229,8 @@ impl Controller {
             IoState::AwaitingUpgrade | IoState::LightEntry => self.input.borrow_mut().suspend(),
             IoState::FullEntry => return,
         }
+
+        self.prepare_entry();
 
         let mut udev = Context::new().expect("Failed to create udev context");
 
@@ -258,8 +257,11 @@ impl Controller {
         self.io_state = IoState::FullEntry;
     }
 
-    /// Sends the current Linux clipboard to Windows
-    pub fn send_clipboard(&mut self) {
+    pub fn prepare_entry(&mut self) {
+        // release modifiers
+        self.write_ga(GaCmd::ReleaseModifiers);
+
+        // send clipboard
         match self.clipboard.get_contents() {
             Ok(s) => {
                 let s = s.replace('\n', "\r\n");
