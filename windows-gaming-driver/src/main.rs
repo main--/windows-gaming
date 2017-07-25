@@ -25,6 +25,7 @@ extern crate tokio_io;
 extern crate tokio_uds;
 extern crate tokio_timer;
 extern crate tokio_process;
+extern crate tokio_signal;
 extern crate dbus;
 extern crate input;
 extern crate clipboard;

@@ -5,7 +5,6 @@ mod monitor;
 mod clientpipe;
 mod controller;
 mod my_io;
-mod signalfd;
 mod sd_notify;
 mod samba;
 mod dbus;
@@ -21,12 +20,12 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 use tokio_core::reactor::Core;
+use tokio_signal::unix::{Signal, SIGINT, SIGTERM};
 use futures::{Future, Stream, future};
 use clipboard::{ClipboardContext, ClipboardProvider};
 
 use driver::controller::Controller;
 use config::Config;
-use driver::signalfd::{SignalFd, signal};
 use self::monitor::Monitor;
 use self::clientpipe::Clientpipe;
 use self::libinput::Input;
@@ -99,7 +98,9 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
 
     let control_handler = control::create(control_socket, &handle, controller.clone());
 
-    let signals = SignalFd::new(vec![signal::SIGTERM, signal::SIGINT], &handle);
+    let sigint = Signal::new(SIGINT, &handle).flatten_stream();
+    let sigterm = Signal::new(SIGTERM, &handle).flatten_stream();
+    let signals = sigint.merge(sigterm);
     let catch_sigterm = signals.for_each(|_| {
         controller.borrow_mut().shutdown();
         Ok(())
