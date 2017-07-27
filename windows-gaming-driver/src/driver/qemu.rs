@@ -2,10 +2,13 @@ use std::process::{Command, Stdio};
 use std::path::{Path};
 use std::iter::Iterator;
 use std::fs;
+use std::io;
+use std::os::unix::process::CommandExt as UnixCommandExt;
 
 use itertools::Itertools;
 use tokio_core::reactor::Handle;
 use tokio_process::{CommandExt, Child};
+use libc;
 
 use config::{Config, SoundBackend, AlsaUnit, UsbBus};
 use driver::controller;
@@ -257,6 +260,15 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
     qemu.stdin(Stdio::null());
     trace!("qemu: {:?}", qemu);
 
+    // try to detach qemu from process group to enable better Ctrl+C support
+    qemu.before_exec(|| unsafe {
+        if libc::setpgid(0, 0) < 0 {
+            warn!("Can't setpgid: {}", io::Error::last_os_error());
+        } else {
+            debug!("Detached qemu process");
+        }
+        Ok(())
+    });
     let qemu = qemu.spawn_async(handle).expect("Failed to start qemu");
     trace!("qemu spawned");
     return qemu;
