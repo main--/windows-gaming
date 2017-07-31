@@ -18,10 +18,14 @@ namespace VfioService
             using (var manager = new ClientManager(form))
             {
                 form.ClientManager = manager;
+                InterceptMouse.ClientManager = manager;
+                InterceptMouse.Start();
                 manager.ReportBoot();
 
                 var _ = form.Handle; // create form without showing
+                
                 Application.Run();
+                InterceptMouse.Stop();
             }
         }
     }

@@ -12,6 +12,7 @@ using System.Windows.Forms;
 using ClientpipeProtocol;
 using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
+using Point = System.Drawing.Point;
 
 namespace VfioService
 {
@@ -52,7 +53,9 @@ namespace VfioService
                         case GaCmdOut.MessageOneofCase.Clipboard:
                             HandleClipboardMessage(outCmd.Clipboard);
                             break;
-
+                        case GaCmdOut.MessageOneofCase.SetMousePosition:
+                            Cursor.Position = new Point(outCmd.SetMousePosition.X, outCmd.SetMousePosition.Y);
+                            break;
                     }
                 }
             }).Start();
@@ -179,6 +182,18 @@ namespace VfioService
                 Clipboard = new ClipboardMessage
                 {
                     RequestClipboardContents = type
+                }
+            });
+        }
+
+        public void MouseEdged(int x, int y)
+        {
+            Send(new GaCmdIn
+            {
+                MouseEdged = new ClientpipeProtocol.Point
+                {
+                    X = x,
+                    Y = y
                 }
             });
         }
