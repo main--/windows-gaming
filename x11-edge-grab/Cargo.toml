@@ -1,0 +1,8 @@
+[package]
+name = "x11-edge-grab"
+version = "0.1.0"
+authors = ["oberien <jaro.fietz@gmx.de>"]
+
+[dependencies]
+xcb = "0.8"
+byteorder = "1.1"

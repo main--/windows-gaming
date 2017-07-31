@@ -13,7 +13,7 @@ use futures::future;
 
 use config::{UsbId, UsbPort, UsbBinding, MachineConfig, HotKeyAction, Action};
 use util;
-use driver::clientpipe::{GaCmdOut as GaCmd, ClipboardMessage, ClipboardType, ClipboardTypes, RegisterHotKey};
+use driver::clientpipe::{GaCmdOut as GaCmd, ClipboardMessage, ClipboardType, ClipboardTypes, RegisterHotKey, Point};
 use driver::monitor::QmpCommand;
 use driver::sd_notify;
 use driver::libinput::Input;
@@ -50,7 +50,10 @@ pub struct Controller {
 
     ga: State,
     io_state: IoState,
+    // senders to be sent to when windows finished suspending
     suspend_senders: Vec<Sender<()>>,
+    // controlpipe writer to write mouse motion events to
+    temporary_entry_writer: Option<UnboundedSender<(i32, i32)>>,
 
     input: Rc<RefCell<Input>>,
 
@@ -83,6 +86,7 @@ impl Controller {
             ga: State::Down,
             io_state: IoState::Detached,
             suspend_senders: Vec::new(),
+            temporary_entry_writer: None,
 
             monitor,
             clientpipe,
@@ -229,6 +233,24 @@ impl Controller {
         }
     }
 
+    pub fn temporary_entry(&mut self, sender: UnboundedSender<(i32, i32)>, x: i32, y: i32) -> bool {
+        if self.temporary_entry_writer.is_none() {
+            self.temporary_entry_writer = Some(sender);
+            self.write_ga(GaCmd::SetMousePosition(Point { x, y }));
+            self.light_attach();
+            return true;
+        }
+        false
+    }
+
+    pub fn temporary_exit(&mut self) {
+        // only detach if we are not already detached
+        if self.temporary_entry_writer.is_some() {
+            self.io_detach();
+        }
+    }
+
+
     /// Attaches all configured devices regardless of GA state
     pub fn io_force_attach(&mut self) {
         debug!("full entry");
@@ -360,6 +382,12 @@ impl Controller {
     /// Pasting on Windows, X11 responded with contents
     pub fn respond_win_clipboard(&mut self, buf: Vec<u8>) {
         self.write_ga(ClipboardMessage::ClipboardContents(buf));
+    }
+
+    pub fn mouse_edged(&mut self, x: i32, y: i32) {
+        if let Some(ref mut sender) = self.temporary_entry_writer {
+            sender.send((x, y)).unwrap();
+        }
     }
 }
 

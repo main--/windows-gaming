@@ -1,6 +1,6 @@
 mod codec;
 
-pub use self::codec::{GaCmdOut, ClipboardMessage, ClipboardType, ClipboardTypes, RegisterHotKey};
+pub use self::codec::{GaCmdOut, ClipboardMessage, ClipboardType, ClipboardTypes, RegisterHotKey, Point};
 
 use std::os::unix::net::{UnixStream as StdUnixStream};
 use std::io::{Error, ErrorKind};
@@ -52,15 +52,17 @@ impl Clientpipe {
         self.sender.take().unwrap()
     }
 
-    pub fn take_handler<'a>(&mut self, controller: Rc<RefCell<Controller>>, handle: &'a Handle) -> Handler<'a> {
+    pub fn take_handler<'a>(&mut self, controller_rc: Rc<RefCell<Controller>>, handle: &'a Handle) -> Handler<'a> {
         let handler = self.read.take().unwrap().for_each(move |cmd| {
             trace!("GA sent message: {:?}", cmd);
+            let mut controller = controller_rc.borrow_mut();
+
             match cmd {
                 GaCmdIn::ReportBoot(()) => {
                     info!("client is now alive!");
 
-                    if controller.borrow_mut().ga_hello() {
-                        let controller = controller.clone();
+                    if controller.ga_hello() {
+                        let controller = controller_rc.clone();
                         let timer = Timer::default().interval(Duration::new(5, 0))
                             .map_err(|_| ())
                             .for_each(move |()| match controller.borrow_mut().ga_ping() {
@@ -72,21 +74,25 @@ impl Clientpipe {
                 }
                 GaCmdIn::Suspending(()) => {
                     info!("client says that it's suspending");
-                    controller.borrow_mut().ga_suspending();
+                    controller.ga_suspending();
                 }
-                GaCmdIn::Pong(()) => controller.borrow_mut().ga_pong(),
-                GaCmdIn::HotKey(id) => controller.borrow_mut().ga_hotkey(id),
+                GaCmdIn::Pong(()) => controller.ga_pong(),
+                GaCmdIn::HotKey(id) => controller.ga_hotkey(id),
                 GaCmdIn::HotKeyBindingFailed(s) => warn!("HotKeyBinding failed: {}", s),
                 GaCmdIn::Clipboard(c) => match c.message {
-                    Some(ClipboardMessage::GrabClipboard(())) => controller.borrow_mut().grab_x11_clipboard(),
+                    Some(ClipboardMessage::GrabClipboard(())) => controller.grab_x11_clipboard(),
                     Some(ClipboardMessage::RequestClipboardContents(kind)) => match ClipboardType::from_i32(kind) {
-                        Some(kind) => controller.borrow_mut().read_x11_clipboard(kind),
+                        Some(kind) => controller.read_x11_clipboard(kind),
                         None => error!("Windows requested an invalid clipboard type??"),
                     },
-                    Some(ClipboardMessage::ContentTypes(types)) => controller.borrow_mut().respond_x11_types(types.types().collect()),
-                    Some(ClipboardMessage::ClipboardContents(buf)) => controller.borrow_mut().respond_x11_clipboard(buf),
+                    Some(ClipboardMessage::ContentTypes(types)) => controller.respond_x11_types(types.types().collect()),
+                    Some(ClipboardMessage::ClipboardContents(buf)) => controller.respond_x11_clipboard(buf),
                     None => error!("Windows sent an empty clipboard message??"),
                 },
+                GaCmdIn::MouseEdged(Point { x, y }) => {
+                    trace!("Mouse Edged: {}:{}", x, y);
+                    controller.mouse_edged(x, y);
+                }
             }
             Ok(())
         });
