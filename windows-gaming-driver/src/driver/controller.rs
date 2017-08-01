@@ -10,7 +10,6 @@ use futures::unsync::mpsc::UnboundedSender;
 use futures::unsync::oneshot::{self, Sender};
 use futures::Future;
 use futures::future;
-use clipboard::{ClipboardContext, ClipboardProvider};
 
 use config::{UsbId, UsbPort, UsbBinding, MachineConfig, HotKeyAction, Action};
 use util;
@@ -56,8 +55,6 @@ pub struct Controller {
     // write-only
     monitor: UnboundedSender<QmpCommand>,
     clientpipe: UnboundedSender<GaCmd>,
-
-    clipboard: ClipboardContext,
 }
 
 impl Controller {
@@ -68,8 +65,7 @@ impl Controller {
     pub fn new(machine_config: MachineConfig,
                monitor: UnboundedSender<QmpCommand>,
                clientpipe: UnboundedSender<GaCmd>,
-               input: Rc<RefCell<Input>>,
-               clipboard: ClipboardContext) -> Controller {
+               input: Rc<RefCell<Input>>) -> Controller {
         (&monitor).send(QmpCommand::QmpCapabilities).unwrap();
         Controller {
             machine_config,
@@ -81,8 +77,6 @@ impl Controller {
             monitor,
             clientpipe,
             input,
-
-            clipboard,
         }
     }
 
@@ -208,6 +202,7 @@ impl Controller {
 
     pub fn light_attach(&mut self) {
         debug!("light entry");
+
         match self.io_state {
             IoState::Detached => {
                 self.prepare_entry();
@@ -222,6 +217,9 @@ impl Controller {
     /// Attaches all configured devices regardless of GA state
     pub fn io_force_attach(&mut self) {
         debug!("full entry");
+
+        // might still be holding keyboard modifiers - release them
+        self.write_ga(GaCmd::ReleaseModifiers);
 
         // release light entry first so we don't mess things up
         match self.io_state {
@@ -260,30 +258,6 @@ impl Controller {
     pub fn prepare_entry(&mut self) {
         // release modifiers
         self.write_ga(GaCmd::ReleaseModifiers);
-
-        // send clipboard
-        match self.clipboard.get_contents() {
-            Ok(s) => {
-                let s = s.replace('\n', "\r\n");
-                debug!("send clipboard to GA: {}", s.chars().take(100).collect::<String>());
-                self.write_ga(GaCmd::SetClipboardText(s));
-            },
-            Err(e) => error!("Could not access clipboard: {}", e.description())
-        }
-    }
-
-    /// Asks Windows to provide us with its clipboard contents
-    pub fn ask_clipboard(&mut self) {
-        self.write_ga(GaCmd::GetClipboard);
-    }
-
-    /// Sets Linux's clipboard to the provided value
-    pub fn set_clipboard(&mut self, s: String) {
-        let s = s.replace("\r\n", "\n");
-        match self.clipboard.set_contents(s) {
-            Ok(()) => (),
-            Err(e) => error!("Could not set clipboard: {}", e.description())
-        }
     }
 
     /// Suspends Windows
@@ -307,7 +281,6 @@ impl Controller {
     pub fn io_detach(&mut self) {
         assert!(self.ga != State::Suspending, "trying to exit from a suspending vm?");
         assert!(self.ga != State::Suspended, "trying to exit from a suspended vm?");
-        self.ask_clipboard();
 
         match self.io_state {
             IoState::Detached => (),

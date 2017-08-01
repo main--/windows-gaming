@@ -12,9 +12,6 @@ pub enum GaCmdOut {
     },
     ReleaseModifiers,
     Suspend,
-    GetClipboard,
-    SetClipboardText(String),
-    SetClipboardPng(Vec<u8>)
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -24,8 +21,6 @@ pub enum GaCmdIn {
     Pong,
     HotKey(u32),
     HotKeyBindingFailed(String),
-    ClipboardText(String),
-    ClipboardPng(Vec<u8>),
 }
 
 pub struct Codec;
@@ -53,37 +48,12 @@ impl Decoder for Codec {
                 let mut bbuf = (&*buf).into_buf();
                 bbuf.advance(1); // skip cmd
                 let len = bbuf.get_u32::<LittleEndian>() as usize;
-                if bbuf.remaining() < len {
+                if buf.len() < len + 5 {
                     return Ok(None);
                 }
-                let s = String::from_utf8_lossy(&bbuf.bytes()[..len]).into_owned();
+                let s = String::from_utf8_lossy(&buf[5..5+len]).into_owned();
                 size += 4 + len;
                 GaCmdIn::HotKeyBindingFailed(s)
-            }
-            Some(7) if buf.len() < 5 => return Ok(None),
-            Some(7) => {
-                let mut bbuf = (&*buf).into_buf();
-                bbuf.advance(1); // skip cmd
-                let len = bbuf.get_u32::<LittleEndian>() as usize;
-                if bbuf.remaining() < len {
-                    return Ok(None);
-                }
-                let s = String::from_utf8_lossy(&bbuf.bytes()[..len]).into_owned();
-                size += 4 + len;
-                GaCmdIn::ClipboardText(s)
-            }
-            Some(8) if buf.len() < 5 => return Ok(None),
-            Some(8) => {
-                let mut bbuf = (&*buf).into_buf();
-                bbuf.advance(1); // skip cmd
-                let len = bbuf.get_u32::<LittleEndian>() as usize;
-                if bbuf.remaining() < len {
-                    return Ok(None);
-                }
-                let mut png = Vec::with_capacity(len);
-                png.extend(&bbuf.bytes()[..len]);
-                size += 4 + len;
-                GaCmdIn::ClipboardPng(png)
             }
             Some(x) => {
                 warn!("client sent invalid request {}", x);
@@ -115,19 +85,6 @@ impl Encoder for Codec {
             }
             GaCmdOut::ReleaseModifiers => buf.put_u8(0x03),
             GaCmdOut::Suspend => buf.put_u8(0x04),
-            GaCmdOut::GetClipboard => buf.put_u8(0x06),
-            GaCmdOut::SetClipboardText(s) => {
-                buf.put_u8(0x07);
-                buf.reserve(4 + s.len());
-                buf.put_u32::<LittleEndian>(s.len() as u32);
-                buf.extend(s.bytes());
-            }
-            GaCmdOut::SetClipboardPng(png) => {
-                buf.put_u8(0x08);
-                buf.reserve(4 + png.len());
-                buf.put_u32::<LittleEndian>(png.len() as u32);
-                buf.extend(png);
-            }
         }
         Ok(())
     }

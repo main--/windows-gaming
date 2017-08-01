@@ -84,13 +84,6 @@ impl Clientpipe {
                 GaCmdIn::HotKeyBindingFailed(s) => {
                     warn!("HotKeyBinding failed: {}", s);
                 }
-                GaCmdIn::ClipboardText(s) => {
-                    debug!("client sent clipboard: {}", s.chars().take(100).collect::<String>());
-                    controller.borrow_mut().set_clipboard(s);
-                }
-                GaCmdIn::ClipboardPng(_) => {
-                    warn!("client sent png clipboard, but we don't handle that yet");
-                }
             }
             Ok(())
         });

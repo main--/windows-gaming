@@ -22,7 +22,6 @@ use std::path::Path;
 use tokio_core::reactor::Core;
 use tokio_signal::unix::{Signal, SIGINT, SIGTERM};
 use futures::{Future, Stream, future};
-use clipboard::{ClipboardContext, ClipboardProvider};
 
 use driver::controller::Controller;
 use config::Config;
@@ -52,9 +51,6 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
         .expect("Failed to set permissions on control socket");
     debug!("Started Control socket");
 
-    let clipboard = ClipboardContext::new().expect("Failed to access clipboard");
-    debug!("Clipboard created");
-
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
@@ -82,8 +78,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     let input = Rc::new(RefCell::new(input));
 
     let monitor_sender = monitor.take_send();
-    let ctrl = Controller::new(cfg.machine.clone(), monitor_sender.clone(), clientpipe.take_send(),
-                               input.clone(), clipboard);
+    let ctrl = Controller::new(cfg.machine.clone(), monitor_sender.clone(), clientpipe.take_send(), input.clone());
     let controller = Rc::new(RefCell::new(ctrl));
 
     let sysbus = sleep_inhibitor::system_dbus();
