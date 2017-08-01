@@ -17,6 +17,8 @@ use driver::clientpipe::GaCmdOut as GaCmd;
 use driver::monitor::QmpCommand;
 use driver::sd_notify;
 use driver::libinput::Input;
+use driver::clipboard::{ClipboardRequestEvent, ClipboardRequestResponse};
+
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 /// States the state machine of this Controller can have
@@ -52,6 +54,11 @@ pub struct Controller {
 
     input: Rc<RefCell<Input>>,
 
+    x11_clipboard: UnboundedSender<ClipboardRequestResponse>,
+    x11_clipboard_grabber: UnboundedSender<()>,
+    x11_clipboard_reader: UnboundedSender<()>,
+    win_clipboard_request: Option<ClipboardRequestEvent>,
+
     // write-only
     monitor: UnboundedSender<QmpCommand>,
     clientpipe: UnboundedSender<GaCmd>,
@@ -65,7 +72,10 @@ impl Controller {
     pub fn new(machine_config: MachineConfig,
                monitor: UnboundedSender<QmpCommand>,
                clientpipe: UnboundedSender<GaCmd>,
-               input: Rc<RefCell<Input>>) -> Controller {
+               input: Rc<RefCell<Input>>,
+               x11_clipboard: UnboundedSender<ClipboardRequestResponse>,
+               x11_clipboard_grabber: UnboundedSender<()>,
+               x11_clipboard_reader: UnboundedSender<()>) -> Controller {
         (&monitor).send(QmpCommand::QmpCapabilities).unwrap();
         Controller {
             machine_config,
@@ -77,6 +87,11 @@ impl Controller {
             monitor,
             clientpipe,
             input,
+
+            x11_clipboard,
+            x11_clipboard_grabber,
+            x11_clipboard_reader,
+            win_clipboard_request: None,
         }
     }
 
@@ -302,6 +317,33 @@ impl Controller {
 
     pub fn shutdown(&mut self) {
         (&self.monitor).send(QmpCommand::SystemPowerdown).unwrap();
+    }
+
+    pub fn grab_x11_clipboard(&mut self) {
+        (&self.x11_clipboard_grabber).send(()).unwrap();
+    }
+
+    pub fn read_x11_clipboard(&mut self) {
+        (&self.x11_clipboard_reader).send(()).unwrap();
+    }
+
+    pub fn respond_x11_clipboard(&mut self, buf: Vec<u8>) {
+        if let Some(event) = self.win_clipboard_request.take() {
+            (&self.x11_clipboard).send(event.reply(buf)).unwrap();
+        }
+    }
+
+    pub fn grab_win_clipboard(&mut self) {
+        self.write_ga(GaCmd::GrabClipboard);
+    }
+
+    pub fn read_win_clipboard(&mut self, event: ClipboardRequestEvent) {
+        self.win_clipboard_request = Some(event);
+        self.write_ga(GaCmd::RequestClipboardContents(0));
+    }
+
+    pub fn respond_win_clipboard(&mut self, buf: Vec<u8>) {
+        self.write_ga(GaCmd::ClipboardContents(buf));
     }
 }
 

@@ -12,6 +12,10 @@ pub enum GaCmdOut {
     },
     ReleaseModifiers,
     Suspend,
+
+    GrabClipboard,
+    RequestClipboardContents(u8), // TODO: kind enum
+    ClipboardContents(Vec<u8>),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -21,6 +25,10 @@ pub enum GaCmdIn {
     Pong,
     HotKey(u32),
     HotKeyBindingFailed(String),
+
+    GrabClipboard,
+    RequestClipboardContents(u8), // TODO: kind enum
+    ClipboardContents(Vec<u8>),
 }
 
 pub struct Codec;
@@ -55,6 +63,24 @@ impl Decoder for Codec {
                 size += 4 + len;
                 GaCmdIn::HotKeyBindingFailed(s)
             }
+            Some(0xa) => GaCmdIn::GrabClipboard,
+            Some(0xb) if buf.len() < 2 => return Ok(None),
+            Some(0xb) => {
+                size += 1;
+                GaCmdIn::RequestClipboardContents(*buf.get(1).unwrap())
+            }
+            Some(0xc) if buf.len() < 5 => return Ok(None),
+            Some(0xc) => {
+                let mut bbuf = (&*buf).into_buf();
+                bbuf.advance(1); // skip cmd
+                let len = bbuf.get_u32::<LittleEndian>() as usize;
+                if buf.len() < len + 5 {
+                    return Ok(None);
+                }
+                let vec = buf[5..5+len].to_vec();
+                size += 4 + len;
+                GaCmdIn::ClipboardContents(vec)
+            }
             Some(x) => {
                 warn!("client sent invalid request {}", x);
                 // no idea how to proceed as the request might have payload
@@ -85,6 +111,18 @@ impl Encoder for Codec {
             }
             GaCmdOut::ReleaseModifiers => buf.put_u8(0x03),
             GaCmdOut::Suspend => buf.put_u8(0x04),
+            GaCmdOut::GrabClipboard => buf.put_u8(0x0a),
+            GaCmdOut::RequestClipboardContents(x) => {
+                buf.put_u8(0x0b);
+                buf.reserve(1);
+                buf.put_u8(x);
+            }
+            GaCmdOut::ClipboardContents(x) => {
+                buf.put_u8(0x0c);
+                buf.reserve(4 + x.len());
+                buf.put_u32::<LittleEndian>(x.len() as u32);
+                buf.put_slice(&x);
+            }
         }
         Ok(())
     }

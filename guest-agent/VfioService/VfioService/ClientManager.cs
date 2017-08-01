@@ -57,59 +57,58 @@ namespace VfioService
                         case CommandIn.Suspend:
                             Application.SetSuspendState(PowerState.Suspend, false, false);
                             break;
-                        case CommandIn.GetClipboard:
-                            SendClipboardData();
+                        case CommandIn.GrabClipboard:
+                            MainForm.GrabClipboard();
                             break;
-                        case CommandIn.ClipboardText:
-                            var clipboarTextLength = ReadInt(Stream);
-                            var clipboardString = Encoding.UTF8.GetString(ReadBytes(Stream, clipboarTextLength));
-                            MainForm.Invoke(new Func<string, object>(MainForm.SetClipboradText), clipboardString);
+                        case CommandIn.RequestClipboardContents:
+                            SendClipboardData(Stream.ReadByte());
                             break;
-                        case CommandIn.ClipboardPng:
-                            var clipboarImageLength = ReadInt(Stream);
-                            var clipboardImageStream = new MemoryStream(ReadBytes(Stream, clipboarImageLength));
-                            var decodedImage = Image.FromStream(clipboardImageStream);
-                            MainForm.Invoke(new Func<Image, object>(MainForm.SetClipboardImage), decodedImage);
+                        case CommandIn.ClipboardContents:
+                            var len = ReadInt(Stream);
+                            MainForm.SetClipboardResponse(ReadBytes(Stream, len));
                             break;
                     }
                 }
             }).Start();
         }
 
-        private void SendClipboardData()
+        private void SendClipboardData(int format)
         {
-            var clipboardText = (string)MainForm.Invoke(new Func<string>(MainForm.GetClipboardText));
-            if (clipboardText != null)
+            lock (WriteLock)
             {
-                lock (WriteLock)
+                SendCommand(CommandOut.ClipboardContents);
+                switch (format)
                 {
-                    SendCommand(CommandOut.ClipboardText);
-                    // This removes formatting, which I think is a good idea.
-                    var data = Encoding.UTF8.GetBytes(clipboardText);
-                    SendData(BitConverter.GetBytes(data.Length));
-                    SendData(data);
+                    case 0: // utf8 text
+                        var clipboardText = (string)MainForm.Invoke(new Func<string>(MainForm.GetClipboardText));
+                        if (clipboardText != null)
+                        {
+                            var data = Encoding.UTF8.GetBytes(clipboardText);
+                            SendData(BitConverter.GetBytes(data.Length));
+                            SendData(data);
+                            return;
+                        }
+                        break;
+                        /*
+                    case 1: // png image
+                        var clipboardImage = (Image)MainForm.Invoke(new Func<Image>(MainForm.GetClipboardImage));
+                        if (clipboardImage != null)
+                        {
+                            MemoryStream ms = new MemoryStream();
+                            clipboardImage.Save(ms, ImageFormat.Png);
+                            var data = ms.ToArray();
+
+                            SendData(BitConverter.GetBytes(data.Length));
+                            SendData(data);
+                            return;
+                        }
+                        break;
+                        */
                 }
 
-                return;
+                // unknown or wrong format => send no data
+                SendData(BitConverter.GetBytes(0));
             }
-
-            var clipboardImage = (Image)MainForm.Invoke(new Func<Image>(MainForm.GetClipboardImage));
-            if (clipboardImage != null)
-            {
-                lock (WriteLock)
-                {
-                    MemoryStream ms = new MemoryStream();
-                    clipboardImage.Save(ms, ImageFormat.Png);
-                    var data = ms.ToArray();
-
-                    SendCommand(CommandOut.ClipboardPng);
-                    SendData(BitConverter.GetBytes(data.Length));
-                    SendData(data);
-                }
-
-                return;
-            }
-
         }
 
         public void Dispose()

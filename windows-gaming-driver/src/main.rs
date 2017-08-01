@@ -28,6 +28,7 @@ extern crate tokio_process;
 extern crate tokio_signal;
 extern crate dbus;
 extern crate input;
+extern crate xcb;
 
 mod logger;
 mod config;
