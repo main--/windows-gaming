@@ -10,7 +10,6 @@ use futures::unsync::mpsc::UnboundedSender;
 use futures::unsync::oneshot::{self, Sender};
 use futures::Future;
 use futures::future;
-use clipboard::{ClipboardContext, ClipboardProvider};
 
 use config::{UsbId, UsbPort, UsbBinding, MachineConfig, HotKeyAction, Action};
 use util;
@@ -18,6 +17,8 @@ use driver::clientpipe::GaCmdOut as GaCmd;
 use driver::monitor::QmpCommand;
 use driver::sd_notify;
 use driver::libinput::Input;
+use driver::clipboard::{ClipboardRequestEvent, ClipboardRequestResponse};
+
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 /// States the state machine of this Controller can have
@@ -53,11 +54,14 @@ pub struct Controller {
 
     input: Rc<RefCell<Input>>,
 
+    x11_clipboard: UnboundedSender<ClipboardRequestResponse>,
+    x11_clipboard_grabber: UnboundedSender<()>,
+    x11_clipboard_reader: UnboundedSender<()>,
+    win_clipboard_request: Option<ClipboardRequestEvent>,
+
     // write-only
     monitor: UnboundedSender<QmpCommand>,
     clientpipe: UnboundedSender<GaCmd>,
-
-    clipboard: ClipboardContext,
 }
 
 impl Controller {
@@ -69,7 +73,9 @@ impl Controller {
                monitor: UnboundedSender<QmpCommand>,
                clientpipe: UnboundedSender<GaCmd>,
                input: Rc<RefCell<Input>>,
-               clipboard: ClipboardContext) -> Controller {
+               x11_clipboard: UnboundedSender<ClipboardRequestResponse>,
+               x11_clipboard_grabber: UnboundedSender<()>,
+               x11_clipboard_reader: UnboundedSender<()>) -> Controller {
         (&monitor).send(QmpCommand::QmpCapabilities).unwrap();
         Controller {
             machine_config,
@@ -82,7 +88,10 @@ impl Controller {
             clientpipe,
             input,
 
-            clipboard,
+            x11_clipboard,
+            x11_clipboard_grabber,
+            x11_clipboard_reader,
+            win_clipboard_request: None,
         }
     }
 
@@ -208,6 +217,7 @@ impl Controller {
 
     pub fn light_attach(&mut self) {
         debug!("light entry");
+
         match self.io_state {
             IoState::Detached => {
                 self.prepare_entry();
@@ -260,30 +270,6 @@ impl Controller {
     pub fn prepare_entry(&mut self) {
         // release modifiers
         self.write_ga(GaCmd::ReleaseModifiers);
-
-        // send clipboard
-        match self.clipboard.get_contents() {
-            Ok(s) => {
-                let s = s.replace('\n', "\r\n");
-                debug!("send clipboard to GA: {}", s.chars().take(100).collect::<String>());
-                self.write_ga(GaCmd::SetClipboardText(s));
-            },
-            Err(e) => error!("Could not access clipboard: {}", e.description())
-        }
-    }
-
-    /// Asks Windows to provide us with its clipboard contents
-    pub fn ask_clipboard(&mut self) {
-        self.write_ga(GaCmd::GetClipboard);
-    }
-
-    /// Sets Linux's clipboard to the provided value
-    pub fn set_clipboard(&mut self, s: String) {
-        let s = s.replace("\r\n", "\n");
-        match self.clipboard.set_contents(s) {
-            Ok(()) => (),
-            Err(e) => error!("Could not set clipboard: {}", e.description())
-        }
     }
 
     /// Suspends Windows
@@ -307,7 +293,6 @@ impl Controller {
     pub fn io_detach(&mut self) {
         assert!(self.ga != State::Suspending, "trying to exit from a suspending vm?");
         assert!(self.ga != State::Suspended, "trying to exit from a suspended vm?");
-        self.ask_clipboard();
 
         match self.io_state {
             IoState::Detached => (),
@@ -329,6 +314,39 @@ impl Controller {
 
     pub fn shutdown(&mut self) {
         (&self.monitor).send(QmpCommand::SystemPowerdown).unwrap();
+    }
+
+    /// Windows told us to grab the keyboard
+    pub fn grab_x11_clipboard(&mut self) {
+        (&self.x11_clipboard_grabber).send(()).unwrap();
+    }
+
+    /// Paste on Windows, so we have to request contents
+    pub fn read_x11_clipboard(&mut self) {
+        (&self.x11_clipboard_reader).send(()).unwrap();
+    }
+
+    /// Pasting on Linux, Windows responded with contents
+    pub fn respond_x11_clipboard(&mut self, buf: Vec<u8>) {
+        if let Some(event) = self.win_clipboard_request.take() {
+            (&self.x11_clipboard).send(event.reply(buf)).unwrap();
+        }
+    }
+
+    /// We lost the X11 clipboard, so we grab the Windows keyboard
+    pub fn grab_win_clipboard(&mut self) {
+        self.write_ga(GaCmd::GrabClipboard);
+    }
+
+    /// Paste on Linux, so we have to request contents
+    pub fn read_win_clipboard(&mut self, event: ClipboardRequestEvent) {
+        self.win_clipboard_request = Some(event);
+        self.write_ga(GaCmd::RequestClipboardContents(0));
+    }
+
+    /// Pasting on Windows, X11 responded with contents
+    pub fn respond_win_clipboard(&mut self, buf: Vec<u8>) {
+        self.write_ga(GaCmd::ClipboardContents(buf));
     }
 }
 

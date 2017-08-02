@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -30,9 +31,14 @@ namespace VfioService
 
         public ClientManager ClientManager { get; set; }
 
+        private readonly SynchronizationContext SyncContext;
+
         public MainForm()
         {
             InitializeComponent();
+
+            SyncContext = SynchronizationContext.Current;
+            GrabClipboard();
         }
 
         public string RegisterHotKey(int id, int mods, int keys)
@@ -68,18 +74,6 @@ namespace VfioService
             return Clipboard.GetImage();
         }
 
-        public object SetClipboradText(string data)
-        {
-            Clipboard.SetText(data);
-            return null;
-        }
-
-        public object SetClipboardImage(Image image)
-        {
-            Clipboard.SetImage(image);
-            return null;
-        }
-
         private const int WmPowerBroadcast = 0x0218;
         private const int WmHotkey = 0x0312;
 
@@ -110,6 +104,7 @@ namespace VfioService
                     break;
             }
 
+            WndProcClipboard(ref m);
             base.WndProc(ref m);
         }
     }

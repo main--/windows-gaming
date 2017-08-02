@@ -67,7 +67,7 @@ impl Monitor {
     pub fn take_handler(&mut self, controller: Rc<RefCell<Controller>>) -> Handler {
         let handler = self.read.take().unwrap().for_each(move |msg| {
             if let Message::Return { .. } = msg {
-                trace!("{:?}", msg);
+                // do not print these, they are useless and spammy
             } else {
                 info!("{:?}", msg);
             }

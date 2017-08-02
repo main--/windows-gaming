@@ -12,9 +12,10 @@ pub enum GaCmdOut {
     },
     ReleaseModifiers,
     Suspend,
-    GetClipboard,
-    SetClipboardText(String),
-    SetClipboardPng(Vec<u8>)
+
+    GrabClipboard,
+    RequestClipboardContents(u8), // TODO: kind enum
+    ClipboardContents(Vec<u8>),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -24,8 +25,10 @@ pub enum GaCmdIn {
     Pong,
     HotKey(u32),
     HotKeyBindingFailed(String),
-    ClipboardText(String),
-    ClipboardPng(Vec<u8>),
+
+    GrabClipboard,
+    RequestClipboardContents(u8), // TODO: kind enum
+    ClipboardContents(Vec<u8>),
 }
 
 pub struct Codec;
@@ -35,6 +38,7 @@ impl Decoder for Codec {
     type Error = io::Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<GaCmdIn>> {
+        trace!("Decoding client command {:?}", buf);
         let mut size = 1;
         let ret = match buf.get(0).cloned() {
             Some(1) => GaCmdIn::ReportBoot,
@@ -53,37 +57,30 @@ impl Decoder for Codec {
                 let mut bbuf = (&*buf).into_buf();
                 bbuf.advance(1); // skip cmd
                 let len = bbuf.get_u32::<LittleEndian>() as usize;
-                if bbuf.remaining() < len {
+                if buf.len() < len + 5 {
                     return Ok(None);
                 }
-                let s = String::from_utf8_lossy(&bbuf.bytes()[..len]).into_owned();
+                let s = String::from_utf8_lossy(&buf[5..5+len]).into_owned();
                 size += 4 + len;
                 GaCmdIn::HotKeyBindingFailed(s)
             }
-            Some(7) if buf.len() < 5 => return Ok(None),
-            Some(7) => {
-                let mut bbuf = (&*buf).into_buf();
-                bbuf.advance(1); // skip cmd
-                let len = bbuf.get_u32::<LittleEndian>() as usize;
-                if bbuf.remaining() < len {
-                    return Ok(None);
-                }
-                let s = String::from_utf8_lossy(&bbuf.bytes()[..len]).into_owned();
-                size += 4 + len;
-                GaCmdIn::ClipboardText(s)
+            Some(0xa) => GaCmdIn::GrabClipboard,
+            Some(0xb) if buf.len() < 2 => return Ok(None),
+            Some(0xb) => {
+                size += 1;
+                GaCmdIn::RequestClipboardContents(*buf.get(1).unwrap())
             }
-            Some(8) if buf.len() < 5 => return Ok(None),
-            Some(8) => {
+            Some(0xc) if buf.len() < 5 => return Ok(None),
+            Some(0xc) => {
                 let mut bbuf = (&*buf).into_buf();
                 bbuf.advance(1); // skip cmd
                 let len = bbuf.get_u32::<LittleEndian>() as usize;
-                if bbuf.remaining() < len {
+                if buf.len() < len + 5 {
                     return Ok(None);
                 }
-                let mut png = Vec::with_capacity(len);
-                png.extend(&bbuf.bytes()[..len]);
+                let vec = buf[5..5+len].to_vec();
                 size += 4 + len;
-                GaCmdIn::ClipboardPng(png)
+                GaCmdIn::ClipboardContents(vec)
             }
             Some(x) => {
                 warn!("client sent invalid request {}", x);
@@ -115,18 +112,17 @@ impl Encoder for Codec {
             }
             GaCmdOut::ReleaseModifiers => buf.put_u8(0x03),
             GaCmdOut::Suspend => buf.put_u8(0x04),
-            GaCmdOut::GetClipboard => buf.put_u8(0x06),
-            GaCmdOut::SetClipboardText(s) => {
-                buf.put_u8(0x07);
-                buf.reserve(4 + s.len());
-                buf.put_u32::<LittleEndian>(s.len() as u32);
-                buf.extend(s.bytes());
+            GaCmdOut::GrabClipboard => buf.put_u8(0x0a),
+            GaCmdOut::RequestClipboardContents(x) => {
+                buf.put_u8(0x0b);
+                buf.reserve(1);
+                buf.put_u8(x);
             }
-            GaCmdOut::SetClipboardPng(png) => {
-                buf.put_u8(0x08);
-                buf.reserve(4 + png.len());
-                buf.put_u32::<LittleEndian>(png.len() as u32);
-                buf.extend(png);
+            GaCmdOut::ClipboardContents(x) => {
+                buf.put_u8(0x0c);
+                buf.reserve(4 + x.len());
+                buf.put_u32::<LittleEndian>(x.len() as u32);
+                buf.put_slice(&x);
             }
         }
         Ok(())

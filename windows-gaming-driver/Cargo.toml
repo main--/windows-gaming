@@ -31,4 +31,7 @@ tokio-process = "0.1"
 tokio-signal = "0.1"
 dbus = "0.5"
 input = "0.2"
-clipboard = "0.4"
+xcb = "0.8"
+
+[replace]
+"xcb:0.8.0" = { git = "https://github.com/main--/rust-xcb.git" }

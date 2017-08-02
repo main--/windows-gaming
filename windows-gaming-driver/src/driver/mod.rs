@@ -11,6 +11,7 @@ mod dbus;
 mod sleep_inhibitor;
 mod libinput;
 pub mod hotkeys;
+mod clipboard;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -22,13 +23,14 @@ use std::path::Path;
 use tokio_core::reactor::Core;
 use tokio_signal::unix::{Signal, SIGINT, SIGTERM};
 use futures::{Future, Stream, future};
-use clipboard::{ClipboardContext, ClipboardProvider};
+use futures::unsync::mpsc;
 
 use driver::controller::Controller;
 use config::Config;
 use self::monitor::Monitor;
 use self::clientpipe::Clientpipe;
 use self::libinput::Input;
+use self::clipboard::X11Clipboard;
 
 pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     let _ = fs::remove_dir_all(tmp); // may fail - we dont care
@@ -51,9 +53,6 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     fs::set_permissions(control_socket_file, Permissions::from_mode(0o777))
         .expect("Failed to set permissions on control socket");
     debug!("Started Control socket");
-
-    let clipboard = ClipboardContext::new().expect("Failed to access clipboard");
-    debug!("Clipboard created");
 
     let mut core = Core::new().unwrap();
     let handle = core.handle();
@@ -82,9 +81,27 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     let input = Rc::new(RefCell::new(input));
 
     let monitor_sender = monitor.take_send();
-    let ctrl = Controller::new(cfg.machine.clone(), monitor_sender.clone(), clientpipe.take_send(),
-                               input.clone(), clipboard);
+    let (clipgrab_send, clipgrab_recv) = mpsc::unbounded();
+    let (clipread_send, clipread_recv) = mpsc::unbounded();
+    let (resp_send, resp_recv) = mpsc::unbounded();
+
+    let ctrl = Controller::new(cfg.machine.clone(), monitor_sender.clone(), clientpipe.take_send(), input.clone(),
+                               resp_send, clipgrab_send, clipread_send);
+
     let controller = Rc::new(RefCell::new(ctrl));
+
+    let clipboard = X11Clipboard::open().expect("Failed to open X11 clipboard!");
+    let clipboard_listener = clipboard.run(controller.clone(), resp_recv, &handle);
+
+    let clipboard_grabber = clipgrab_recv.for_each(|()| {
+        clipboard.grab_clipboard();
+        Ok(())
+    }).then(|_| Ok(()));
+
+    let clipboard_reader = clipread_recv.for_each(|()| {
+        clipboard.read_clipboard();
+        Ok(())
+    }).then(|_| Ok(()));
 
     let sysbus = sleep_inhibitor::system_dbus();
     let ctrl = controller.clone();
@@ -116,6 +133,9 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
         Box::new(catch_sigterm),
         Box::new(input_listener),
         input_handler,
+        clipboard_listener,
+        Box::new(clipboard_grabber),
+        Box::new(clipboard_reader),
     ]).map(|_| ());
 
     match core.run(qemu.select(joined)) {
