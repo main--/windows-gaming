@@ -83,7 +83,7 @@ namespace VfioService
                         var clipboardText = (string)MainForm.Invoke(new Func<string>(MainForm.GetClipboardText));
                         if (clipboardText != null)
                         {
-                            var data = Encoding.UTF8.GetBytes(clipboardText);
+                            var data = Encoding.UTF8.GetBytes(clipboardText.Replace("\r\n", "\n"));
                             SendData(BitConverter.GetBytes(data.Length));
                             SendData(data);
                             return;
