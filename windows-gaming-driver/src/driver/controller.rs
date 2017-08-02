@@ -316,29 +316,35 @@ impl Controller {
         (&self.monitor).send(QmpCommand::SystemPowerdown).unwrap();
     }
 
+    /// Windows told us to grab the keyboard
     pub fn grab_x11_clipboard(&mut self) {
         (&self.x11_clipboard_grabber).send(()).unwrap();
     }
 
+    /// Paste on Windows, so we have to request contents
     pub fn read_x11_clipboard(&mut self) {
         (&self.x11_clipboard_reader).send(()).unwrap();
     }
 
+    /// Pasting on Linux, Windows responded with contents
     pub fn respond_x11_clipboard(&mut self, buf: Vec<u8>) {
         if let Some(event) = self.win_clipboard_request.take() {
             (&self.x11_clipboard).send(event.reply(buf)).unwrap();
         }
     }
 
+    /// We lost the X11 clipboard, so we grab the Windows keyboard
     pub fn grab_win_clipboard(&mut self) {
         self.write_ga(GaCmd::GrabClipboard);
     }
 
+    /// Paste on Linux, so we have to request contents
     pub fn read_win_clipboard(&mut self, event: ClipboardRequestEvent) {
         self.win_clipboard_request = Some(event);
         self.write_ga(GaCmd::RequestClipboardContents(0));
     }
 
+    /// Pasting on Windows, X11 responded with contents
     pub fn respond_win_clipboard(&mut self, buf: Vec<u8>) {
         self.write_ga(GaCmd::ClipboardContents(buf));
     }
