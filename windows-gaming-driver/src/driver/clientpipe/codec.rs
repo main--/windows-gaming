@@ -38,6 +38,7 @@ impl Decoder for Codec {
     type Error = io::Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<GaCmdIn>> {
+        trace!("Decoding client command {:?}", buf);
         let mut size = 1;
         let ret = match buf.get(0).cloned() {
             Some(1) => GaCmdIn::ReportBoot,

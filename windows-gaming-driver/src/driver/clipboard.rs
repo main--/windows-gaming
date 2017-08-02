@@ -118,6 +118,7 @@ impl X11Clipboard {
                    resp_recv: UnboundedReceiver<ClipboardRequestResponse>,
                    handle: &Handle) -> Box<Future<Item=(), Error=::std::io::Error> + 'a> {
         let xcb_listener = XcbEvents::new(&self.connection, handle).for_each(move |event| {
+            debug!("XCB event {}", event.response_type());
             match event.response_type() & !0x80 {
                 SELECTION_REQUEST => {
                     let event: &SelectionRequestEvent = unsafe { xcb::cast_event(&event) };
@@ -134,15 +135,19 @@ impl X11Clipboard {
                 }
                 SELECTION_NOTIFY => {
                     let event: &SelectionNotifyEvent = unsafe { xcb::cast_event(&event) };
-                    let reply = xcb::get_property(
+                    if let Ok(reply) = xcb::get_property(
                         &self.connection, false, self.window,
                         event.property(), self.atoms.utf8_string, 0, ::std::u32::MAX // FIXME reasonable buffer size
-                    ).get_reply().unwrap(); // FIXME
-                    assert!(reply.type_() == self.atoms.utf8_string);
+                    ).get_reply() {
+                        assert!(reply.type_() == self.atoms.utf8_string);
 
-                    controller.borrow_mut().respond_win_clipboard(reply.value().to_vec());
+                        controller.borrow_mut().respond_win_clipboard(reply.value().to_vec());
+                        xcb::delete_property(&self.connection, self.window, self.atoms.property);
+                    } else {
+                        controller.borrow_mut().respond_win_clipboard(Vec::new());
+                    }
                 }
-                _ => unimplemented!(),
+                _ => info!("Unknown XCB event: {}", event.response_type()),//unimplemented!(),
             }
 
             Ok(())
