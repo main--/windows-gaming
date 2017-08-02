@@ -187,7 +187,7 @@ impl X11Clipboard {
             Ok(())
         });
 
-        Box::new(xcb_listener.join(responder.map_err(|()| unimplemented!())).then(|_| Ok(())))
+        Box::new(xcb_listener.join(responder.map_err(|()| unreachable!())).then(|_| Ok(())))
     }
 }
 
