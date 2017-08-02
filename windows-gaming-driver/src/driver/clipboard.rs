@@ -7,7 +7,7 @@ use futures::unsync::mpsc::UnboundedReceiver;
 use tokio_core::reactor::{Handle, PollEvented};
 use xcb::{self, Atom, Connection, ConnError, GenericEvent, GenericError, Window, Timestamp,
           SelectionRequestEvent, SelectionNotifyEvent,
-          SELECTION_REQUEST, SELECTION_CLEAR, SELECTION_NOTIFY, PROP_MODE_REPLACE};
+          SELECTION_REQUEST, SELECTION_CLEAR, SELECTION_NOTIFY, PROPERTY_NOTIFY, PROP_MODE_REPLACE};
 
 use super::my_io::MyIo;
 use super::controller::Controller;
@@ -118,7 +118,7 @@ impl X11Clipboard {
                    resp_recv: UnboundedReceiver<ClipboardRequestResponse>,
                    handle: &Handle) -> Box<Future<Item=(), Error=::std::io::Error> + 'a> {
         let xcb_listener = XcbEvents::new(&self.connection, handle).for_each(move |event| {
-            debug!("XCB event {}", event.response_type());
+            trace!("XCB event {}", event.response_type());
             match event.response_type() & !0x80 {
                 SELECTION_REQUEST => {
                     let event: &SelectionRequestEvent = unsafe { xcb::cast_event(&event) };
@@ -147,7 +147,8 @@ impl X11Clipboard {
                         controller.borrow_mut().respond_win_clipboard(Vec::new());
                     }
                 }
-                _ => info!("Unknown XCB event: {}", event.response_type()),//unimplemented!(),
+                PROPERTY_NOTIFY => debug!("Ignoring PROPERTY_NOTIFY event"),
+                _ => warn!("Unknown XCB event: {}", event.response_type()),
             }
 
             Ok(())
