@@ -1,13 +1,16 @@
+use std::rc::Rc;
+use std::cell::RefCell;
 use std::os::unix::io::AsRawFd;
 
 use futures::{Async, Stream, Future};
-use futures::unsync::mpsc::{self, UnboundedSender, UnboundedReceiver};
+use futures::unsync::mpsc::UnboundedReceiver;
 use tokio_core::reactor::{Handle, PollEvented};
 use xcb::{self, Atom, Connection, ConnError, GenericEvent, GenericError, Window, Timestamp,
           SelectionRequestEvent, SelectionNotifyEvent,
           SELECTION_REQUEST, SELECTION_CLEAR, SELECTION_NOTIFY, PROP_MODE_REPLACE};
 
 use super::my_io::MyIo;
+use super::controller::Controller;
 
 
 struct XcbEvents<'a> {
@@ -63,14 +66,6 @@ pub struct X11Clipboard {
     atoms: Atoms,
 }
 
-pub struct ClipboardContext<'a> {
-    pub listener: Box<Future<Item=(), Error=::std::io::Error> + 'a>,
-    pub lost_recv: UnboundedReceiver<()>,
-    pub query_recv: UnboundedReceiver<ClipboardRequestEvent>,
-    pub data_recv: UnboundedReceiver<Vec<u8>>,
-    pub resp_send: UnboundedSender<ClipboardRequestResponse>,
-}
-
 impl X11Clipboard {
     pub fn open() -> Result<X11Clipboard, GenericError> {
         let (connection, screen) = Connection::connect(None).unwrap();
@@ -118,26 +113,24 @@ impl X11Clipboard {
         self.connection.flush();
     }
 
-    pub fn run<'a>(&'a self, handle: &Handle) -> ClipboardContext<'a> {
-        let (lost_send, lost_recv) = mpsc::unbounded();
-        let (query_send, query_recv) = mpsc::unbounded();
-        let (data_send, data_recv) = mpsc::unbounded();
-        let (resp_send, resp_recv) = mpsc::unbounded();
-
-        let listener = Box::new(XcbEvents::new(&self.connection, handle).for_each(move |event| {
+    pub fn run<'a>(&'a self,
+                   controller: Rc<RefCell<Controller>>,
+                   resp_recv: UnboundedReceiver<ClipboardRequestResponse>,
+                   handle: &Handle) -> Box<Future<Item=(), Error=::std::io::Error> + 'a> {
+        let xcb_listener = XcbEvents::new(&self.connection, handle).for_each(move |event| {
             match event.response_type() & !0x80 {
                 SELECTION_REQUEST => {
                     let event: &SelectionRequestEvent = unsafe { xcb::cast_event(&event) };
-                    query_send.send(ClipboardRequestEvent {
+                    controller.borrow_mut().read_win_clipboard(ClipboardRequestEvent {
                         time: event.time(),
                         requestor: event.requestor(),
                         selection: event.selection(),
                         target: event.target(),
                         property: event.property(),
-                    }).unwrap();
+                    });
                 }
                 SELECTION_CLEAR => {
-                    lost_send.send(()).unwrap();
+                    controller.borrow_mut().grab_win_clipboard();
                 }
                 SELECTION_NOTIFY => {
                     let event: &SelectionNotifyEvent = unsafe { xcb::cast_event(&event) };
@@ -146,13 +139,16 @@ impl X11Clipboard {
                         event.property(), self.atoms.utf8_string, 0, ::std::u32::MAX // FIXME reasonable buffer size
                     ).get_reply().unwrap(); // FIXME
                     assert!(reply.type_() == self.atoms.utf8_string);
-                    data_send.send(reply.value().to_vec()).unwrap();
+
+                    controller.borrow_mut().respond_win_clipboard(reply.value().to_vec());
                 }
                 _ => unimplemented!(),
             }
 
             Ok(())
-        }).join(resp_recv.for_each(move |response: ClipboardRequestResponse| {
+        });
+
+        let responder = resp_recv.for_each(move |response: ClipboardRequestResponse| {
             let event = &response.event;
 
             if event.target == self.atoms.targets {
@@ -184,9 +180,9 @@ impl X11Clipboard {
             self.connection.flush();
 
             Ok(())
-        }).map_err(|()| unimplemented!())).then(|_| Ok(())));
+        });
 
-        ClipboardContext { listener, lost_recv, query_recv, data_recv, resp_send }
+        Box::new(xcb_listener.join(responder.map_err(|()| unimplemented!())).then(|_| Ok(())))
     }
 }
 
