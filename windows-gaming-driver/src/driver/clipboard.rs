@@ -147,7 +147,7 @@ impl X11Clipboard {
                         controller.borrow_mut().respond_win_clipboard(Vec::new());
                     }
                 }
-                PROPERTY_NOTIFY => debug!("Ignoring PROPERTY_NOTIFY event"),
+                PROPERTY_NOTIFY => trace!("Ignoring PROPERTY_NOTIFY event"),
                 _ => warn!("Unknown XCB event: {}", event.response_type()),
             }
 
