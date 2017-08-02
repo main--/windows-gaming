@@ -38,6 +38,7 @@ namespace VfioService
             InitializeComponent();
 
             SyncContext = SynchronizationContext.Current;
+            GrabClipboard();
         }
 
         public string RegisterHotKey(int id, int mods, int keys)

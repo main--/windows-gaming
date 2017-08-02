@@ -11,6 +11,7 @@ namespace VfioService
     public partial class MainForm
     {
         private TaskCompletionSource<byte[]> ClipboardResponse;
+        private bool IsGrabbingClipboard = false;
 
         public void SetClipboardResponse(byte[] data)
         {
@@ -24,6 +25,8 @@ namespace VfioService
 
         private void GrabClipboardInternal(object _)
         {
+            IsGrabbingClipboard = true;
+
             while (!OpenClipboard(this.Handle))
                 Thread.Yield(); // potential infinite loop but unfixable AFAIK
 
@@ -34,6 +37,8 @@ namespace VfioService
 
             if (!CloseClipboard())
                 throw new Win32Exception();
+
+            IsGrabbingClipboard = false;
         }
 
         private const uint CF_UNICODETEXT = 13;
@@ -63,7 +68,8 @@ namespace VfioService
             switch (m.Msg)
             {
                 case WM_DESTROYCLIPBOARD:
-                    ClientManager.SendCommand(CommandOut.GrabClipboard);
+                    if (!IsGrabbingClipboard)
+                        ClientManager.SendCommand(CommandOut.GrabClipboard);
                     break;
                 case WM_RENDERFORMAT:
                 case WM_RENDERALLFORMATS:
@@ -104,7 +110,7 @@ namespace VfioService
                         throw new Win32Exception();
 
                     // Calling this inline would DEADLOCK (!!!) our application 
-                    SynchronizationContext.Current.Post(_ => GrabClipboard(), null);
+                    SyncContext.Post(_ => GrabClipboard(), null);
                     break;
             }
         }
