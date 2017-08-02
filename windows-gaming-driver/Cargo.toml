@@ -34,4 +34,4 @@ input = "0.2"
 xcb = "0.8"
 
 [replace]
-"xcb:0.8.0" = { path = "../../rust-xcb" }
+"xcb:0.8.0" = { git = "https://github.com/main--/rust-xcb.git" }
