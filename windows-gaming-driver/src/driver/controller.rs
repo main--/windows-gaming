@@ -233,9 +233,6 @@ impl Controller {
     pub fn io_force_attach(&mut self) {
         debug!("full entry");
 
-        // might still be holding keyboard modifiers - release them
-        self.write_ga(GaCmd::ReleaseModifiers);
-
         // release light entry first so we don't mess things up
         match self.io_state {
             IoState::Detached => (),
