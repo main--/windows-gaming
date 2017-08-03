@@ -10,10 +10,10 @@ namespace VfioService
 {
     public partial class MainForm
     {
-        private TaskCompletionSource<byte[]> ClipboardResponse;
+        private TaskCompletionSource<string> ClipboardResponse;
         private bool IsGrabbingClipboard = false;
 
-        public void SetClipboardResponse(byte[] data)
+        public void SetClipboardResponse(string data)
         {
             ClipboardResponse.SetResult(data);
         }
@@ -65,27 +65,24 @@ namespace VfioService
 
         private void WndProcClipboard(ref Message m)
         {
+            // FIXME
+
             switch (m.Msg)
             {
                 case WM_DESTROYCLIPBOARD:
                     if (!IsGrabbingClipboard)
-                        ClientManager.SendCommand(CommandOut.GrabClipboard);
+                        ClientManager.GrabClipboard();
                     break;
                 case WM_RENDERFORMAT:
                 case WM_RENDERALLFORMATS:
-                    lock (ClientManager.WriteLock)
-                    {
-                        ClientManager.SendCommand(CommandOut.RequestClipboardContents);
-                        ClientManager.SendData(new byte[] { 0 }); // format 0 is utf8 text
-                    }
+                    ClientManager.RequestClipboardContents();
 
                     // wait for the data to arrive - this has to be blocking :(
-                    ClipboardResponse = new TaskCompletionSource<byte[]>();
-                    var result = ClipboardResponse.Task.Result;
+                    ClipboardResponse = new TaskCompletionSource<string>();
+                    var resultString = ClipboardResponse.Task.Result;
 
                     // TODO: do this efficiently
                     // substrings by newlines, convert pieces etc
-                    var resultString = Encoding.UTF8.GetString(result).Replace("\n", "\r\n");
                     var resultSize = Encoding.Unicode.GetByteCount(resultString);
 
                     var handle = GlobalAlloc(GMEM_MOVABLE, (UIntPtr)(resultSize + 2));

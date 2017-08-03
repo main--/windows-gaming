@@ -41,7 +41,7 @@ namespace VfioService
             GrabClipboard();
         }
 
-        public string RegisterHotKey(int id, int mods, int keys)
+        public string RegisterHotKey(int id, uint mods, uint keys)
         {
             HotkeyModifiers modifiers = (HotkeyModifiers)mods;
             Keys? key = (Keys)keys;
@@ -87,18 +87,17 @@ namespace VfioService
                 case WmHotkey:
                     lock (ClientManager.WriteLock)
                     {
-                        ClientManager.SendCommand(CommandOut.HotKey);
-                        ClientManager.SendData(BitConverter.GetBytes(m.WParam.ToInt32()));
+                        ClientManager.SendHotkey((uint)m.WParam.ToInt64());
                     }
                     break;
                 case WmPowerBroadcast:
                     switch (m.WParam.ToInt64())
                     {
                         case PbtApmSuspend:
-                            ClientManager.SendCommand(CommandOut.Suspending);
+                            ClientManager.SendSuspending();
                             break;
                         case PbtApmResume:
-                            ClientManager.SendCommand(CommandOut.ReportBoot);
+                            ClientManager.ReportBoot();
                             break;
                     }
                     break;
