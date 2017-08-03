@@ -21,17 +21,28 @@ pub struct Codec;
 impl Decoder for Codec {
     type Item = GaCmdIn;
     type Error = io::Error;
-
+    
     fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<GaCmdIn>> {
-        let mut rbuf = (&*buf).into_buf();
-        // prost's length delimiting functions are astonishingly useless because they return io::Error
-        if let Ok(len) = encoding::decode_varint(&mut rbuf) {
-            if rbuf.remaining() as u64 >= len {
-                return proto::GaCmdIn::decode(&mut rbuf.take(len as usize)).map(|x| x.message);
+        let mut res = Ok(None);
+        let mut consumed = 0;
+        {
+            let mut rbuf = (&*buf).into_buf();
+            // prost's length delimiting functions are astonishingly useless because they return io::Error
+            if let Ok(len) = encoding::decode_varint(&mut rbuf) {
+                if rbuf.remaining() as u64 >= len {
+                    consumed = len as usize + encoding::encoded_len_varint(len);
+                    // Even if it's an error don't return early, as we want to
+                    // skip over the message.
+                    res = proto::GaCmdIn::decode(&mut rbuf.take(len as usize))
+                        .map(|x| x.message);
+                }
             }
         }
-
-        Ok(None)
+        if let Err(_) = res {
+            warn!("Unknown / invalid request, skipping over: {:?}", &buf[..consumed]);
+        }
+        buf.split_to(consumed);
+        res
     }
 }
 
