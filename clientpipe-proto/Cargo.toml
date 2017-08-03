@@ -1,0 +1,13 @@
+[package]
+name = "clientpipe-proto"
+version = "0.1.0"
+authors = ["main() <main@ehvag.de>"]
+
+[dependencies]
+prost = "0.1"
+prost-derive = "0.1"
+bytes = "0.4"
+
+[build-dependencies]
+prost-build = "0.1"
+

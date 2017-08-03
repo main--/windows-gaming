@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package clientpipe_protocol;
+
+message Unit {}
+
+message ClipboardMessage {
+  enum Type {
+    None = 0;
+    Text = 1;
+    Image = 2;
+  }
+
+  oneof message {
+    Unit grab_clipboard = 1;
+    bool request_clipboard_contents = 2;
+    Type contents_type = 3;
+    bytes clipboard_contents = 4;
+  }
+}
+
+message RegisterHotKey {
+  uint32 id = 1;
+  uint32 modifiers = 2;
+  uint32 key = 3;
+}
+
+message GaCmdOut {
+  oneof message {
+    Unit ping = 1;
+    ClipboardMessage clipboard = 2;
+    Unit release_modifiers = 16;
+    Unit suspend = 17;
+    RegisterHotKey register_hot_key = 18;
+  }
+}
+
+
+message GaCmdIn {
+  oneof message {
+    Unit pong = 1;
+    Unit report_boot = 2;
+    ClipboardMessage clipboard = 3;
+    Unit suspending = 16;
+    uint32 hot_key = 17;
+    string hot_key_binding_failed = 18;
+  }
+}

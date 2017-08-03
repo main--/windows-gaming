@@ -1,6 +1,6 @@
 mod codec;
 
-pub use self::codec::GaCmdOut;
+pub use self::codec::{GaCmdOut, ClipboardMessage, RegisterHotKey, O};
 
 use std::os::unix::net::{UnixStream as StdUnixStream};
 use std::io::{Error, ErrorKind};
@@ -55,7 +55,7 @@ impl Clientpipe {
     pub fn take_handler<'a>(&mut self, controller: Rc<RefCell<Controller>>, handle: &'a Handle) -> Handler<'a> {
         let handler = self.read.take().unwrap().for_each(move |cmd| {
             match cmd {
-                GaCmdIn::ReportBoot => {
+                GaCmdIn::ReportBoot(_) => {
                     info!("client is now alive!");
 
                     if controller.borrow_mut().ga_hello() {
@@ -69,11 +69,11 @@ impl Clientpipe {
                         handle.spawn(timer);
                     }
                 }
-                GaCmdIn::Suspending => {
+                GaCmdIn::Suspending(_) => {
                     info!("client says that it's suspending");
                     controller.borrow_mut().ga_suspending();
                 }
-                GaCmdIn::Pong => {
+                GaCmdIn::Pong(_) => {
                     trace!("ga pong'ed");
                     controller.borrow_mut().ga_pong();
                 }
@@ -84,18 +84,24 @@ impl Clientpipe {
                 GaCmdIn::HotKeyBindingFailed(s) => {
                     warn!("HotKeyBinding failed: {}", s);
                 }
-                GaCmdIn::GrabClipboard => {
-                    debug!("windows is grabbing clipboard");
-                    controller.borrow_mut().grab_x11_clipboard();
-                }
-                GaCmdIn::RequestClipboardContents(_) => {
-                    debug!("windows requested clipboard contents");
-                    controller.borrow_mut().read_x11_clipboard();
-                }
-                GaCmdIn::ClipboardContents(buf) => {
-                    debug!("windows responded with clipboard contents");
-                    controller.borrow_mut().respond_x11_clipboard(buf);
-                }
+                GaCmdIn::Clipboard(c) => match c.message {
+                    Some(ClipboardMessage::GrabClipboard(_)) => {
+                        debug!("windows is grabbing clipboard");
+                        controller.borrow_mut().grab_x11_clipboard();
+                    }
+                    Some(ClipboardMessage::RequestClipboardContents(data)) => {
+                        debug!("windows requested clipboard contents");
+                        controller.borrow_mut().read_x11_clipboard();
+                    }
+                    Some(ClipboardMessage::ContentsType(t)) => {
+                        unimplemented!();
+                    }
+                    Some(ClipboardMessage::ClipboardContents(buf)) => {
+                        debug!("windows responded with clipboard contents");
+                        controller.borrow_mut().respond_x11_clipboard(buf);
+                    }
+                    None => error!("Windows sent an empty clipboard message??"),
+                },
             }
             Ok(())
         });
