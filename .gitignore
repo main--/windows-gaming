@@ -48,6 +48,10 @@ flycheck_*.el
 .idea/
 *.iml
 
+# vim swap files
+*.swp
+*.swo
+
 
 wrk/
 ovmf-x64
