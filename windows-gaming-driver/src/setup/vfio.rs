@@ -107,7 +107,7 @@ fn select(machine: &mut MachineConfig) -> Result<()> {
         println!("With everything else you're completely on your own.");
         println!("You will not be able to use these devices on your host system at all.");
         println!();
-        if ask::yesno("Would you like to pass any non-resettable PCI devices=") {
+        if ask::yesno("Would you like to pass any non-resettable PCI devices?") {
             // all non-resettable devices but no PCI bridges (because arch wiki says so)
             while select_device(machine, "Which device do you want to pass through?", &pci_devs,
                                 |x| !x.resettable && x.pci_class != "60400")? { }
@@ -132,8 +132,9 @@ fn select_device<P: Fn(&PciDevice) -> bool>(machine: &mut MachineConfig,
 
     let selection = ask::numeric(question, 0..askable_devices.len()+1);
 
-    if let Some(selected_id) = askable_devices.get(selection).map(|x| x.id) {
-        for device in devices.iter().filter(|x| x.id == selected_id) {
+    if let Some(selected_slot) = askable_devices.get(selection).map(|x| x.pci_slot.clone()) {
+        for device in devices.iter()
+            .filter(|x| x.pci_slot[..x.pci_slot.len()-1] == selected_slot[..selected_slot.len()-1]) {
             let vfio_device = VfioDevice {
                 resettable: device.resettable,
                 slot: device.pci_slot.clone(),
