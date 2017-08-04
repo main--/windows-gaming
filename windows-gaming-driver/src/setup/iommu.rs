@@ -3,7 +3,7 @@ use std::fs;
 
 use libudev::{Context, Enumerator};
 
-use config::SetupConfig;
+use config::{SetupConfig, MachineConfig};
 use setup::ask;
 use pci_device::PciDevice;
 
@@ -39,9 +39,9 @@ pub fn is_enabled() -> bool {
     fs::read_dir("/sys/devices/virtual/iommu/").ok().and_then(|mut x| x.next()).is_some()
 }
 
-pub fn check_grouping(setup: &SetupConfig) -> Result<bool> {
+pub fn check_grouping(machine: &MachineConfig) -> Result<bool> {
     let udev = Context::new().expect("Failed to create udev context");
-    let first_id = setup.vfio_devs[0];
+    let first_id = machine.pci_devices[0].device; // FIXME
     let mut iter = Enumerator::new(&udev)?;
     iter.match_subsystem("pci")?;
     let mut iter = iter.scan_devices()?.map(PciDevice::new).filter(|x| x.id == first_id);
@@ -90,7 +90,7 @@ pub fn check_grouping(setup: &SetupConfig) -> Result<bool> {
     related_devices.sort();
     related_devices.dedup();
 
-    assert!(setup.vfio_devs.iter().cloned().eq(related_devices.iter().cloned()));
+    // FIXME assert!(setup.vfio_devs.iter().cloned().eq(related_devices.iter().cloned()));
     Ok(true)
 }
 

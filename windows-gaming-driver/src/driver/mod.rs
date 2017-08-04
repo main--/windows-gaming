@@ -139,20 +139,27 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
         Box::new(clipboard_reader),
     ]).map(|_| ());
 
-    core.run(qemu.join(joined.or_else(|x| { error!("Unexpected error: {}", x); Ok(()) }))).expect("Unexpected error");
+    core.run(qemu.select2(joined).then(|x| {
+        match x {
+            Ok(future::Either::A((_, _))) => info!("qemu down first, all ok"),
+            Err(future::Either::A((e, _))) => return future::err(e).boxed(),//error!("Waiting for qemu errored: {}", e),
+            Ok(future::Either::B((_, _))) => unreachable!(), // we never return cleanly
+            Err(future::Either::B((e, a))) => {
+                error!("We errored: {}", e);
+                return a.boxed(); // we errored first, wait for qemu to exit
+            }
+        }
+        future::ok(()).boxed()
+    })).expect("Waiting for qemu errored");
 
     info!("unbinding resettable vfio-things");
     
-    for dev in cfg.machine.vfio_slots.iter() {
-        if dev.resettable {
-            let mut child = Command::new(data.join("vfio-ubind")).arg(&dev.slot).arg("-r").spawn().expect("failed to run vfio-ubind");
-            match child.wait() {
-                Ok(status) => 
-                        if !status.success() {	
-                        error!("vfio-ubind failed with {}! The device might still be bound to the vfio-driver!", status);
-                        },
-                Err(err) => error!("failed to wait on child. Got: {}", err)
-            }
+    for dev in cfg.machine.pci_devices.iter().filter(|x| x.resettable) {
+        let mut child = Command::new(data.join("vfio-ubind")).arg(&dev.slot).arg("-r").spawn().expect("failed to run vfio-ubind");
+        match child.wait() {
+            Ok(status) if status.success() => (), // all is well
+            Ok(status) => error!("vfio-ubind failed with {}! The device might still be bound to the vfio-driver!", status),
+            Err(err) => error!("failed to wait on child. Got: {}", err)
         }
     }
     info!("windows-gaming-driver down.");

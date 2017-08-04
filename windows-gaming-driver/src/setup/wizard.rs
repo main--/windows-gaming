@@ -52,7 +52,7 @@ impl Wizard {
         }
         config.save(cfg_path);
 
-        if !vfio::setup(config.setup.as_mut().unwrap(), &mut config.machine) {
+        if !vfio::setup(&mut config.machine) {
             return;
         }
         config.save(cfg_path);
@@ -86,7 +86,7 @@ impl Wizard {
             println!("With that out of the way, your next step after the reboot is simply to launch this wizard again and we can move on!");
         } else { // if something is actually passed through properly
             println!("Step 6: Check IOMMU grouping");
-            if !iommu::check_grouping(config.setup.as_ref().unwrap()).expect("Failed to check IOMMU grouping") {
+            if !iommu::check_grouping(&config.machine).expect("Failed to check IOMMU grouping") {
                 return;
             }
             println!();

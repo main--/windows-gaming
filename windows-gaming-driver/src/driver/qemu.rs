@@ -116,7 +116,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
     qemu.args(&["-netdev", &usernet, "-device", "e1000,netdev=unet"]);
 
     // TODO: Check if the configured device is in the configured slot
-    for device in cfg.machine.vfio_slots.iter() {
+    for device in cfg.machine.pci_devices.iter() {
         if device.resettable {
                 let mut child = Command::new(data.join("vfio-ubind")).arg(&device.slot).spawn().expect("failed to run vfio-ubind");
                 match child.wait() {

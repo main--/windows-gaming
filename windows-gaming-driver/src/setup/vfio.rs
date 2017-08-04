@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io::{BufReader, BufRead, Write, Result};
 use libudev::{Context, Enumerator};
 
-use config::{SetupConfig, MachineConfig, VfioDevice};
+use config::{MachineConfig, VfioDevice};
 use setup::ask;
 use setup::wizard;
 use pci_device::PciDevice;
@@ -13,10 +13,10 @@ use pci_device::PciDevice;
 
 const KERNEL_MODULES: &'static str = "vfio vfio_iommu_type1 vfio_pci vfio_virqfd";
 
-pub fn setup(setup: &mut SetupConfig, machine: &mut MachineConfig) -> bool {
+pub fn setup(machine: &mut MachineConfig) -> bool {
     println!("Step 3: Setting up the vfio driver");
 
-    if !setup.vfio_devs.is_empty() {
+    if !machine.pci_devices.is_empty() {
         println!();
         println!("{}", "Troubleshooting (since you apparently already did this):");
         println!("Just like Step 1, this requires a reboot to activate. If you already did that, the most likely cause \
@@ -28,7 +28,7 @@ pub fn setup(setup: &mut SetupConfig, machine: &mut MachineConfig) -> bool {
         println!();
     }
 
-    select(setup, machine).expect("Failed to select PCI Devices");
+    select(machine).expect("Failed to select PCI Devices");
     println!("Success!");
     println!();
 
@@ -71,7 +71,7 @@ pub fn setup(setup: &mut SetupConfig, machine: &mut MachineConfig) -> bool {
         }
     }
 
-    write_vfio_modconf(&setup);
+    write_vfio_modconf(machine);
 
     if !skip_ask {
         if !ask::yesno("Done?") {
@@ -82,82 +82,69 @@ pub fn setup(setup: &mut SetupConfig, machine: &mut MachineConfig) -> bool {
     true
 }
 
-fn select(setup: &mut SetupConfig, machine: &mut MachineConfig) -> Result<()> {
+fn select(machine: &mut MachineConfig) -> Result<()> {
     let udev = Context::new().expect("Failed to create udev context");
     let mut iter = Enumerator::new(&udev)?;
     iter.match_subsystem("pci")?;
     let pci_devs: Vec<_> = iter.scan_devices()?.map(PciDevice::new).collect();
-    
-    
+
+
     // filter to the display controller class (0x03XXXX, udev drops the leading zero)
-    let gpus = pci_devs.iter().filter(|x| x.pci_class.starts_with("3") && x.pci_class.len() == 5).collect();
-    select_device(setup, machine, "Which graphics card would you like to pass through?", &gpus)?;
-    if ask::yesno("Do you want to pass aditional pci devices?") {
-        println!("Add aditional pci devices (1/2)");
+    select_device(machine, "Which graphics card would you like to pass through?", &pci_devs,
+                  |x| x.pci_class.starts_with("3") && x.pci_class.len() == 5)?;
+    if ask::yesno("Would you like to pass aditional PCI devices?") {
         println!();
-        println!("Please choose aditional pci devices. These will be passed through to qemu on boot.");
-        println!("NOTE: The devices listed here can be reset. They will be bound to the vfio-pci driver on qemu's start and unbound when it quits");
-        println!("This should usually work. If it doesn't you're on your own.");
-        println!("You will not be able to use these devices while qemu is running.");
-        println!("If the device you want to pass through is not resettable (like a gpu) it will show up in the next step.");
-        println!("If you want a device permanently bound to vfio-pci for some reason select it in the next step.");
-        println!("MAKE SURE YOU DON'T PASS THROUGH YOUR USB-CONTROLLER TO WHICH YOUR KEYBOARD AND MOUSE IS CONNECTED!");
-        println!("Helpful tools to avoid this and figure out which numbers are which devices are lspci and lsusb with the -v, -t (lsusb only) and -nn (lspci only) command.");
+        println!("Please choose aditional pci devices. These will be passed through to the VM on boot.");
+        println!("Note: For this to work properly, the device has to support resetting.");
+        println!("The devices will be bound to the vfio-pci driver on VM startup and unbound when it quits.");
+        println!("You will not be able to use them on your host system while Windows is running.");
         println!();
-        let resetable_devices = pci_devs.iter().filter(|x| x.resettable).collect();
-        while let Ok(Some(())) = select_device(setup, machine, "Which device do you want to pass through?", &resetable_devices) {};
-        
-        println!("Add aditional pci devices (2/2)");
-        println!("");
-        println!("If you don't know what you are doing, choose None here!");
-        println!("NOTE: EVERY PCI DEVICE LISTED HERE WILL BE PERMANENTLY BOUND TO VFIO-PCI!");
-        println!("ONLY ADD DEVICES HERE IF YOU KNOW WHAT YOU ARE DOING!");
-        println!("If you kill your system using this there is only one thing i can say to you:");
+
+        while select_device(machine, "Which device woud you like to pass through?", &pci_devs,
+                            |x| x.resettable)? { }
+
+        println!("Note that non-resettable passthrough is only known to work for GPUs.");
+        println!("With everything else you're completely on your own.");
+        println!("You will not be able to use these devices on your host system at all.");
         println!();
-        println!("U done goofed m8.");
-        println!("Ur on ur own :)");
-        println!();
-        let all_devices = pci_devs.iter().filter(|x| x.pci_class != "60400").collect();
-        while let Ok(Some(())) = select_device(setup, machine, "Which device do you want to pass through?", &all_devices) {};
+        if ask::yesno("Would you like to pass any non-resettable PCI devices=") {
+            // all non-resettable devices but no PCI bridges (because arch wiki says so)
+            while select_device(machine, "Which device do you want to pass through?", &pci_devs,
+                                |x| !x.resettable && x.pci_class != "60400")? { }
+        }
     }
-    Ok(())	
+    Ok(())
 }
 
-fn select_device(setup: &mut SetupConfig, machine: &mut MachineConfig, question: &str, devices: &Vec<&PciDevice>) -> Result<Option<()>>{
-    let udev = Context::new().expect("Failed to create udev context");
-    let mut iter = Enumerator::new(&udev)?;
-    iter.match_subsystem("pci")?;
-    let udev_devices = iter.scan_devices()?.map(PciDevice::new);
-    let pci_devs: Vec<_> = udev_devices.filter(|x| !machine.vfio_slots.iter().any(|y| y.device == x.id)).collect();
-    let askable_devices: Vec<_> = devices.iter().filter(|x| !machine.vfio_slots.iter().any(|y| y.device == x.id)).collect();
-    
+fn select_device<P: Fn(&PciDevice) -> bool>(machine: &mut MachineConfig,
+                                            question: &str,
+                                            devices: &[PciDevice],
+                                            predicate: P) -> Result<bool> {
+    let askable_devices: Vec<_> = devices.iter()
+        .filter(|x| predicate(x) && !machine.pci_devices.iter().any(|y| y.device == x.id)).collect();
+
     println!("{}", devices.len());
-    
+
     for (i, dev) in askable_devices.iter().enumerate() {
         println!("[{}]\t{}", i, dev);
     }
     println!("[{}]\tNone of the above.", askable_devices.len());
 
     let selection = ask::numeric(question, 0..askable_devices.len()+1);
-    
-    if selection < askable_devices.len() {
-        let selected = &askable_devices[selection];
-        for device in pci_devs.iter().filter(|x| x.pci_device() == selected.pci_device()) {
+
+    if let Some(selected_id) = askable_devices.get(selection).map(|x| x.id) {
+        for device in devices.iter().filter(|x| x.id == selected_id) {
             let vfio_device = VfioDevice {
                 resettable: device.resettable,
                 slot: device.pci_slot.clone(),
                 device: device.id,
             };
-            
-            if !device.resettable {
-                setup.vfio_devs.push(device.id);
-            }
-            machine.vfio_slots.push(vfio_device);
+
+            machine.pci_devices.push(vfio_device);
         }
-        Ok(Some(()))
-    }
-    else{
-        Ok(None)	
+        Ok(true)
+    } else {
+        Ok(false)
     }
 }
 
@@ -227,11 +214,10 @@ fn autoconfigure_mkinitcpio(has_modconf: &mut bool) -> Result<bool> {
     Ok(false)
 }
 
-fn write_vfio_modconf(setup: &SetupConfig) {
-    let vfio_params = setup.vfio_devs.iter().fold(String::new(),
-                                                  |s, i| s + &format!("{:04x}:{:04x},", i.vendor, i.device));
+fn write_vfio_modconf(machine: &MachineConfig) {
+    let vfio_params = machine.pci_devices.iter().filter(|x| !x.resettable)
+        .fold(String::new(), |s, i| s + &format!("{:04x}:{:04x},", i.device.vendor, i.device.device));
     assert!(wizard::sudo_write_file("/etc/modprobe.d/vfio.conf", |x| {
         writeln!(x, "options vfio-pci ids={}", vfio_params)
     }).unwrap_or(false), "Failed to write modconf");
 }
-
