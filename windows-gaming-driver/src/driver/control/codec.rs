@@ -9,8 +9,8 @@ pub enum ControlCmdOut {
         x: i32,
         y: i32,
     },
-    TemporaryLightAttach,
-    TemporaryLightDetach,
+    TemporaryLightAttached,
+    TemporaryLightDetached,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -78,8 +78,8 @@ impl Encoder for Codec {
                 buf.put_i32::<LittleEndian>(x);
                 buf.put_i32::<LittleEndian>(y);
             }
-            ControlCmdOut::TemporaryLightAttach => buf.put_u8(2),
-            ControlCmdOut::TemporaryLightDetach => buf.put_u8(3),
+            ControlCmdOut::TemporaryLightAttached => buf.put_u8(2),
+            ControlCmdOut::TemporaryLightDetached => buf.put_u8(3),
         }
         Ok(())
     }

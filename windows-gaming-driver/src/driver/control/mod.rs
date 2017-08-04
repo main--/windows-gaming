@@ -57,19 +57,19 @@ pub fn create<'a>(socket: StdUnixListener, handle: &'a Handle, controller: Rc<Re
                     let (send, receiver) = mpsc::unbounded();
                     let res = controller.temporary_entry(send, x, y);
                     if !res {
+                        warn!("Temporary entry failed, closing connection");
                         return Box::new(future::err(()));
                     }
-                    (&*sender.borrow()).send(ControlCmdOut::TemporaryLightAttach).unwrap();
+                    (&*sender.borrow()).send(ControlCmdOut::TemporaryLightAttached).unwrap();
                     temp_entry = true;
-                    let receiver = receiver.map(|(x, y)| ControlCmdOut::MouseEdged { x, y })
-                        .map_err(|_| ());
+                    let receiver = receiver.map_err(|_| ());
                     let controller = controller_rc.clone();
                     let sender = sender.clone();
                     let sender2 = sender.clone();
                     handle_inner.spawn(receiver.for_each(move |data| (&*sender.borrow()).send(data).map_err(|_| ()))
                         .then(move |_| {
                             controller.borrow_mut().temporary_exit();
-                            let _ = (&*sender2.borrow()).send(ControlCmdOut::TemporaryLightDetach);
+                            let _ = (&*sender2.borrow()).send(ControlCmdOut::TemporaryLightDetached);
                             Ok(())
                         }));
                 }

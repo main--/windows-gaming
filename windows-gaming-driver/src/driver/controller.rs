@@ -14,6 +14,7 @@ use futures::future;
 use config::{UsbId, UsbPort, UsbBinding, MachineConfig, HotKeyAction, Action};
 use util;
 use driver::clientpipe::{GaCmdOut as GaCmd, ClipboardMessage, ClipboardType, ClipboardTypes, RegisterHotKey, Point};
+use driver::control::ControlCmdOut as ControlCmd;
 use driver::monitor::QmpCommand;
 use driver::sd_notify;
 use driver::libinput::Input;
@@ -37,10 +38,11 @@ enum State {
     Resuming,
 }
 
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(Clone)]
 enum IoState {
     Detached,
     LightEntry,
+    TemporaryLightEntry(UnboundedSender<ControlCmd>),
     AwaitingUpgrade,
     FullEntry,
 }
@@ -52,8 +54,6 @@ pub struct Controller {
     io_state: IoState,
     // senders to be sent to when windows finished suspending
     suspend_senders: Vec<Sender<()>>,
-    // controlpipe writer to write mouse motion events to
-    temporary_entry_writer: Option<UnboundedSender<(i32, i32)>>,
 
     input: Rc<RefCell<Input>>,
 
@@ -86,7 +86,6 @@ impl Controller {
             ga: State::Down,
             io_state: IoState::Detached,
             suspend_senders: Vec::new(),
-            temporary_entry_writer: None,
 
             monitor,
             clientpipe,
@@ -106,8 +105,10 @@ impl Controller {
                 // the last ping wasn't even answered
                 // we conclude that the ga has died
                 self.ga = State::Down;
-                if self.io_state == IoState::FullEntry {
-                    self.io_detach();
+                match self.io_state {
+                    IoState::FullEntry => self.io_detach(),
+                    IoState::TemporaryLightEntry(_) => self.temporary_exit(),
+                    _ => ()
                 }
                 false
             }
@@ -147,7 +148,7 @@ impl Controller {
 
         let ga = mem::replace(&mut self.ga, State::Up);
 
-        if self.io_state == IoState::AwaitingUpgrade {
+        if let IoState::AwaitingUpgrade = self.io_state {
             self.io_attach();
         }
 
@@ -178,19 +179,20 @@ impl Controller {
     pub fn ga_hotkey(&mut self, index: u32) {
         match self.machine_config.hotkeys.get(index as usize).map(|h| h.action.clone()) {
             None => warn!("Client sent invalid hotkey id"),
-            Some(HotKeyAction::Action(action)) => self.action(action),
+            Some(HotKeyAction::Action(action)) => {
+                if let IoState::TemporaryLightEntry(_) = self.io_state {
+                    info!("Got action-hotkey while in temporary light entry. Ignoring.");
+                    return;
+                }
+                match action {
+                    Action::IoUpgrade => self.io_attach(),
+                    Action::IoEntryForced => self.io_force_attach(),
+                    Action::IoExit => self.io_detach(),
+                }
+            }
             Some(HotKeyAction::Exec(cmd)) => {
                 Command::new("/bin/sh").arg("-c").arg(&cmd).spawn().unwrap();
             }
-        }
-    }
-
-    /// Executes given action
-    pub fn action(&mut self, action: Action) {
-        match action {
-            Action::IoUpgrade => self.io_attach(),
-            Action::IoEntryForced => self.io_force_attach(),
-            Action::IoExit => self.io_detach(),
         }
     }
 
@@ -219,6 +221,26 @@ impl Controller {
         }
     }
 
+    pub fn temporary_entry(&mut self, sender: UnboundedSender<ControlCmd>, x: i32, y: i32) -> bool {
+        if self.ga != State::Up && self.ga != State::Pinging {
+            return false;
+        }
+        if let IoState::Detached = self.io_state {
+            self.write_ga(GaCmd::SetMousePosition(Point { x, y }));
+            self.light_attach();
+            self.io_state = IoState::TemporaryLightEntry(sender);
+            return true;
+        }
+        false
+    }
+
+    pub fn temporary_exit(&mut self) {
+        // only detach if we are not already detached
+        if let IoState::TemporaryLightEntry(_) = self.io_state {
+            self.io_detach();
+        }
+    }
+
     pub fn light_attach(&mut self) {
         debug!("light entry");
 
@@ -229,24 +251,7 @@ impl Controller {
                 self.io_state = IoState::LightEntry;
             }
             IoState::AwaitingUpgrade => self.io_state = IoState::LightEntry,
-            IoState::LightEntry | IoState::FullEntry => (),
-        }
-    }
-
-    pub fn temporary_entry(&mut self, sender: UnboundedSender<(i32, i32)>, x: i32, y: i32) -> bool {
-        if self.temporary_entry_writer.is_none() {
-            self.temporary_entry_writer = Some(sender);
-            self.write_ga(GaCmd::SetMousePosition(Point { x, y }));
-            self.light_attach();
-            return true;
-        }
-        false
-    }
-
-    pub fn temporary_exit(&mut self) {
-        // only detach if we are not already detached
-        if self.temporary_entry_writer.is_some() {
-            self.io_detach();
+            IoState::LightEntry | IoState::FullEntry | IoState::TemporaryLightEntry(_) => (),
         }
     }
 
@@ -259,6 +264,10 @@ impl Controller {
         match self.io_state {
             IoState::Detached => (),
             IoState::AwaitingUpgrade | IoState::LightEntry => self.input.borrow_mut().suspend(),
+            IoState::TemporaryLightEntry(ref mut sender) => {
+                self.input.borrow_mut().suspend();
+                sender.send(ControlCmd::TemporaryLightDetached).unwrap();
+            }
             IoState::FullEntry => return,
         }
 
@@ -318,7 +327,7 @@ impl Controller {
 
         match self.io_state {
             IoState::Detached => (),
-            IoState::AwaitingUpgrade | IoState::LightEntry => {
+            IoState::AwaitingUpgrade | IoState::LightEntry | IoState::TemporaryLightEntry(_) => {
                 debug!("detaching light entry");
                 self.input.borrow_mut().suspend()
             },
@@ -385,8 +394,8 @@ impl Controller {
     }
 
     pub fn mouse_edged(&mut self, x: i32, y: i32) {
-        if let Some(ref mut sender) = self.temporary_entry_writer {
-            sender.send((x, y)).unwrap();
+        if let IoState::TemporaryLightEntry(ref mut sender) = self.io_state {
+            sender.send(ControlCmd::MouseEdged { x, y }).unwrap();
         }
     }
 }
