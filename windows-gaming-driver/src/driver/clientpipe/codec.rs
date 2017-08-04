@@ -38,8 +38,8 @@ impl Decoder for Codec {
                 }
             }
         }
-        if let Err(_) = res {
-            warn!("Unknown / invalid request, skipping over: {:?}", &buf[..consumed]);
+        if let Err(e) = res.as_ref() {
+            warn!("Unknown / invalid request ({}), skipping over: {:?}", e, &buf[..consumed]);
         }
         buf.split_to(consumed);
         res
