@@ -21,7 +21,7 @@ pub struct Codec;
 impl Decoder for Codec {
     type Item = GaCmdIn;
     type Error = io::Error;
-    
+
     fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<GaCmdIn>> {
         let mut res = Ok(None);
         let mut consumed = 0;
