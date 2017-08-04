@@ -57,10 +57,9 @@ fn main() {
         }
     }
 
-    let devices_folder = Path::new("/sys/bus/pci/devices/");
-    let dev_sysfs = devices_folder.join(&device).canonicalize()
+    let dev_sysfs = Path::new("/sys/bus/pci/devices/").read_dir().unwrap()
+        .map(Result::unwrap).find(|x| x.file_name() == *device).map(|x| x.path())
         .expect("Failed to look up the given device (does it exist?)!");
-    assert_eq!(dev_sysfs.parent(), Some(devices_folder));
     let dev_iommu = dev_sysfs.join("iommu");
     
     if !dev_iommu.exists() {
