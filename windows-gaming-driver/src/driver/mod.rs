@@ -5,11 +5,13 @@ mod monitor;
 mod clientpipe;
 mod controller;
 mod my_io;
-mod signalfd;
 mod sd_notify;
 mod samba;
 mod dbus;
 mod sleep_inhibitor;
+mod libinput;
+pub mod hotkeys;
+mod clipboard;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -20,13 +22,16 @@ use std::path::Path;
 use std::process::Command;
 
 use tokio_core::reactor::Core;
+use tokio_signal::unix::{Signal, SIGINT, SIGTERM};
 use futures::{Future, Stream, future};
+use futures::unsync::mpsc;
 
 use driver::controller::Controller;
 use config::Config;
-use driver::signalfd::{SignalFd, signal};
 use self::monitor::Monitor;
 use self::clientpipe::Clientpipe;
+use self::libinput::Input;
+use self::clipboard::X11Clipboard;
 
 pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     let _ = fs::remove_dir_all(tmp); // may fail - we dont care
@@ -72,16 +77,48 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     let mut monitor = Monitor::new(monitor_stream, &handle);
     let mut clientpipe = Clientpipe::new(clientpipe_stream, &handle);
 
-    let ctrl = Controller::new(cfg.machine.clone(), monitor.take_send(), clientpipe.take_send());
+    let (mut input, input_events) = Input::new(&handle, cfg.machine.clone());
+    input.suspend();
+    let input = Rc::new(RefCell::new(input));
+
+    let monitor_sender = monitor.take_send();
+    let (clipgrab_send, clipgrab_recv) = mpsc::unbounded();
+    let (clipread_send, clipread_recv) = mpsc::unbounded();
+    let (resp_send, resp_recv) = mpsc::unbounded();
+
+    let ctrl = Controller::new(cfg.machine.clone(), monitor_sender.clone(), clientpipe.take_send(), input.clone(),
+                               resp_send, clipgrab_send, clipread_send);
+
     let controller = Rc::new(RefCell::new(ctrl));
+
+    let clipboard = X11Clipboard::open().expect("Failed to open X11 clipboard!");
+    let clipboard_listener = clipboard.run(controller.clone(), resp_recv, &handle);
+
+    let clipboard_grabber = clipgrab_recv.for_each(|()| {
+        clipboard.grab_clipboard();
+        Ok(())
+    }).then(|_| Ok(()));
+
+    let clipboard_reader = clipread_recv.for_each(|()| {
+        clipboard.read_clipboard();
+        Ok(())
+    }).then(|_| Ok(()));
 
     let sysbus = sleep_inhibitor::system_dbus();
     let ctrl = controller.clone();
     let inhibitor = sleep_inhibitor::sleep_inhibitor(&sysbus, move || ctrl.borrow_mut().suspend(), &handle);
 
+    let ref input_ref = *input;
+    let input_listener = libinput::InputListener(input_ref);
+    let hotkey_bindings: Vec<_> = cfg.machine.hotkeys.iter().map(|x| x.key.clone()).collect();
+    let input_handler = libinput::create_handler(input_events, &hotkey_bindings, controller.clone(),
+                                                 monitor_sender);
+
     let control_handler = control::create(control_socket, &handle, controller.clone());
 
-    let signals = SignalFd::new(vec![signal::SIGTERM, signal::SIGINT], &handle);
+    let sigint = Signal::new(SIGINT, &handle).flatten_stream();
+    let sigterm = Signal::new(SIGTERM, &handle).flatten_stream();
+    let signals = sigint.merge(sigterm);
     let catch_sigterm = signals.for_each(|_| {
         controller.borrow_mut().shutdown();
         Ok(())
@@ -95,6 +132,11 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
         monitor.take_handler(controller.clone()),
         monitor.take_sender(),
         Box::new(catch_sigterm),
+        Box::new(input_listener),
+        input_handler,
+        clipboard_listener,
+        Box::new(clipboard_grabber),
+        Box::new(clipboard_reader),
     ]).map(|_| ());
 
     core.run(qemu.join(joined.or_else(|x| { error!("Unexpected error: {}", x); Ok(()) }))).expect("Unexpected error");

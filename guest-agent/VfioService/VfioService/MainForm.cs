@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -30,35 +31,20 @@ namespace VfioService
 
         public ClientManager ClientManager { get; set; }
 
+        private readonly SynchronizationContext SyncContext;
+
         public MainForm()
         {
             InitializeComponent();
+
+            SyncContext = SynchronizationContext.Current;
+            GrabClipboard();
         }
 
-        public string RegisterHotKey(int id, string hotkey)
+        public string RegisterHotKey(int id, int mods, int keys)
         {
-            HotkeyModifiers modifiers = 0;
-            Keys? key = null;
-
-            foreach (var ele in hotkey.Split('+'))
-            {
-                HotkeyModifiers hkm;
-                Keys k;
-                if (Enum.TryParse(ele, true, out hkm))
-                    modifiers |= hkm;
-                else if (Enum.TryParse(ele, false, out k))
-                {
-                    if (key == null)
-                        key = k;
-                    else
-                        return "parse error: multiple keys";
-                }
-                else
-                    return "parse error: unknown key";
-            }
-
-            if (!key.HasValue)
-                return "parse error: no key";
+            HotkeyModifiers modifiers = (HotkeyModifiers)mods;
+            Keys? key = (Keys)keys;
 
             if (!RegisterHotKey(Handle, id, modifiers, key.Value))
             {
@@ -70,6 +56,22 @@ namespace VfioService
             }
 
             return null;
+        }
+        
+        public string GetClipboardText()
+        {
+            if (!Clipboard.ContainsText())
+                return null;
+
+            return Clipboard.GetText(TextDataFormat.UnicodeText);
+        }
+
+        public Image GetClipboardImage()
+        {
+            if (!Clipboard.ContainsImage())
+                return null;
+
+            return Clipboard.GetImage();
         }
 
         private const int WmPowerBroadcast = 0x0218;
@@ -102,6 +104,7 @@ namespace VfioService
                     break;
             }
 
+            WndProcClipboard(ref m);
             base.WndProc(ref m);
         }
     }

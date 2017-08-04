@@ -1,5 +1,7 @@
 use std::mem;
+use std::rc::Rc;
 use std::ffi::OsStr;
+use std::cell::RefCell;
 use std::process::Command;
 
 use itertools::Itertools;
@@ -14,6 +16,9 @@ use util;
 use driver::clientpipe::GaCmdOut as GaCmd;
 use driver::monitor::QmpCommand;
 use driver::sd_notify;
+use driver::libinput::Input;
+use driver::clipboard::{ClipboardRequestEvent, ClipboardRequestResponse};
+
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 /// States the state machine of this Controller can have
@@ -32,12 +37,27 @@ enum State {
     Resuming,
 }
 
+#[derive(PartialEq, Eq, Clone, Copy)]
+enum IoState {
+    Detached,
+    LightEntry,
+    AwaitingUpgrade,
+    FullEntry,
+}
+
 pub struct Controller {
     machine_config: MachineConfig,
 
     ga: State,
-    io_attached: bool,
+    io_state: IoState,
     suspend_senders: Vec<Sender<()>>,
+
+    input: Rc<RefCell<Input>>,
+
+    x11_clipboard: UnboundedSender<ClipboardRequestResponse>,
+    x11_clipboard_grabber: UnboundedSender<()>,
+    x11_clipboard_reader: UnboundedSender<()>,
+    win_clipboard_request: Option<ClipboardRequestEvent>,
 
     // write-only
     monitor: UnboundedSender<QmpCommand>,
@@ -51,17 +71,27 @@ impl Controller {
 
     pub fn new(machine_config: MachineConfig,
                monitor: UnboundedSender<QmpCommand>,
-               clientpipe: UnboundedSender<GaCmd>) -> Controller {
+               clientpipe: UnboundedSender<GaCmd>,
+               input: Rc<RefCell<Input>>,
+               x11_clipboard: UnboundedSender<ClipboardRequestResponse>,
+               x11_clipboard_grabber: UnboundedSender<()>,
+               x11_clipboard_reader: UnboundedSender<()>) -> Controller {
         (&monitor).send(QmpCommand::QmpCapabilities).unwrap();
         Controller {
             machine_config,
 
             ga: State::Down,
-            io_attached: false,
+            io_state: IoState::Detached,
             suspend_senders: Vec::new(),
 
             monitor,
             clientpipe,
+            input,
+
+            x11_clipboard,
+            x11_clipboard_grabber,
+            x11_clipboard_reader,
+            win_clipboard_request: None,
         }
     }
 
@@ -72,7 +102,9 @@ impl Controller {
                 // the last ping wasn't even answered
                 // we conclude that the ga has died
                 self.ga = State::Down;
-                self.io_detach();
+                if self.io_state == IoState::FullEntry {
+                    self.io_detach();
+                }
                 false
             }
             State::Up => {
@@ -97,7 +129,7 @@ impl Controller {
         for (i, hotkey) in self.machine_config.hotkeys.clone().into_iter().enumerate() {
             self.write_ga(GaCmd::RegisterHotKey {
                 id: i as u32,
-                key: hotkey.key,
+                key: hotkey.key.to_windows(),
             });
         }
 
@@ -112,6 +144,11 @@ impl Controller {
         // exists in that case so it would be a bug to create a second one.
 
         let ga = mem::replace(&mut self.ga, State::Up);
+
+        if self.io_state == IoState::AwaitingUpgrade {
+            self.io_attach();
+        }
+
         match ga {
             State::Pinging | State::Up => false,
             State::Down | State::Suspended => true,
@@ -137,9 +174,9 @@ impl Controller {
     }
 
     pub fn ga_hotkey(&mut self, index: u32) {
-        match self.machine_config.hotkeys.get(index as usize).cloned().map(|h| h.action) {
+        match self.machine_config.hotkeys.get(index as usize).map(|h| h.action.clone()) {
             None => warn!("Client sent invalid hotkey id"),
-            Some(HotKeyAction::Action(action) ) => self.action(action),
+            Some(HotKeyAction::Action(action)) => self.action(action),
             Some(HotKeyAction::Exec(cmd)) => {
                 Command::new("/bin/sh").arg("-c").arg(&cmd).spawn().unwrap();
             }
@@ -149,7 +186,7 @@ impl Controller {
     /// Executes given action
     pub fn action(&mut self, action: Action) {
         match action {
-            Action::IoEntry => self.io_attach(),
+            Action::IoUpgrade => self.io_attach(),
             Action::IoEntryForced => self.io_force_attach(),
             Action::IoExit => self.io_detach(),
         }
@@ -158,25 +195,54 @@ impl Controller {
     /// Attaches all configured devices if GA is up and wakes the host up if it's suspended
     pub fn io_attach(&mut self) {
         match self.ga {
-            State::Down | State::Resuming | State::Suspending => (),
+            State::Resuming | State::Suspending => (),
             State::Suspended => {
                 // make them wake up
                 (&self.monitor).send(QmpCommand::SystemWakeup).unwrap();
                 // can't enter now - gotta wait for GA to get ready
                 self.ga = State::Resuming;
             },
-            State::Up | State::Pinging => self.io_force_attach()
+            State::Down => {
+                self.light_attach();
+                self.io_state = IoState::AwaitingUpgrade;
+            }
+            State::Up | State::Pinging => self.io_force_attach(),
+        }
+    }
+
+    pub fn try_attach(&mut self) {
+        match self.ga {
+            State::Up | State::Pinging => self.io_force_attach(),
+            _ => (),
+        }
+    }
+
+    pub fn light_attach(&mut self) {
+        debug!("light entry");
+
+        match self.io_state {
+            IoState::Detached => {
+                self.prepare_entry();
+                self.input.borrow_mut().resume();
+                self.io_state = IoState::LightEntry;
+            }
+            IoState::AwaitingUpgrade => self.io_state = IoState::LightEntry,
+            IoState::LightEntry | IoState::FullEntry => (),
         }
     }
 
     /// Attaches all configured devices regardless of GA state
     pub fn io_force_attach(&mut self) {
-        if self.io_attached {
-            return;
+        debug!("full entry");
+
+        // release light entry first so we don't mess things up
+        match self.io_state {
+            IoState::Detached => (),
+            IoState::AwaitingUpgrade | IoState::LightEntry => self.input.borrow_mut().suspend(),
+            IoState::FullEntry => return,
         }
 
-        // might still be holding keyboard modifiers - release them
-        self.write_ga(GaCmd::ReleaseModifiers);
+        self.prepare_entry();
 
         let mut udev = Context::new().expect("Failed to create udev context");
 
@@ -199,7 +265,13 @@ impl Controller {
                 }).unwrap();
             }
         }
-        self.io_attached = true;
+
+        self.io_state = IoState::FullEntry;
+    }
+
+    pub fn prepare_entry(&mut self) {
+        // release modifiers
+        self.write_ga(GaCmd::ReleaseModifiers);
     }
 
     /// Suspends Windows
@@ -223,18 +295,60 @@ impl Controller {
     pub fn io_detach(&mut self) {
         assert!(self.ga != State::Suspending, "trying to exit from a suspending vm?");
         assert!(self.ga != State::Suspended, "trying to exit from a suspended vm?");
-        if !self.io_attached {
-            return;
+
+        match self.io_state {
+            IoState::Detached => (),
+            IoState::AwaitingUpgrade | IoState::LightEntry => {
+                debug!("detaching light entry");
+                self.input.borrow_mut().suspend()
+            },
+            IoState::FullEntry => {
+                debug!("detaching full entry");
+                for i in self.machine_config.usb_devices.iter().enumerate()
+                        .filter(|&(_, dev)| !dev.permanent).map(|(i, _)| i) {
+                    (&self.monitor).send(QmpCommand::DeviceDel { id: format!("usb{}", i) }).unwrap();
+                }
+            }
         }
-        for i in self.machine_config.usb_devices.iter().enumerate()
-            .filter(|&(_, dev)| !dev.permanent).map(|(i, _)| i) {
-            (&self.monitor).send(QmpCommand::DeviceDel { id: format!("usb{}", i) }).unwrap();
-        }
-        self.io_attached = false;
+
+        self.io_state = IoState::Detached;
     }
 
     pub fn shutdown(&mut self) {
         (&self.monitor).send(QmpCommand::SystemPowerdown).unwrap();
+    }
+
+    /// Windows told us to grab the keyboard
+    pub fn grab_x11_clipboard(&mut self) {
+        (&self.x11_clipboard_grabber).send(()).unwrap();
+    }
+
+    /// Paste on Windows, so we have to request contents
+    pub fn read_x11_clipboard(&mut self) {
+        (&self.x11_clipboard_reader).send(()).unwrap();
+    }
+
+    /// Pasting on Linux, Windows responded with contents
+    pub fn respond_x11_clipboard(&mut self, buf: Vec<u8>) {
+        if let Some(event) = self.win_clipboard_request.take() {
+            (&self.x11_clipboard).send(event.reply(buf)).unwrap();
+        }
+    }
+
+    /// We lost the X11 clipboard, so we grab the Windows keyboard
+    pub fn grab_win_clipboard(&mut self) {
+        self.write_ga(GaCmd::GrabClipboard);
+    }
+
+    /// Paste on Linux, so we have to request contents
+    pub fn read_win_clipboard(&mut self, event: ClipboardRequestEvent) {
+        self.win_clipboard_request = Some(event);
+        self.write_ga(GaCmd::RequestClipboardContents(0));
+    }
+
+    /// Pasting on Windows, X11 responded with contents
+    pub fn respond_win_clipboard(&mut self, buf: Vec<u8>) {
+        self.write_ga(GaCmd::ClipboardContents(buf));
     }
 }
 

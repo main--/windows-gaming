@@ -11,6 +11,8 @@ pub enum ControlCmdOut {
 #[derive(Debug, PartialEq, Eq)]
 pub enum ControlCmdIn {
     IoEntry,
+    TryIoEntry,
+    LightEntry,
     Shutdown,
     ForceIoEntry,
     IoExit,
@@ -30,6 +32,8 @@ impl Decoder for Codec {
             Some(3) => ControlCmdIn::ForceIoEntry,
             Some(4) => ControlCmdIn::IoExit,
             Some(5) => ControlCmdIn::Suspend,
+            Some(6) => ControlCmdIn::TryIoEntry,
+            Some(7) => ControlCmdIn::LightEntry,
             Some(x) => {
                 warn!("control sent invalid request {}", x);
                 // no idea how to proceed as the request might have payload
@@ -59,25 +63,20 @@ mod test {
     use bytes::BytesMut;
     use tokio_io::codec::Decoder;
 
-    macro_rules! please {
-        (create a test function named $name:ident, which creates and passes BytesMut containing $data:expr, asserts the result $expected:expr, and a remaining length of $len:expr) => (
-            #[test]
-            fn $name() {
-                let mut bytes = BytesMut::new();
-                bytes.extend($data);
-                assert_eq!(Codec.decode(&mut bytes).unwrap(), $expected);
-                assert_eq!(bytes.len(), $len);
-            }
-        )
+    fn verify(data: &[u8], expected: Option<ControlCmdIn>, remaining: usize) {
+        let mut bytes = BytesMut::new();
+        bytes.extend(data);
+        assert_eq!(Codec.decode(&mut bytes).unwrap(), expected);
+        assert_eq!(bytes.len(), remaining);
     }
 
-    please!(create a test function named none, which creates and passes BytesMut containing &[], asserts the result None, and a remaining length of 0);
-    please!(create a test function named invalid, which creates and passes BytesMut containing &[0], asserts the result None, and a remaining length of 1);
-    please!(create a test function named io_entry, which creates and passes BytesMut containing &[1], asserts the result Some(ControlCmdIn::IoEntry), and a remaining length of 0);
-    please!(create a test function named shutdown, which creates and passes BytesMut containing &[2], asserts the result Some(ControlCmdIn::Shutdown), and a remaining length of 0);
-    please!(create a test function named force_io_entry, which creates and passes BytesMut containing &[3], asserts the result Some(ControlCmdIn::ForceIoEntry), and a remaining length of 0);
-    please!(create a test function named io_exit, which creates and passes BytesMut containing &[4], asserts the result Some(ControlCmdIn::IoExit), and a remaining length of 0);
-    please!(create a test function named suspend, which creates and passes BytesMut containing &[5], asserts the result Some(ControlCmdIn::Suspend), and a remaining length of 0);
+    #[test] fn none() { verify(&[], None, 0); }
+    #[test] fn invalid() { verify(&[0], None, 1); }
+    #[test] fn io_entry() { verify(&[1], Some(ControlCmdIn::IoEntry), 0); }
+    #[test] fn shutdown() { verify(&[2], Some(ControlCmdIn::Shutdown), 0); }
+    #[test] fn force_io_entry() { verify(&[3], Some(ControlCmdIn::ForceIoEntry), 0); }
+    #[test] fn io_exit() { verify(&[4], Some(ControlCmdIn::IoExit), 0); }
+    #[test] fn suspend() { verify(&[5], Some(ControlCmdIn::Suspend), 0); }
 
     #[test]
     fn multiple() {

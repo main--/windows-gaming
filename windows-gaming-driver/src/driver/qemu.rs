@@ -2,10 +2,13 @@ use std::process::{Command, Stdio};
 use std::path::{Path};
 use std::iter::Iterator;
 use std::fs;
+use std::io;
+use std::os::unix::process::CommandExt as UnixCommandExt;
 
 use itertools::Itertools;
 use tokio_core::reactor::Handle;
 use tokio_process::{CommandExt, Child};
+use libc;
 
 use config::{Config, SoundBackend, AlsaUnit, UsbBus};
 use driver::controller;
@@ -136,7 +139,13 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
     // create usb buses
     {
         let mut create_usb_buses = |name, typ, ports| {
-            let count = cfg.machine.usb_devices.iter().filter(|dev| dev.bus == typ).count();
+            let mut count = cfg.machine.usb_devices.iter().filter(|dev| dev.bus == typ).count();
+
+            if typ == UsbBus::Xhci {
+                // account for lighthouse usb-mouse
+                count += 1;
+            }
+
             let usable_ports = util::usable_ports(typ);
             let num = (count + usable_ports - 1) / usable_ports;
             debug!("Setup {} {:?} bus(es)", num, typ);
@@ -154,16 +163,30 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
 
     let sorted = cfg.machine.usb_devices.iter().sorted_by(|a, b| a.bus.cmp(&b.bus));
     let groups = sorted.iter().group_by(|dev| dev.bus);
-    for (port, dev) in groups.into_iter().flat_map(|(_, group)| group.enumerate())
-            .filter(|&(_, ref dev)| dev.permanent) {
-        if let Some((hostbus, hostaddr)) = controller::resolve_binding(&dev.binding)
-                .expect("Failed to resolve usb binding") {
-            let bus = dev.bus;
-            let usable_ports = util::usable_ports(bus);
-            qemu.args(&["-device",
-                &format!("usb-host,hostbus={},hostaddr={},bus={}{}.0,port={}", hostbus, hostaddr,
-                         bus, port / usable_ports, (port % usable_ports) + 1)]);
-            debug!("Connected {:?} ({}:{}) to bus {}", dev.binding, hostbus, hostaddr, bus);
+    for (bus, devices) in &groups {
+        let usable_ports = util::usable_ports(bus);
+        let mut i = 0;
+        for dev in devices {
+            let port = i;
+            i += 1;
+            if dev.permanent {
+            if let Some((hostbus, hostaddr)) = controller::resolve_binding(&dev.binding)
+                    .expect("Failed to resolve usb binding")
+                {
+                    qemu.args(&["-device", &format!(
+                        "usb-host,hostbus={},hostaddr={},bus={}{}.0,port={}", hostbus, hostaddr,
+                        bus, port / usable_ports, (port % usable_ports) + 1)]);
+                    debug!("Connected {:?} ({}:{}) to bus {}", dev.binding, hostbus, hostaddr, bus);
+                }
+            }
+        }
+
+        if bus == UsbBus::Xhci {
+            // add lighthouse usb-mouse
+            let port = i;
+            qemu.args(&["-device", &format!("usb-mouse,bus=xhci{}.0,port={}",
+                                            port / usable_ports, (port % usable_ports) + 1)]);
+            debug!("usb-mouse at xhci{}.0p{}", port / usable_ports, (port % usable_ports) + 1);
         }
     }
 
@@ -253,6 +276,15 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
     qemu.stdin(Stdio::null());
     trace!("qemu: {:?}", qemu);
 
+    // try to detach qemu from process group to enable better Ctrl+C support
+    qemu.before_exec(|| unsafe {
+        if libc::setpgid(0, 0) < 0 {
+            warn!("Can't setpgid: {}", io::Error::last_os_error());
+        } else {
+            debug!("Detached qemu process");
+        }
+        Ok(())
+    });
     let qemu = qemu.spawn_async(handle).expect("Failed to start qemu");
     trace!("qemu spawned");
     return qemu;
