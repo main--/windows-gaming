@@ -6,10 +6,4 @@ IF %ERRORLEVEL% NEQ 0 (
   EXIT
 )
 
-mkdir csproto
-
-protoc clientpipe-proto/src/protocol.proto --csharp_out=csproto
-
-copy csproto\Protocol.cs guest-agent\VfioService\VfioService\
-
-rmdir /q /s csproto
+protoc clientpipe-proto/src/protocol.proto --csharp_out=guest-agent\VfioService\VfioService\
