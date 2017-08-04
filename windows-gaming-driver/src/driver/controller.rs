@@ -102,7 +102,9 @@ impl Controller {
                 // the last ping wasn't even answered
                 // we conclude that the ga has died
                 self.ga = State::Down;
-                self.io_detach();
+                if self.io_state == IoState::FullEntry {
+                    self.io_detach();
+                }
                 false
             }
             State::Up => {
