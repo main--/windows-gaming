@@ -11,6 +11,7 @@ use xcb::{self, Atom, Connection, ConnError, GenericEvent, GenericError, Window,
 
 use super::my_io::MyIo;
 use super::controller::Controller;
+use super::clientpipe::ClipboardType;
 
 
 struct XcbEvents<'a> {
@@ -58,6 +59,7 @@ struct Atoms {
     targets: Atom,
     utf8_string: Atom,
     property: Atom,
+    png: Atom,
 }
 
 pub struct X11Clipboard {
@@ -93,13 +95,16 @@ impl X11Clipboard {
             connection.flush();
         }
 
-        let clipboard = get_atom(&connection, "CLIPBOARD")?;
-        let property = get_atom(&connection, "THIS_CLIPBOARD_OUT")?;
-        let targets = get_atom(&connection, "TARGETS")?;
-        let utf8_string = get_atom(&connection, "UTF8_STRING")?;
-        // let incr = get_atom(&connection, "INCR")?; // not (yet?) implemented
+        let atoms = Atoms {
+            clipboard: get_atom(&connection, "CLIPBOARD")?,
+            property: get_atom(&connection, "THIS_CLIPBOARD_OUT")?,
+            targets: get_atom(&connection, "TARGETS")?,
+            utf8_string: get_atom(&connection, "UTF8_STRING")?,
+            // incr: get_atom(&connection, "INCR")?, // not (yet?) implemented
+            png: get_atom(&connection, "image/png")?,
+        };
 
-        Ok(X11Clipboard { connection, window, atoms: Atoms { clipboard, targets, utf8_string, property } })
+        Ok(X11Clipboard { connection, window, atoms })
     }
 
     pub fn grab_clipboard(&self) {
@@ -107,10 +112,28 @@ impl X11Clipboard {
         self.connection.flush();
     }
 
-    pub fn read_clipboard(&self) {
-        xcb::convert_selection(&self.connection, self.window, self.atoms.clipboard, self.atoms.utf8_string,
-                               self.atoms.property, xcb::CURRENT_TIME);
+    pub fn read_clipboard(&self, kind: ClipboardType) {
+        let target = self.cliptype_to_atom(kind).unwrap_or(self.atoms.targets);
+        xcb::convert_selection(&self.connection, self.window, self.atoms.clipboard,
+                               target, self.atoms.property, xcb::CURRENT_TIME);
         self.connection.flush();
+    }
+
+    fn atom_to_cliptype(&self, atom: Atom) -> Option<ClipboardType> {
+        Some(match atom {
+            x if x == self.atoms.targets => ClipboardType::None,
+            x if x == self.atoms.utf8_string => ClipboardType::Text,
+            x if x == self.atoms.png => ClipboardType::Image,
+            _ => return None,
+        })
+    }
+
+    fn cliptype_to_atom(&self, kind: ClipboardType) -> Option<Atom> {
+        match kind {
+            ClipboardType::None => None,
+            ClipboardType::Text => Some(self.atoms.utf8_string),
+            ClipboardType::Image => Some(self.atoms.png),
+        }
     }
 
     pub fn run<'a>(&'a self,
@@ -128,6 +151,7 @@ impl X11Clipboard {
                         selection: event.selection(),
                         target: event.target(),
                         property: event.property(),
+                        desired_type: self.atom_to_cliptype(event.target()).unwrap_or(ClipboardType::Text),
                     });
                 }
                 SELECTION_CLEAR => {
@@ -137,11 +161,18 @@ impl X11Clipboard {
                     let event: &SelectionNotifyEvent = unsafe { xcb::cast_event(&event) };
                     if let Ok(reply) = xcb::get_property(
                         &self.connection, false, self.window,
-                        event.property(), self.atoms.utf8_string, 0, ::std::u32::MAX // FIXME reasonable buffer size
+                        event.property(), xcb::ATOM_ANY, 0, ::std::u32::MAX // FIXME reasonable buffer size
                     ).get_reply() {
-                        assert!(reply.type_() == self.atoms.utf8_string);
+                        if reply.type_() == xcb::ATOM_ATOM {
+                            // this is type info (targets)
+                            let formats: &[Atom] = reply.value();
+                            let formats = formats.iter().filter_map(|&x| self.atom_to_cliptype(x)).collect();
 
-                        controller.borrow_mut().respond_win_clipboard(reply.value().to_vec());
+                            controller.borrow_mut().respond_win_types(formats);
+                        } else {
+                            controller.borrow_mut().respond_win_clipboard(reply.value().to_vec());
+                        }
+
                         xcb::delete_property(&self.connection, self.window, self.atoms.property);
                     } else {
                         controller.borrow_mut().respond_win_clipboard(Vec::new());
@@ -157,21 +188,22 @@ impl X11Clipboard {
         let responder = resp_recv.for_each(move |response: ClipboardRequestResponse| {
             let event = &response.event;
 
-            if event.target == self.atoms.targets {
-                xcb::change_property(
-                    &self.connection, PROP_MODE_REPLACE as u8,
-                    event.requestor, event.property, xcb::ATOM_ATOM, 32,
-                    &[self.atoms.targets, self.atoms.utf8_string],
-                );
-
-            } else if event.target == self.atoms.utf8_string {
-                xcb::change_property(
-                    &self.connection, PROP_MODE_REPLACE as u8,
-                    event.requestor, event.property, event.target, 8,
-                    &response.response
-                );
+            match response.response {
+                ClipboardResponse::Types(kinds) => {
+                    let mut kinds: Vec<_> = kinds.iter().filter_map(|&x| self.cliptype_to_atom(x)).collect();
+                    kinds.push(self.atoms.targets);
+                    xcb::change_property(&self.connection, PROP_MODE_REPLACE as u8,
+                                         event.requestor, event.property, xcb::ATOM_ATOM, 32,
+                                         &kinds);
+                }
+                ClipboardResponse::Data(buf) => {
+                    xcb::change_property(&self.connection, PROP_MODE_REPLACE as u8,
+                                         event.requestor, event.property, event.target, 8, &buf);
+                }
             }
-            // else do nothing: we don't set anything so they realize that this format is unsupported
+            // TODO: right now we default to requesting unknown formats as text
+            // this is potentially bad
+            // we should not set anything here for unsupported formats
 
             xcb::send_event(
                 &self.connection, false, event.requestor, 0,
@@ -198,18 +230,35 @@ pub struct ClipboardRequestEvent {
     selection: Atom,
     target: Atom,
     property: Atom,
+    desired_type: ClipboardType,
 }
 
 impl ClipboardRequestEvent {
-    pub fn reply(self, response: Vec<u8>) -> ClipboardRequestResponse {
+    pub fn reply_data(self, response: Vec<u8>) -> ClipboardRequestResponse {
         ClipboardRequestResponse {
             event: self,
-            response,
+            response: ClipboardResponse::Data(response),
         }
     }
+
+    pub fn reply_types(self, types: Vec<ClipboardType>) -> ClipboardRequestResponse {
+        ClipboardRequestResponse {
+            event: self,
+            response: ClipboardResponse::Types(types),
+        }
+    }
+
+    pub fn desired_type(&self) -> ClipboardType {
+        self.desired_type
+    }
+}
+
+enum ClipboardResponse {
+    Types(Vec<ClipboardType>),
+    Data(Vec<u8>),
 }
 
 pub struct ClipboardRequestResponse {
     event: ClipboardRequestEvent,
-    response: Vec<u8>,
+    response: ClipboardResponse,
 }

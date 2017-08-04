@@ -98,8 +98,8 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
         Ok(())
     }).then(|_| Ok(()));
 
-    let clipboard_reader = clipread_recv.for_each(|()| {
-        clipboard.read_clipboard();
+    let clipboard_reader = clipread_recv.for_each(|kind| {
+        clipboard.read_clipboard(kind);
         Ok(())
     }).then(|_| Ok(()));
 

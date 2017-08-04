@@ -4,19 +4,23 @@ package clientpipe_protocol;
 
 message Unit {}
 
-message ClipboardMessage {
-  enum Type {
-    None = 0;
-    Text = 1;
-    Image = 2;
-  }
+enum ClipboardType {
+  None = 0;
+  Text = 1;
+  Image = 2;
+}
 
+message ClipboardMessage {
   oneof message {
     Unit grab_clipboard = 1;
-    bool request_clipboard_contents = 2;
-    Type contents_type = 3;
+    ClipboardType request_clipboard_contents = 2;
+    ClipboardTypes content_types = 3;
     bytes clipboard_contents = 4;
   }
+}
+
+message ClipboardTypes {
+  repeated ClipboardType types = 1;
 }
 
 message RegisterHotKey {
