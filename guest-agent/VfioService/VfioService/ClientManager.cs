@@ -65,10 +65,13 @@ namespace VfioService
                     MainForm.GrabClipboard();
                     break;
                 case ClipboardMessage.MessageOneofCase.RequestClipboardContents:
-                    SendClipboardData();
+                    SendClipboardData(msg.RequestClipboardContents);
                     break;
                 case ClipboardMessage.MessageOneofCase.ClipboardContents:
-                    MainForm.SetClipboardResponse(msg.ClipboardContents.ToStringUtf8().Replace("\n", Environment.NewLine));
+                    MainForm.SetClipboardResponse(msg.ClipboardContents);
+                    break;
+                case ClipboardMessage.MessageOneofCase.ContentTypes:
+                    MainForm.SetClipboardFormats(msg.ContentTypes.Types_.ToArray());
                     break;
 
             }
@@ -85,16 +88,51 @@ namespace VfioService
             }
         }
 
-        private void SendClipboardData()
+        private void SendClipboardData(ClipboardType type)
         {
-            var clipboardText = (string)MainForm.Invoke(new Func<string>(MainForm.GetClipboardText));
-            if (clipboardText != null)
+            if (type == ClipboardType.None)
             {
-                var message = new GaCmdIn();
-                message.Clipboard = new ClipboardMessage();
-                message.Clipboard.ClipboardContents = ByteString.CopyFromUtf8(clipboardText.Replace(Environment.NewLine, "\n"));
+                var types = (IEnumerable<ClipboardType>)MainForm.Invoke(new Func<IEnumerable<ClipboardType>>(MainForm.GetClipboardTypes));
+
+                var message = new GaCmdIn
+                {
+                    Clipboard = new ClipboardMessage
+                    {
+                        ContentTypes = new ClipboardTypes
+                        {
+                        }
+                    }
+                };
+
+                message.Clipboard.ContentTypes.Types_.AddRange(types);
                 Send(message);
+
+                return;
             }
+            else if (type == ClipboardType.Text)
+            {
+                var clipboardText = (string)MainForm.Invoke(new Func<string>(MainForm.GetClipboardText));
+                if (clipboardText != null)
+                {
+                    var message = new GaCmdIn();
+                    message.Clipboard = new ClipboardMessage();
+                    message.Clipboard.ClipboardContents = ByteString.CopyFromUtf8(clipboardText.Replace(Environment.NewLine, "\n"));
+                    Send(message);
+                }
+            }
+            else if (type == ClipboardType.Image)
+            {
+                var image = (byte[])MainForm.Invoke(new Func<byte[]>(MainForm.GetClipboardImage));
+                if (image != null)
+                {
+                    var message = new GaCmdIn();
+                    message.Clipboard = new ClipboardMessage();
+                    message.Clipboard.ClipboardContents = ByteString.CopyFrom(image);
+                    Send(message);
+                }
+            }
+
+
         }
 
         public void SendHotkey(uint hotkey)
@@ -133,13 +171,13 @@ namespace VfioService
             });
         }
 
-        public void RequestClipboardContents()
+        public void RequestClipboardContents(ClipboardType type)
         {
             Send(new GaCmdIn
             {
                 Clipboard = new ClipboardMessage
                 {
-                    RequestClipboardContents = false
+                    RequestClipboardContents = type
                 }
             });
         }

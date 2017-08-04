@@ -23,32 +23,35 @@ namespace ClientpipeProtocol {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
             "CiNjbGllbnRwaXBlLXByb3RvL3NyYy9wcm90b2NvbC5wcm90bxITY2xpZW50",
-            "cGlwZV9wcm90b2NvbCIGCgRVbml0IoICChBDbGlwYm9hcmRNZXNzYWdlEjMK",
+            "cGlwZV9wcm90b2NvbCIGCgRVbml0IvgBChBDbGlwYm9hcmRNZXNzYWdlEjMK",
             "DmdyYWJfY2xpcGJvYXJkGAEgASgLMhkuY2xpZW50cGlwZV9wcm90b2NvbC5V",
-            "bml0SAASJAoacmVxdWVzdF9jbGlwYm9hcmRfY29udGVudHMYAiABKAhIABJD",
-            "Cg1jb250ZW50c190eXBlGAMgASgOMiouY2xpZW50cGlwZV9wcm90b2NvbC5D",
-            "bGlwYm9hcmRNZXNzYWdlLlR5cGVIABIcChJjbGlwYm9hcmRfY29udGVudHMY",
-            "BCABKAxIACIlCgRUeXBlEggKBE5vbmUQABIICgRUZXh0EAESCQoFSW1hZ2UQ",
-            "AkIJCgdtZXNzYWdlIjwKDlJlZ2lzdGVySG90S2V5EgoKAmlkGAEgASgNEhEK",
-            "CW1vZGlmaWVycxgCIAEoDRILCgNrZXkYAyABKA0iowIKCEdhQ21kT3V0EikK",
-            "BHBpbmcYASABKAsyGS5jbGllbnRwaXBlX3Byb3RvY29sLlVuaXRIABI6Cglj",
-            "bGlwYm9hcmQYAiABKAsyJS5jbGllbnRwaXBlX3Byb3RvY29sLkNsaXBib2Fy",
-            "ZE1lc3NhZ2VIABI2ChFyZWxlYXNlX21vZGlmaWVycxgQIAEoCzIZLmNsaWVu",
-            "dHBpcGVfcHJvdG9jb2wuVW5pdEgAEiwKB3N1c3BlbmQYESABKAsyGS5jbGll",
-            "bnRwaXBlX3Byb3RvY29sLlVuaXRIABI/ChByZWdpc3Rlcl9ob3Rfa2V5GBIg",
-            "ASgLMiMuY2xpZW50cGlwZV9wcm90b2NvbC5SZWdpc3RlckhvdEtleUgAQgkK",
-            "B21lc3NhZ2UikwIKB0dhQ21kSW4SKQoEcG9uZxgBIAEoCzIZLmNsaWVudHBp",
-            "cGVfcHJvdG9jb2wuVW5pdEgAEjAKC3JlcG9ydF9ib290GAIgASgLMhkuY2xp",
-            "ZW50cGlwZV9wcm90b2NvbC5Vbml0SAASOgoJY2xpcGJvYXJkGAMgASgLMiUu",
-            "Y2xpZW50cGlwZV9wcm90b2NvbC5DbGlwYm9hcmRNZXNzYWdlSAASLwoKc3Vz",
-            "cGVuZGluZxgQIAEoCzIZLmNsaWVudHBpcGVfcHJvdG9jb2wuVW5pdEgAEhEK",
-            "B2hvdF9rZXkYESABKA1IABIgChZob3Rfa2V5X2JpbmRpbmdfZmFpbGVkGBIg",
-            "ASgJSABCCQoHbWVzc2FnZWIGcHJvdG8z"));
+            "bml0SAASSAoacmVxdWVzdF9jbGlwYm9hcmRfY29udGVudHMYAiABKA4yIi5j",
+            "bGllbnRwaXBlX3Byb3RvY29sLkNsaXBib2FyZFR5cGVIABI8Cg1jb250ZW50",
+            "X3R5cGVzGAMgASgLMiMuY2xpZW50cGlwZV9wcm90b2NvbC5DbGlwYm9hcmRU",
+            "eXBlc0gAEhwKEmNsaXBib2FyZF9jb250ZW50cxgEIAEoDEgAQgkKB21lc3Nh",
+            "Z2UiQwoOQ2xpcGJvYXJkVHlwZXMSMQoFdHlwZXMYASADKA4yIi5jbGllbnRw",
+            "aXBlX3Byb3RvY29sLkNsaXBib2FyZFR5cGUiPAoOUmVnaXN0ZXJIb3RLZXkS",
+            "CgoCaWQYASABKA0SEQoJbW9kaWZpZXJzGAIgASgNEgsKA2tleRgDIAEoDSKj",
+            "AgoIR2FDbWRPdXQSKQoEcGluZxgBIAEoCzIZLmNsaWVudHBpcGVfcHJvdG9j",
+            "b2wuVW5pdEgAEjoKCWNsaXBib2FyZBgCIAEoCzIlLmNsaWVudHBpcGVfcHJv",
+            "dG9jb2wuQ2xpcGJvYXJkTWVzc2FnZUgAEjYKEXJlbGVhc2VfbW9kaWZpZXJz",
+            "GBAgASgLMhkuY2xpZW50cGlwZV9wcm90b2NvbC5Vbml0SAASLAoHc3VzcGVu",
+            "ZBgRIAEoCzIZLmNsaWVudHBpcGVfcHJvdG9jb2wuVW5pdEgAEj8KEHJlZ2lz",
+            "dGVyX2hvdF9rZXkYEiABKAsyIy5jbGllbnRwaXBlX3Byb3RvY29sLlJlZ2lz",
+            "dGVySG90S2V5SABCCQoHbWVzc2FnZSKTAgoHR2FDbWRJbhIpCgRwb25nGAEg",
+            "ASgLMhkuY2xpZW50cGlwZV9wcm90b2NvbC5Vbml0SAASMAoLcmVwb3J0X2Jv",
+            "b3QYAiABKAsyGS5jbGllbnRwaXBlX3Byb3RvY29sLlVuaXRIABI6CgljbGlw",
+            "Ym9hcmQYAyABKAsyJS5jbGllbnRwaXBlX3Byb3RvY29sLkNsaXBib2FyZE1l",
+            "c3NhZ2VIABIvCgpzdXNwZW5kaW5nGBAgASgLMhkuY2xpZW50cGlwZV9wcm90",
+            "b2NvbC5Vbml0SAASEQoHaG90X2tleRgRIAEoDUgAEiAKFmhvdF9rZXlfYmlu",
+            "ZGluZ19mYWlsZWQYEiABKAlIAEIJCgdtZXNzYWdlKi4KDUNsaXBib2FyZFR5",
+            "cGUSCAoETm9uZRAAEggKBFRleHQQARIJCgVJbWFnZRACYgZwcm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
-          new pbr::GeneratedClrTypeInfo(null, new pbr::GeneratedClrTypeInfo[] {
+          new pbr::GeneratedClrTypeInfo(new[] {typeof(global::ClientpipeProtocol.ClipboardType), }, new pbr::GeneratedClrTypeInfo[] {
             new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.Unit), global::ClientpipeProtocol.Unit.Parser, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.ClipboardMessage), global::ClientpipeProtocol.ClipboardMessage.Parser, new[]{ "GrabClipboard", "RequestClipboardContents", "ContentsType", "ClipboardContents" }, new[]{ "Message" }, new[]{ typeof(global::ClientpipeProtocol.ClipboardMessage.Types.Type) }, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.ClipboardMessage), global::ClientpipeProtocol.ClipboardMessage.Parser, new[]{ "GrabClipboard", "RequestClipboardContents", "ContentTypes", "ClipboardContents" }, new[]{ "Message" }, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.ClipboardTypes), global::ClientpipeProtocol.ClipboardTypes.Parser, new[]{ "Types_" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.RegisterHotKey), global::ClientpipeProtocol.RegisterHotKey.Parser, new[]{ "Id", "Modifiers", "Key" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.GaCmdOut), global::ClientpipeProtocol.GaCmdOut.Parser, new[]{ "Ping", "Clipboard", "ReleaseModifiers", "Suspend", "RegisterHotKey" }, new[]{ "Message" }, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.GaCmdIn), global::ClientpipeProtocol.GaCmdIn.Parser, new[]{ "Pong", "ReportBoot", "Clipboard", "Suspending", "HotKey", "HotKeyBindingFailed" }, new[]{ "Message" }, null, null)
@@ -57,6 +60,15 @@ namespace ClientpipeProtocol {
     #endregion
 
   }
+  #region Enums
+  public enum ClipboardType {
+    [pbr::OriginalName("None")] None = 0,
+    [pbr::OriginalName("Text")] Text = 1,
+    [pbr::OriginalName("Image")] Image = 2,
+  }
+
+  #endregion
+
   #region Messages
   public sealed partial class Unit : pb::IMessage<Unit> {
     private static readonly pb::MessageParser<Unit> _parser = new pb::MessageParser<Unit>(() => new Unit());
@@ -178,8 +190,8 @@ namespace ClientpipeProtocol {
         case MessageOneofCase.RequestClipboardContents:
           RequestClipboardContents = other.RequestClipboardContents;
           break;
-        case MessageOneofCase.ContentsType:
-          ContentsType = other.ContentsType;
+        case MessageOneofCase.ContentTypes:
+          ContentTypes = other.ContentTypes.Clone();
           break;
         case MessageOneofCase.ClipboardContents:
           ClipboardContents = other.ClipboardContents;
@@ -207,22 +219,22 @@ namespace ClientpipeProtocol {
     /// <summary>Field number for the "request_clipboard_contents" field.</summary>
     public const int RequestClipboardContentsFieldNumber = 2;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public bool RequestClipboardContents {
-      get { return messageCase_ == MessageOneofCase.RequestClipboardContents ? (bool) message_ : false; }
+    public global::ClientpipeProtocol.ClipboardType RequestClipboardContents {
+      get { return messageCase_ == MessageOneofCase.RequestClipboardContents ? (global::ClientpipeProtocol.ClipboardType) message_ : 0; }
       set {
         message_ = value;
         messageCase_ = MessageOneofCase.RequestClipboardContents;
       }
     }
 
-    /// <summary>Field number for the "contents_type" field.</summary>
-    public const int ContentsTypeFieldNumber = 3;
+    /// <summary>Field number for the "content_types" field.</summary>
+    public const int ContentTypesFieldNumber = 3;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public global::ClientpipeProtocol.ClipboardMessage.Types.Type ContentsType {
-      get { return messageCase_ == MessageOneofCase.ContentsType ? (global::ClientpipeProtocol.ClipboardMessage.Types.Type) message_ : 0; }
+    public global::ClientpipeProtocol.ClipboardTypes ContentTypes {
+      get { return messageCase_ == MessageOneofCase.ContentTypes ? (global::ClientpipeProtocol.ClipboardTypes) message_ : null; }
       set {
         message_ = value;
-        messageCase_ = MessageOneofCase.ContentsType;
+        messageCase_ = value == null ? MessageOneofCase.None : MessageOneofCase.ContentTypes;
       }
     }
 
@@ -243,7 +255,7 @@ namespace ClientpipeProtocol {
       None = 0,
       GrabClipboard = 1,
       RequestClipboardContents = 2,
-      ContentsType = 3,
+      ContentTypes = 3,
       ClipboardContents = 4,
     }
     private MessageOneofCase messageCase_ = MessageOneofCase.None;
@@ -273,7 +285,7 @@ namespace ClientpipeProtocol {
       }
       if (!object.Equals(GrabClipboard, other.GrabClipboard)) return false;
       if (RequestClipboardContents != other.RequestClipboardContents) return false;
-      if (ContentsType != other.ContentsType) return false;
+      if (!object.Equals(ContentTypes, other.ContentTypes)) return false;
       if (ClipboardContents != other.ClipboardContents) return false;
       if (MessageCase != other.MessageCase) return false;
       return true;
@@ -284,7 +296,7 @@ namespace ClientpipeProtocol {
       int hash = 1;
       if (messageCase_ == MessageOneofCase.GrabClipboard) hash ^= GrabClipboard.GetHashCode();
       if (messageCase_ == MessageOneofCase.RequestClipboardContents) hash ^= RequestClipboardContents.GetHashCode();
-      if (messageCase_ == MessageOneofCase.ContentsType) hash ^= ContentsType.GetHashCode();
+      if (messageCase_ == MessageOneofCase.ContentTypes) hash ^= ContentTypes.GetHashCode();
       if (messageCase_ == MessageOneofCase.ClipboardContents) hash ^= ClipboardContents.GetHashCode();
       hash ^= (int) messageCase_;
       return hash;
@@ -303,11 +315,11 @@ namespace ClientpipeProtocol {
       }
       if (messageCase_ == MessageOneofCase.RequestClipboardContents) {
         output.WriteRawTag(16);
-        output.WriteBool(RequestClipboardContents);
+        output.WriteEnum((int) RequestClipboardContents);
       }
-      if (messageCase_ == MessageOneofCase.ContentsType) {
-        output.WriteRawTag(24);
-        output.WriteEnum((int) ContentsType);
+      if (messageCase_ == MessageOneofCase.ContentTypes) {
+        output.WriteRawTag(26);
+        output.WriteMessage(ContentTypes);
       }
       if (messageCase_ == MessageOneofCase.ClipboardContents) {
         output.WriteRawTag(34);
@@ -322,10 +334,10 @@ namespace ClientpipeProtocol {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(GrabClipboard);
       }
       if (messageCase_ == MessageOneofCase.RequestClipboardContents) {
-        size += 1 + 1;
+        size += 1 + pb::CodedOutputStream.ComputeEnumSize((int) RequestClipboardContents);
       }
-      if (messageCase_ == MessageOneofCase.ContentsType) {
-        size += 1 + pb::CodedOutputStream.ComputeEnumSize((int) ContentsType);
+      if (messageCase_ == MessageOneofCase.ContentTypes) {
+        size += 1 + pb::CodedOutputStream.ComputeMessageSize(ContentTypes);
       }
       if (messageCase_ == MessageOneofCase.ClipboardContents) {
         size += 1 + pb::CodedOutputStream.ComputeBytesSize(ClipboardContents);
@@ -345,8 +357,8 @@ namespace ClientpipeProtocol {
         case MessageOneofCase.RequestClipboardContents:
           RequestClipboardContents = other.RequestClipboardContents;
           break;
-        case MessageOneofCase.ContentsType:
-          ContentsType = other.ContentsType;
+        case MessageOneofCase.ContentTypes:
+          ContentTypes = other.ContentTypes;
           break;
         case MessageOneofCase.ClipboardContents:
           ClipboardContents = other.ClipboardContents;
@@ -373,12 +385,17 @@ namespace ClientpipeProtocol {
             break;
           }
           case 16: {
-            RequestClipboardContents = input.ReadBool();
+            message_ = input.ReadEnum();
+            messageCase_ = MessageOneofCase.RequestClipboardContents;
             break;
           }
-          case 24: {
-            message_ = input.ReadEnum();
-            messageCase_ = MessageOneofCase.ContentsType;
+          case 26: {
+            global::ClientpipeProtocol.ClipboardTypes subBuilder = new global::ClientpipeProtocol.ClipboardTypes();
+            if (messageCase_ == MessageOneofCase.ContentTypes) {
+              subBuilder.MergeFrom(ContentTypes);
+            }
+            input.ReadMessage(subBuilder);
+            ContentTypes = subBuilder;
             break;
           }
           case 34: {
@@ -389,18 +406,115 @@ namespace ClientpipeProtocol {
       }
     }
 
-    #region Nested types
-    /// <summary>Container for nested types declared in the ClipboardMessage message type.</summary>
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public static partial class Types {
-      public enum Type {
-        [pbr::OriginalName("None")] None = 0,
-        [pbr::OriginalName("Text")] Text = 1,
-        [pbr::OriginalName("Image")] Image = 2,
-      }
+  }
 
+  public sealed partial class ClipboardTypes : pb::IMessage<ClipboardTypes> {
+    private static readonly pb::MessageParser<ClipboardTypes> _parser = new pb::MessageParser<ClipboardTypes>(() => new ClipboardTypes());
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public static pb::MessageParser<ClipboardTypes> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[2]; }
     }
-    #endregion
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public ClipboardTypes() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public ClipboardTypes(ClipboardTypes other) : this() {
+      types_ = other.types_.Clone();
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public ClipboardTypes Clone() {
+      return new ClipboardTypes(this);
+    }
+
+    /// <summary>Field number for the "types" field.</summary>
+    public const int Types_FieldNumber = 1;
+    private static readonly pb::FieldCodec<global::ClientpipeProtocol.ClipboardType> _repeated_types_codec
+        = pb::FieldCodec.ForEnum(10, x => (int) x, x => (global::ClientpipeProtocol.ClipboardType) x);
+    private readonly pbc::RepeatedField<global::ClientpipeProtocol.ClipboardType> types_ = new pbc::RepeatedField<global::ClientpipeProtocol.ClipboardType>();
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public pbc::RepeatedField<global::ClientpipeProtocol.ClipboardType> Types_ {
+      get { return types_; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public override bool Equals(object other) {
+      return Equals(other as ClipboardTypes);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public bool Equals(ClipboardTypes other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if(!types_.Equals(other.types_)) return false;
+      return true;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public override int GetHashCode() {
+      int hash = 1;
+      hash ^= types_.GetHashCode();
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public void WriteTo(pb::CodedOutputStream output) {
+      types_.WriteTo(output, _repeated_types_codec);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public int CalculateSize() {
+      int size = 0;
+      size += types_.CalculateSize(_repeated_types_codec);
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public void MergeFrom(ClipboardTypes other) {
+      if (other == null) {
+        return;
+      }
+      types_.Add(other.types_);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public void MergeFrom(pb::CodedInputStream input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+        switch(tag) {
+          default:
+            input.SkipLastField();
+            break;
+          case 10:
+          case 8: {
+            types_.AddEntriesFrom(input, _repeated_types_codec);
+            break;
+          }
+        }
+      }
+    }
 
   }
 
@@ -411,7 +525,7 @@ namespace ClientpipeProtocol {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[2]; }
+      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[3]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -584,7 +698,7 @@ namespace ClientpipeProtocol {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[3]; }
+      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[4]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -878,7 +992,7 @@ namespace ClientpipeProtocol {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[4]; }
+      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[5]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]

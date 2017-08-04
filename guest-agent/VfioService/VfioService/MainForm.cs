@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ClientpipeProtocol;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -38,7 +39,6 @@ namespace VfioService
             InitializeComponent();
 
             SyncContext = SynchronizationContext.Current;
-            GrabClipboard();
         }
 
         public string RegisterHotKey(int id, uint mods, uint keys)
@@ -66,12 +66,29 @@ namespace VfioService
             return Clipboard.GetText(TextDataFormat.UnicodeText);
         }
 
-        public Image GetClipboardImage()
+        public byte[] GetClipboardImage()
         {
             if (!Clipboard.ContainsImage())
                 return null;
 
-            return Clipboard.GetImage();
+            using (var ms = new MemoryStream())
+            {
+                Clipboard.GetImage().Save(ms, System.Drawing.Imaging.ImageFormat.Png);
+                return ms.ToArray();
+            }
+        }
+        
+        public IEnumerable<ClipboardType> GetClipboardTypes()
+        {
+            List<ClipboardType> types = new List<ClipboardType>();
+
+            if (Clipboard.ContainsImage())
+                types.Add(ClipboardType.Image);
+
+            if (Clipboard.ContainsText())
+                types.Add(ClipboardType.Text);
+
+            return types;
         }
 
         private const int WmPowerBroadcast = 0x0218;
