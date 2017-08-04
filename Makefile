@@ -28,6 +28,10 @@ ovmf-x64/OVMF_CODE-pure-efi%fd ovmf-x64/OVMF_VARS-pure-efi%fd: ovmf%rpm
 	rpm2cpio ovmf.rpm | bsdtar -xvmf - --strip-components 4 './usr/share/edk2.git/ovmf-x64/OVMF_CODE-pure-efi.fd' './usr/share/edk2.git/ovmf-x64/OVMF_VARS-pure-efi.fd'
 
 
+guest-agent/VfioService/VfioService/Protocol.cs:clientpipe-proto/src/protocol.proto
+	protoc clientpipe-proto/src/protocol.proto --csharp_out=guest-agent/VfioService/VfioService/
+
+
 clean:
 	$(RM) ovmf.rpm $(OVMF)
 	$(RM) $(GA_EXE) $(GA_ISO)
