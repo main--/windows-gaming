@@ -57,8 +57,10 @@ fn main() {
         }
     }
 
-    let dev_sysfs = Path::new("/sys/bus/pci/devices/").join(&device);
-    assert!(dev_sysfs.exists(), "The given device does not exist!");
+    let devices_folder = Path::new("/sys/bus/pci/devices/");
+    let dev_sysfs = devices_folder.join(&device).canonicalize()
+        .expect("Failed to look up the given device (does it exist?)!");
+    assert_eq!(dev_sysfs.parent(), Some(devices_folder));
     let dev_iommu = dev_sysfs.join("iommu");
     
     if !dev_iommu.exists() {
