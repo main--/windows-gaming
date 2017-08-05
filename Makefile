@@ -1,9 +1,10 @@
 DRIVER := windows-gaming-driver/target/release/windows-gaming-driver
+VFIO_UBIND := vfio-ubind/target/release/vfio-ubind
 GA_EXE := guest-agent/VfioService.exe
 GA_ISO := guest-agent/windows-gaming-ga.iso
 OVMF   := ovmf-x64/OVMF_CODE-pure-efi.fd ovmf-x64/OVMF_VARS-pure-efi.fd
 
-all: $(DRIVER) $(GA_ISO) $(OVMF)
+all: $(DRIVER) $(GA_ISO) $(OVMF) $(VFIO_UBIND)
 
 clippy:
 	cd windows-gaming-driver && rustup run nightly cargo clippy
@@ -13,6 +14,9 @@ test:
 
 $(DRIVER):
 	cd windows-gaming-driver && cargo build --release --locked
+
+$(VFIO_UBIND):
+	cd vfio-ubind && cargo build --release --locked
 
 $(GA_EXE): guest-agent/VfioService/VfioService.sln $(wildcard guest-agent/VfioService/VfioService/*.*) $(wildcard guest-agent/VfioService/VfioService/Properties/*)
 	cd guest-agent/VfioService && nuget restore
@@ -43,6 +47,7 @@ clean:
 
 install: all
 	install -D $(DRIVER) $(DESTDIR)/usr/bin/windows-gaming-driver
+	install -D -m4755 $(VFIO_UBIND) $(DESTDIR)/usr/lib/windows-gaming/vfio-ubind
 	install -D -m644 ovmf-x64/OVMF_CODE-pure-efi.fd $(DESTDIR)/usr/lib/windows-gaming/ovmf-code.fd
 	install -D -m644 ovmf-x64/OVMF_VARS-pure-efi.fd $(DESTDIR)/usr/lib/windows-gaming/ovmf-vars.fd
 	install -D -m644 $(GA_ISO) $(DESTDIR)/usr/lib/windows-gaming/windows-gaming-ga.iso

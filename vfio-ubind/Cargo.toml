@@ -1,0 +1,10 @@
+[package]
+name = "vfio-ubind"
+version = "0.1.0"
+authors = ["Ediacairum <alex@thole.org>"]
+
+[dependencies]
+argparse = "0.2.1"
+env_logger = "0.4.3"
+log = "0.3.8"
+users = "0.5.0"

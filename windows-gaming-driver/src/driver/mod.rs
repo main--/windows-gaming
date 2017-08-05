@@ -19,6 +19,7 @@ use std::os::unix::net::{UnixListener as StdUnixListener};
 use std::fs::{self, Permissions};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
+use std::process::Command;
 
 use tokio_core::reactor::Core;
 use tokio_signal::unix::{Signal, SIGINT, SIGTERM};
@@ -138,10 +139,28 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
         Box::new(clipboard_reader),
     ]).map(|_| ());
 
-    match core.run(qemu.select(joined)) {
-        Ok(((), _)) => (), // one (*hopefully* qemu) is done, so the other is too
-        Err((e, _)) => panic!("Unexpected error: {}", e),
-    }
+    core.run(qemu.select2(joined).then(|x| {
+        match x {
+            Ok(future::Either::A((_, _))) => info!("qemu down first, all ok"),
+            Err(future::Either::A((e, _))) => return future::err(e).boxed(),
+            Ok(future::Either::B((_, _))) => unreachable!(), // we never return cleanly
+            Err(future::Either::B((e, a))) => {
+                error!("We errored: {}", e);
+                return a.boxed(); // we errored first, wait for qemu to exit
+            }
+        }
+        future::ok(()).boxed()
+    })).expect("Waiting for qemu errored");
 
+    info!("unbinding resettable vfio-things");
+    
+    for dev in cfg.machine.pci_devices.iter().filter(|x| x.resettable) {
+        let mut child = Command::new(data.join("vfio-ubind")).arg(&dev.slot).arg("-r").spawn().expect("failed to run vfio-ubind");
+        match child.wait() {
+            Ok(status) if status.success() => (), // all is well
+            Ok(status) => error!("vfio-ubind failed with {}! The device might still be bound to the vfio-driver!", status),
+            Err(err) => error!("failed to wait on child. Got: {}", err)
+        }
+    }
     info!("windows-gaming-driver down.");
 }

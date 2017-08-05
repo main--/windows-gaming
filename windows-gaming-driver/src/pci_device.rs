@@ -14,6 +14,7 @@ pub struct PciDevice<'a> {
     pub model: Option<String>,
     pub pci_slot: String,
     pub pci_class: String,
+    pub resettable: bool,
 }
 
 impl<'a, 'b> PartialEq<PciDevice<'a>> for PciDevice<'b> {
@@ -76,15 +77,17 @@ impl<'a> PciDevice<'a> {
                 }
             }
         }
-
+        let resettable = dev.syspath().join("reset").exists();
+        
         PciDevice {
-            dev: dev,
+            dev,
             id: PciId { vendor: vendor_id.unwrap(), device: model_id.unwrap() },
 
-            vendor: vendor,
-            model: model,
+            vendor,
+            model,
             pci_slot: pci_slot.unwrap(),
             pci_class: pci_class.unwrap(),
+            resettable,
         }
     }
 

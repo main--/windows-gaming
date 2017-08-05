@@ -206,8 +206,6 @@ pub struct SetupConfig {
 
     // setup state
     pub iommu_commanded: bool,
-    // convention: gpu must be first for iommu group checks
-    pub vfio_devs: Vec<PciId>,
     pub reboot_commanded: bool,
 }
 
@@ -223,7 +221,7 @@ pub struct MachineConfig {
     pub light_mouse_speed: f64,
 
     // convention: gpu is first
-    pub vfio_slots: Vec<String>,
+    pub pci_devices: Vec<VfioDevice>,
     pub network: Option<NetworkConfig>,
     pub storage: Vec<StorageDevice>,
     pub usb_devices: Vec<UsbDevice>,
@@ -249,6 +247,13 @@ pub struct StorageDevice {
     pub path: String,
     pub cache: String,
     pub format: String,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct VfioDevice {
+    pub resettable: bool,
+    pub slot: String,
+    pub id: PciId,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

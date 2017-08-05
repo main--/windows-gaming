@@ -22,4 +22,3 @@ pub fn usable_ports(bus: UsbBus) -> usize {
         UsbBus::Xhci => 15,
     }
 }
-
