@@ -120,8 +120,6 @@ fn select_device<P>(machine: &mut MachineConfig, question: &str, devices: &[PciD
     let askable_devices: Vec<_> = devices.iter()
         .filter(|x| predicate(x) && !machine.pci_devices.iter().any(|y| y.id == x.id)).collect();
 
-    println!("{}", devices.len());
-
     for (i, dev) in askable_devices.iter().enumerate() {
         println!("[{}]\t{}", i, dev);
     }
