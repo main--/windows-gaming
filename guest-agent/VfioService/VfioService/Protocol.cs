@@ -23,33 +23,32 @@ namespace ClientpipeProtocol {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
             "CiNjbGllbnRwaXBlLXByb3RvL3NyYy9wcm90b2NvbC5wcm90bxITY2xpZW50",
-            "cGlwZV9wcm90b2NvbCIGCgRVbml0IvgBChBDbGlwYm9hcmRNZXNzYWdlEjMK",
-            "DmdyYWJfY2xpcGJvYXJkGAEgASgLMhkuY2xpZW50cGlwZV9wcm90b2NvbC5V",
-            "bml0SAASSAoacmVxdWVzdF9jbGlwYm9hcmRfY29udGVudHMYAiABKA4yIi5j",
-            "bGllbnRwaXBlX3Byb3RvY29sLkNsaXBib2FyZFR5cGVIABI8Cg1jb250ZW50",
-            "X3R5cGVzGAMgASgLMiMuY2xpZW50cGlwZV9wcm90b2NvbC5DbGlwYm9hcmRU",
-            "eXBlc0gAEhwKEmNsaXBib2FyZF9jb250ZW50cxgEIAEoDEgAQgkKB21lc3Nh",
-            "Z2UiQwoOQ2xpcGJvYXJkVHlwZXMSMQoFdHlwZXMYASADKA4yIi5jbGllbnRw",
-            "aXBlX3Byb3RvY29sLkNsaXBib2FyZFR5cGUiPAoOUmVnaXN0ZXJIb3RLZXkS",
-            "CgoCaWQYASABKA0SEQoJbW9kaWZpZXJzGAIgASgNEgsKA2tleRgDIAEoDSKj",
-            "AgoIR2FDbWRPdXQSKQoEcGluZxgBIAEoCzIZLmNsaWVudHBpcGVfcHJvdG9j",
-            "b2wuVW5pdEgAEjoKCWNsaXBib2FyZBgCIAEoCzIlLmNsaWVudHBpcGVfcHJv",
-            "dG9jb2wuQ2xpcGJvYXJkTWVzc2FnZUgAEjYKEXJlbGVhc2VfbW9kaWZpZXJz",
-            "GBAgASgLMhkuY2xpZW50cGlwZV9wcm90b2NvbC5Vbml0SAASLAoHc3VzcGVu",
-            "ZBgRIAEoCzIZLmNsaWVudHBpcGVfcHJvdG9jb2wuVW5pdEgAEj8KEHJlZ2lz",
-            "dGVyX2hvdF9rZXkYEiABKAsyIy5jbGllbnRwaXBlX3Byb3RvY29sLlJlZ2lz",
-            "dGVySG90S2V5SABCCQoHbWVzc2FnZSKTAgoHR2FDbWRJbhIpCgRwb25nGAEg",
-            "ASgLMhkuY2xpZW50cGlwZV9wcm90b2NvbC5Vbml0SAASMAoLcmVwb3J0X2Jv",
-            "b3QYAiABKAsyGS5jbGllbnRwaXBlX3Byb3RvY29sLlVuaXRIABI6CgljbGlw",
-            "Ym9hcmQYAyABKAsyJS5jbGllbnRwaXBlX3Byb3RvY29sLkNsaXBib2FyZE1l",
-            "c3NhZ2VIABIvCgpzdXNwZW5kaW5nGBAgASgLMhkuY2xpZW50cGlwZV9wcm90",
-            "b2NvbC5Vbml0SAASEQoHaG90X2tleRgRIAEoDUgAEiAKFmhvdF9rZXlfYmlu",
+            "cGlwZV9wcm90b2NvbBobZ29vZ2xlL3Byb3RvYnVmL2VtcHR5LnByb3RvIvUB",
+            "ChBDbGlwYm9hcmRNZXNzYWdlEjAKDmdyYWJfY2xpcGJvYXJkGAEgASgLMhYu",
+            "Z29vZ2xlLnByb3RvYnVmLkVtcHR5SAASSAoacmVxdWVzdF9jbGlwYm9hcmRf",
+            "Y29udGVudHMYAiABKA4yIi5jbGllbnRwaXBlX3Byb3RvY29sLkNsaXBib2Fy",
+            "ZFR5cGVIABI8Cg1jb250ZW50X3R5cGVzGAMgASgLMiMuY2xpZW50cGlwZV9w",
+            "cm90b2NvbC5DbGlwYm9hcmRUeXBlc0gAEhwKEmNsaXBib2FyZF9jb250ZW50",
+            "cxgEIAEoDEgAQgkKB21lc3NhZ2UiQwoOQ2xpcGJvYXJkVHlwZXMSMQoFdHlw",
+            "ZXMYASADKA4yIi5jbGllbnRwaXBlX3Byb3RvY29sLkNsaXBib2FyZFR5cGUi",
+            "PAoOUmVnaXN0ZXJIb3RLZXkSCgoCaWQYASABKA0SEQoJbW9kaWZpZXJzGAIg",
+            "ASgNEgsKA2tleRgDIAEoDSKaAgoIR2FDbWRPdXQSJgoEcGluZxgBIAEoCzIW",
+            "Lmdvb2dsZS5wcm90b2J1Zi5FbXB0eUgAEjoKCWNsaXBib2FyZBgCIAEoCzIl",
+            "LmNsaWVudHBpcGVfcHJvdG9jb2wuQ2xpcGJvYXJkTWVzc2FnZUgAEjMKEXJl",
+            "bGVhc2VfbW9kaWZpZXJzGBAgASgLMhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5",
+            "SAASKQoHc3VzcGVuZBgRIAEoCzIWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eUgA",
+            "Ej8KEHJlZ2lzdGVyX2hvdF9rZXkYEiABKAsyIy5jbGllbnRwaXBlX3Byb3Rv",
+            "Y29sLlJlZ2lzdGVySG90S2V5SABCCQoHbWVzc2FnZSKKAgoHR2FDbWRJbhIm",
+            "CgRwb25nGAEgASgLMhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5SAASLQoLcmVw",
+            "b3J0X2Jvb3QYAiABKAsyFi5nb29nbGUucHJvdG9idWYuRW1wdHlIABI6Cglj",
+            "bGlwYm9hcmQYAyABKAsyJS5jbGllbnRwaXBlX3Byb3RvY29sLkNsaXBib2Fy",
+            "ZE1lc3NhZ2VIABIsCgpzdXNwZW5kaW5nGBAgASgLMhYuZ29vZ2xlLnByb3Rv",
+            "YnVmLkVtcHR5SAASEQoHaG90X2tleRgRIAEoDUgAEiAKFmhvdF9rZXlfYmlu",
             "ZGluZ19mYWlsZWQYEiABKAlIAEIJCgdtZXNzYWdlKi4KDUNsaXBib2FyZFR5",
             "cGUSCAoETm9uZRAAEggKBFRleHQQARIJCgVJbWFnZRACYgZwcm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
-          new pbr::FileDescriptor[] { },
+          new pbr::FileDescriptor[] { global::Google.Protobuf.WellKnownTypes.EmptyReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::ClientpipeProtocol.ClipboardType), }, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.Unit), global::ClientpipeProtocol.Unit.Parser, null, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.ClipboardMessage), global::ClientpipeProtocol.ClipboardMessage.Parser, new[]{ "GrabClipboard", "RequestClipboardContents", "ContentTypes", "ClipboardContents" }, new[]{ "Message" }, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.ClipboardTypes), global::ClientpipeProtocol.ClipboardTypes.Parser, new[]{ "Types_" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.RegisterHotKey), global::ClientpipeProtocol.RegisterHotKey.Parser, new[]{ "Id", "Modifiers", "Key" }, null, null, null),
@@ -70,95 +69,6 @@ namespace ClientpipeProtocol {
   #endregion
 
   #region Messages
-  public sealed partial class Unit : pb::IMessage<Unit> {
-    private static readonly pb::MessageParser<Unit> _parser = new pb::MessageParser<Unit>(() => new Unit());
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public static pb::MessageParser<Unit> Parser { get { return _parser; } }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public static pbr::MessageDescriptor Descriptor {
-      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[0]; }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    pbr::MessageDescriptor pb::IMessage.Descriptor {
-      get { return Descriptor; }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public Unit() {
-      OnConstruction();
-    }
-
-    partial void OnConstruction();
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public Unit(Unit other) : this() {
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public Unit Clone() {
-      return new Unit(this);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public override bool Equals(object other) {
-      return Equals(other as Unit);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public bool Equals(Unit other) {
-      if (ReferenceEquals(other, null)) {
-        return false;
-      }
-      if (ReferenceEquals(other, this)) {
-        return true;
-      }
-      return true;
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public override int GetHashCode() {
-      int hash = 1;
-      return hash;
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public override string ToString() {
-      return pb::JsonFormatter.ToDiagnosticString(this);
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public void WriteTo(pb::CodedOutputStream output) {
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public int CalculateSize() {
-      int size = 0;
-      return size;
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public void MergeFrom(Unit other) {
-      if (other == null) {
-        return;
-      }
-    }
-
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public void MergeFrom(pb::CodedInputStream input) {
-      uint tag;
-      while ((tag = input.ReadTag()) != 0) {
-        switch(tag) {
-          default:
-            input.SkipLastField();
-            break;
-        }
-      }
-    }
-
-  }
-
   public sealed partial class ClipboardMessage : pb::IMessage<ClipboardMessage> {
     private static readonly pb::MessageParser<ClipboardMessage> _parser = new pb::MessageParser<ClipboardMessage>(() => new ClipboardMessage());
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -166,7 +76,7 @@ namespace ClientpipeProtocol {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[1]; }
+      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[0]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -208,8 +118,8 @@ namespace ClientpipeProtocol {
     /// <summary>Field number for the "grab_clipboard" field.</summary>
     public const int GrabClipboardFieldNumber = 1;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public global::ClientpipeProtocol.Unit GrabClipboard {
-      get { return messageCase_ == MessageOneofCase.GrabClipboard ? (global::ClientpipeProtocol.Unit) message_ : null; }
+    public global::Google.Protobuf.WellKnownTypes.Empty GrabClipboard {
+      get { return messageCase_ == MessageOneofCase.GrabClipboard ? (global::Google.Protobuf.WellKnownTypes.Empty) message_ : null; }
       set {
         message_ = value;
         messageCase_ = value == null ? MessageOneofCase.None : MessageOneofCase.GrabClipboard;
@@ -376,7 +286,7 @@ namespace ClientpipeProtocol {
             input.SkipLastField();
             break;
           case 10: {
-            global::ClientpipeProtocol.Unit subBuilder = new global::ClientpipeProtocol.Unit();
+            global::Google.Protobuf.WellKnownTypes.Empty subBuilder = new global::Google.Protobuf.WellKnownTypes.Empty();
             if (messageCase_ == MessageOneofCase.GrabClipboard) {
               subBuilder.MergeFrom(GrabClipboard);
             }
@@ -415,7 +325,7 @@ namespace ClientpipeProtocol {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[2]; }
+      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[1]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -525,7 +435,7 @@ namespace ClientpipeProtocol {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[3]; }
+      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[2]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -698,7 +608,7 @@ namespace ClientpipeProtocol {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[4]; }
+      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[3]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -743,8 +653,8 @@ namespace ClientpipeProtocol {
     /// <summary>Field number for the "ping" field.</summary>
     public const int PingFieldNumber = 1;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public global::ClientpipeProtocol.Unit Ping {
-      get { return messageCase_ == MessageOneofCase.Ping ? (global::ClientpipeProtocol.Unit) message_ : null; }
+    public global::Google.Protobuf.WellKnownTypes.Empty Ping {
+      get { return messageCase_ == MessageOneofCase.Ping ? (global::Google.Protobuf.WellKnownTypes.Empty) message_ : null; }
       set {
         message_ = value;
         messageCase_ = value == null ? MessageOneofCase.None : MessageOneofCase.Ping;
@@ -765,8 +675,8 @@ namespace ClientpipeProtocol {
     /// <summary>Field number for the "release_modifiers" field.</summary>
     public const int ReleaseModifiersFieldNumber = 16;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public global::ClientpipeProtocol.Unit ReleaseModifiers {
-      get { return messageCase_ == MessageOneofCase.ReleaseModifiers ? (global::ClientpipeProtocol.Unit) message_ : null; }
+    public global::Google.Protobuf.WellKnownTypes.Empty ReleaseModifiers {
+      get { return messageCase_ == MessageOneofCase.ReleaseModifiers ? (global::Google.Protobuf.WellKnownTypes.Empty) message_ : null; }
       set {
         message_ = value;
         messageCase_ = value == null ? MessageOneofCase.None : MessageOneofCase.ReleaseModifiers;
@@ -776,8 +686,8 @@ namespace ClientpipeProtocol {
     /// <summary>Field number for the "suspend" field.</summary>
     public const int SuspendFieldNumber = 17;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public global::ClientpipeProtocol.Unit Suspend {
-      get { return messageCase_ == MessageOneofCase.Suspend ? (global::ClientpipeProtocol.Unit) message_ : null; }
+    public global::Google.Protobuf.WellKnownTypes.Empty Suspend {
+      get { return messageCase_ == MessageOneofCase.Suspend ? (global::Google.Protobuf.WellKnownTypes.Empty) message_ : null; }
       set {
         message_ = value;
         messageCase_ = value == null ? MessageOneofCase.None : MessageOneofCase.Suspend;
@@ -935,7 +845,7 @@ namespace ClientpipeProtocol {
             input.SkipLastField();
             break;
           case 10: {
-            global::ClientpipeProtocol.Unit subBuilder = new global::ClientpipeProtocol.Unit();
+            global::Google.Protobuf.WellKnownTypes.Empty subBuilder = new global::Google.Protobuf.WellKnownTypes.Empty();
             if (messageCase_ == MessageOneofCase.Ping) {
               subBuilder.MergeFrom(Ping);
             }
@@ -953,7 +863,7 @@ namespace ClientpipeProtocol {
             break;
           }
           case 130: {
-            global::ClientpipeProtocol.Unit subBuilder = new global::ClientpipeProtocol.Unit();
+            global::Google.Protobuf.WellKnownTypes.Empty subBuilder = new global::Google.Protobuf.WellKnownTypes.Empty();
             if (messageCase_ == MessageOneofCase.ReleaseModifiers) {
               subBuilder.MergeFrom(ReleaseModifiers);
             }
@@ -962,7 +872,7 @@ namespace ClientpipeProtocol {
             break;
           }
           case 138: {
-            global::ClientpipeProtocol.Unit subBuilder = new global::ClientpipeProtocol.Unit();
+            global::Google.Protobuf.WellKnownTypes.Empty subBuilder = new global::Google.Protobuf.WellKnownTypes.Empty();
             if (messageCase_ == MessageOneofCase.Suspend) {
               subBuilder.MergeFrom(Suspend);
             }
@@ -992,7 +902,7 @@ namespace ClientpipeProtocol {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[5]; }
+      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[4]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1040,8 +950,8 @@ namespace ClientpipeProtocol {
     /// <summary>Field number for the "pong" field.</summary>
     public const int PongFieldNumber = 1;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public global::ClientpipeProtocol.Unit Pong {
-      get { return messageCase_ == MessageOneofCase.Pong ? (global::ClientpipeProtocol.Unit) message_ : null; }
+    public global::Google.Protobuf.WellKnownTypes.Empty Pong {
+      get { return messageCase_ == MessageOneofCase.Pong ? (global::Google.Protobuf.WellKnownTypes.Empty) message_ : null; }
       set {
         message_ = value;
         messageCase_ = value == null ? MessageOneofCase.None : MessageOneofCase.Pong;
@@ -1051,8 +961,8 @@ namespace ClientpipeProtocol {
     /// <summary>Field number for the "report_boot" field.</summary>
     public const int ReportBootFieldNumber = 2;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public global::ClientpipeProtocol.Unit ReportBoot {
-      get { return messageCase_ == MessageOneofCase.ReportBoot ? (global::ClientpipeProtocol.Unit) message_ : null; }
+    public global::Google.Protobuf.WellKnownTypes.Empty ReportBoot {
+      get { return messageCase_ == MessageOneofCase.ReportBoot ? (global::Google.Protobuf.WellKnownTypes.Empty) message_ : null; }
       set {
         message_ = value;
         messageCase_ = value == null ? MessageOneofCase.None : MessageOneofCase.ReportBoot;
@@ -1073,8 +983,8 @@ namespace ClientpipeProtocol {
     /// <summary>Field number for the "suspending" field.</summary>
     public const int SuspendingFieldNumber = 16;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public global::ClientpipeProtocol.Unit Suspending {
-      get { return messageCase_ == MessageOneofCase.Suspending ? (global::ClientpipeProtocol.Unit) message_ : null; }
+    public global::Google.Protobuf.WellKnownTypes.Empty Suspending {
+      get { return messageCase_ == MessageOneofCase.Suspending ? (global::Google.Protobuf.WellKnownTypes.Empty) message_ : null; }
       set {
         message_ = value;
         messageCase_ = value == null ? MessageOneofCase.None : MessageOneofCase.Suspending;
@@ -1256,7 +1166,7 @@ namespace ClientpipeProtocol {
             input.SkipLastField();
             break;
           case 10: {
-            global::ClientpipeProtocol.Unit subBuilder = new global::ClientpipeProtocol.Unit();
+            global::Google.Protobuf.WellKnownTypes.Empty subBuilder = new global::Google.Protobuf.WellKnownTypes.Empty();
             if (messageCase_ == MessageOneofCase.Pong) {
               subBuilder.MergeFrom(Pong);
             }
@@ -1265,7 +1175,7 @@ namespace ClientpipeProtocol {
             break;
           }
           case 18: {
-            global::ClientpipeProtocol.Unit subBuilder = new global::ClientpipeProtocol.Unit();
+            global::Google.Protobuf.WellKnownTypes.Empty subBuilder = new global::Google.Protobuf.WellKnownTypes.Empty();
             if (messageCase_ == MessageOneofCase.ReportBoot) {
               subBuilder.MergeFrom(ReportBoot);
             }
@@ -1283,7 +1193,7 @@ namespace ClientpipeProtocol {
             break;
           }
           case 130: {
-            global::ClientpipeProtocol.Unit subBuilder = new global::ClientpipeProtocol.Unit();
+            global::Google.Protobuf.WellKnownTypes.Empty subBuilder = new global::Google.Protobuf.WellKnownTypes.Empty();
             if (messageCase_ == MessageOneofCase.Suspending) {
               subBuilder.MergeFrom(Suspending);
             }

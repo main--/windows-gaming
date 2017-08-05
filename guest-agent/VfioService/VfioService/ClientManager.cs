@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using ClientpipeProtocol;
 using Google.Protobuf;
+using Google.Protobuf.WellKnownTypes;
 
 namespace VfioService
 {
@@ -37,7 +38,7 @@ namespace VfioService
                     switch (outCmd.MessageCase)
                     {
                         case GaCmdOut.MessageOneofCase.Ping:
-                            Send(new GaCmdIn { Pong = new Unit() });
+                            Send(new GaCmdIn { Pong = new Empty() });
                             break;
                         case GaCmdOut.MessageOneofCase.RegisterHotKey:
                             HandleRegisterHotkey(outCmd.RegisterHotKey);
@@ -147,7 +148,7 @@ namespace VfioService
         {
             Send(new GaCmdIn
             {
-                Suspending = new Unit()
+                Suspending = new Empty()
             });
         }
 
@@ -156,7 +157,7 @@ namespace VfioService
         {
             Send(new GaCmdIn
             {
-                ReportBoot = new Unit(),
+                ReportBoot = new Empty(),
             });
         }
 
@@ -166,7 +167,7 @@ namespace VfioService
             {
                 Clipboard = new ClipboardMessage
                 {
-                    GrabClipboard = new Unit()
+                    GrabClipboard = new Empty()
                 }
             });
         }
