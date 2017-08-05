@@ -33,7 +33,7 @@ dbus = "0.5"
 input = "0.2"
 xcb = "0.8"
 clientpipe-proto = { path = "../clientpipe-proto" }
-prost = "0.1"
+prost = { git = "https://github.com/danburkert/prost.git", rev = "f73e0198f76d9ed438277e1072edec6962c21a09" }
 
 [replace]
 "xcb:0.8.0" = { git = "https://github.com/main--/rust-xcb.git" }

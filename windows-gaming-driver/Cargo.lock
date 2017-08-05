@@ -16,7 +16,7 @@ dependencies = [
  "mio 0.6.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "nix 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "num_cpus 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "prost 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "prost 0.1.1 (git+https://github.com/danburkert/prost.git?rev=f73e0198f76d9ed438277e1072edec6962c21a09)",
  "serde 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -117,9 +117,10 @@ name = "clientpipe-proto"
 version = "0.1.0"
 dependencies = [
  "bytes 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "prost 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "prost-build 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "prost-derive 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "prost 0.1.1 (git+https://github.com/danburkert/prost.git?rev=f73e0198f76d9ed438277e1072edec6962c21a09)",
+ "prost-build 0.1.1 (git+https://github.com/danburkert/prost.git?rev=f73e0198f76d9ed438277e1072edec6962c21a09)",
+ "prost-derive 0.1.1 (git+https://github.com/danburkert/prost.git?rev=f73e0198f76d9ed438277e1072edec6962c21a09)",
+ "prost-types 0.1.1 (git+https://github.com/danburkert/prost.git?rev=f73e0198f76d9ed438277e1072edec6962c21a09)",
 ]
 
 [[package]]
@@ -448,7 +449,7 @@ dependencies = [
 
 [[package]]
 name = "multimap"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -530,8 +531,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "prost"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+version = "0.1.1"
+source = "git+https://github.com/danburkert/prost.git?rev=f73e0198f76d9ed438277e1072edec6962c21a09#f73e0198f76d9ed438277e1072edec6962c21a09"
 dependencies = [
  "byteorder 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bytes 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -539,41 +540,41 @@ dependencies = [
 
 [[package]]
 name = "prost-build"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+version = "0.1.1"
+source = "git+https://github.com/danburkert/prost.git?rev=f73e0198f76d9ed438277e1072edec6962c21a09#f73e0198f76d9ed438277e1072edec6962c21a09"
 dependencies = [
  "bytes 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "curl 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "prost 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "prost-codegen 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "env_logger 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "itertools 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "multimap 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "petgraph 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "prost 0.1.1 (git+https://github.com/danburkert/prost.git?rev=f73e0198f76d9ed438277e1072edec6962c21a09)",
+ "prost-types 0.1.1 (git+https://github.com/danburkert/prost.git?rev=f73e0198f76d9ed438277e1072edec6962c21a09)",
  "tempdir 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "zip 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
-name = "prost-codegen"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "bytes 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "env_logger 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "itertools 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "multimap 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "petgraph 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "prost 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "prost-derive 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "prost-derive"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+version = "0.1.1"
+source = "git+https://github.com/danburkert/prost.git?rev=f73e0198f76d9ed438277e1072edec6962c21a09#f73e0198f76d9ed438277e1072edec6962c21a09"
 dependencies = [
  "error-chain 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "syn 0.11.11 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "prost-types"
+version = "0.1.1"
+source = "git+https://github.com/danburkert/prost.git?rev=f73e0198f76d9ed438277e1072edec6962c21a09#f73e0198f76d9ed438277e1072edec6962c21a09"
+dependencies = [
+ "bytes 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "prost 0.1.1 (git+https://github.com/danburkert/prost.git?rev=f73e0198f76d9ed438277e1072edec6962c21a09)",
+ "prost-derive 0.1.1 (git+https://github.com/danburkert/prost.git?rev=f73e0198f76d9ed438277e1072edec6962c21a09)",
 ]
 
 [[package]]
@@ -993,7 +994,7 @@ dependencies = [
 "checksum mio-uds 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)" = "1731a873077147b626d89cc6c2a0db6288d607496c5d10c0cfcf3adc697ec673"
 "checksum miow 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8c1f2f3b1cf331de6896aabf6e9d55dca90356cc9960cca7eaaf408a355ae919"
 "checksum msdos_time 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "65ba9d75bcea84e07812618fedf284a64776c2f2ea0cad6bca7f69739695a958"
-"checksum multimap 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9223f4774d08e06185e44e555b9a7561243d387bac49c78a6205c42d6975fbf2"
+"checksum multimap 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2eb04b9f127583ed176e163fb9ec6f3e793b87e21deedd5734a69386a18a0151"
 "checksum net2 0.2.29 (registry+https://github.com/rust-lang/crates.io-index)" = "bc01404e7568680f1259aa5729539f221cb1e6d047a0d9053cab4be8a73b5d67"
 "checksum nix 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a0d95c5fa8b641c10ad0b8887454ebaafa3c92b5cd5350f8fc693adafd178e7b"
 "checksum num-traits 0.1.37 (registry+https://github.com/rust-lang/crates.io-index)" = "e1cbfa3781f3fe73dc05321bed52a06d2d491eaa764c52335cf4399f046ece99"
@@ -1004,10 +1005,10 @@ dependencies = [
 "checksum petgraph 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)" = "14c6ae5ccb73b438781abc93d35615019b1ad6e24b44116377fb819cfd7587de"
 "checksum pkg-config 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "3a8b4c6b8165cd1a1cd4b9b120978131389f64bdaf456435caa41e630edba903"
 "checksum podio 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "e5422a1ee1bc57cc47ae717b0137314258138f38fd5f3cea083f43a9725383a0"
-"checksum prost 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c995bf7ce65d8f98304bee0320528815744b7632e156526d5627b49853f25688"
-"checksum prost-build 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5d0f4e2f1f45e5b9955e97e2b708645ca2bb04797770ed5bb1cb029be3a571ab"
-"checksum prost-codegen 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "6174303003b2ced63fbe5020aa07c1008ae133299185c2508f3d0cd71ea53a52"
-"checksum prost-derive 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7a203840d9a4e159f39938d0e8985b9281cdf7f33fac1ccd4e12d54fd2a940f3"
+"checksum prost 0.1.1 (git+https://github.com/danburkert/prost.git?rev=f73e0198f76d9ed438277e1072edec6962c21a09)" = "<none>"
+"checksum prost-build 0.1.1 (git+https://github.com/danburkert/prost.git?rev=f73e0198f76d9ed438277e1072edec6962c21a09)" = "<none>"
+"checksum prost-derive 0.1.1 (git+https://github.com/danburkert/prost.git?rev=f73e0198f76d9ed438277e1072edec6962c21a09)" = "<none>"
+"checksum prost-types 0.1.1 (git+https://github.com/danburkert/prost.git?rev=f73e0198f76d9ed438277e1072edec6962c21a09)" = "<none>"
 "checksum quote 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)" = "7a6e920b65c65f10b2ae65c831a81a073a89edd28c7cce89475bff467ab4167a"
 "checksum rand 0.3.16 (registry+https://github.com/rust-lang/crates.io-index)" = "eb250fd207a4729c976794d03db689c9be1d634ab5a1c9da9492a13d8fecbcdf"
 "checksum redox_syscall 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)" = "3041aeb6000db123d2c9c751433f526e1f404b23213bd733167ab770c3989b4d"

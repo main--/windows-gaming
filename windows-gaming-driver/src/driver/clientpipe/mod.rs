@@ -1,6 +1,6 @@
 mod codec;
 
-pub use self::codec::{GaCmdOut, ClipboardMessage, ClipboardType, ClipboardTypes, RegisterHotKey, O};
+pub use self::codec::{GaCmdOut, ClipboardMessage, ClipboardType, ClipboardTypes, RegisterHotKey};
 
 use std::os::unix::net::{UnixStream as StdUnixStream};
 use std::io::{Error, ErrorKind};
@@ -56,7 +56,7 @@ impl Clientpipe {
         let handler = self.read.take().unwrap().for_each(move |cmd| {
             trace!("GA sent message: {:?}", cmd);
             match cmd {
-                GaCmdIn::ReportBoot(_) => {
+                GaCmdIn::ReportBoot(()) => {
                     info!("client is now alive!");
 
                     if controller.borrow_mut().ga_hello() {
@@ -70,15 +70,15 @@ impl Clientpipe {
                         handle.spawn(timer);
                     }
                 }
-                GaCmdIn::Suspending(_) => {
+                GaCmdIn::Suspending(()) => {
                     info!("client says that it's suspending");
                     controller.borrow_mut().ga_suspending();
                 }
-                GaCmdIn::Pong(_) => controller.borrow_mut().ga_pong(),
+                GaCmdIn::Pong(()) => controller.borrow_mut().ga_pong(),
                 GaCmdIn::HotKey(id) => controller.borrow_mut().ga_hotkey(id),
                 GaCmdIn::HotKeyBindingFailed(s) => warn!("HotKeyBinding failed: {}", s),
                 GaCmdIn::Clipboard(c) => match c.message {
-                    Some(ClipboardMessage::GrabClipboard(_)) => controller.borrow_mut().grab_x11_clipboard(),
+                    Some(ClipboardMessage::GrabClipboard(())) => controller.borrow_mut().grab_x11_clipboard(),
                     Some(ClipboardMessage::RequestClipboardContents(kind)) => match ClipboardType::from_i32(kind) {
                         Some(kind) => controller.borrow_mut().read_x11_clipboard(kind),
                         None => error!("Windows requested an invalid clipboard type??"),

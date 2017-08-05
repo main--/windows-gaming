@@ -13,7 +13,7 @@ use futures::future;
 
 use config::{UsbId, UsbPort, UsbBinding, MachineConfig, HotKeyAction, Action};
 use util;
-use driver::clientpipe::{GaCmdOut as GaCmd, ClipboardMessage, ClipboardType, ClipboardTypes, RegisterHotKey, O};
+use driver::clientpipe::{GaCmdOut as GaCmd, ClipboardMessage, ClipboardType, ClipboardTypes, RegisterHotKey};
 use driver::monitor::QmpCommand;
 use driver::sd_notify;
 use driver::libinput::Input;
@@ -107,7 +107,7 @@ impl Controller {
             }
             State::Up => {
                 self.ga = State::Pinging;
-                self.write_ga(GaCmd::Ping(O));
+                self.write_ga(GaCmd::Ping(()));
                 true
             }
             _ => false,
@@ -267,7 +267,7 @@ impl Controller {
 
     pub fn prepare_entry(&mut self) {
         // release modifiers
-        self.write_ga(GaCmd::ReleaseModifiers(O));
+        self.write_ga(GaCmd::ReleaseModifiers(()));
     }
 
     /// Suspends Windows
@@ -279,7 +279,7 @@ impl Controller {
 
         if self.ga != State::Suspending {
             // only need to write suspend command to qemu if the system is not already suspending
-            self.write_ga(GaCmd::Suspend(O));
+            self.write_ga(GaCmd::Suspend(()));
         }
 
         let (sender, receiver) = oneshot::channel();
@@ -340,7 +340,7 @@ impl Controller {
 
     /// We lost the X11 clipboard, so we grab the Windows keyboard
     pub fn grab_win_clipboard(&mut self) {
-        self.write_ga(ClipboardMessage::GrabClipboard(O));
+        self.write_ga(ClipboardMessage::GrabClipboard(()));
     }
 
     /// Paste on Linux, so we have to request contents

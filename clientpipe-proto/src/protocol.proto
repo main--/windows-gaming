@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package clientpipe_protocol;
 
-message Unit {}
+import "google/protobuf/empty.proto";
 
 enum ClipboardType {
   None = 0;
@@ -12,7 +12,7 @@ enum ClipboardType {
 
 message ClipboardMessage {
   oneof message {
-    Unit grab_clipboard = 1;
+    google.protobuf.Empty grab_clipboard = 1;
     ClipboardType request_clipboard_contents = 2;
     ClipboardTypes content_types = 3;
     bytes clipboard_contents = 4;
@@ -31,10 +31,10 @@ message RegisterHotKey {
 
 message GaCmdOut {
   oneof message {
-    Unit ping = 1;
+    google.protobuf.Empty ping = 1;
     ClipboardMessage clipboard = 2;
-    Unit release_modifiers = 16;
-    Unit suspend = 17;
+    google.protobuf.Empty release_modifiers = 16;
+    google.protobuf.Empty suspend = 17;
     RegisterHotKey register_hot_key = 18;
   }
 }
@@ -42,10 +42,10 @@ message GaCmdOut {
 
 message GaCmdIn {
   oneof message {
-    Unit pong = 1;
-    Unit report_boot = 2;
+    google.protobuf.Empty pong = 1;
+    google.protobuf.Empty report_boot = 2;
     ClipboardMessage clipboard = 3;
-    Unit suspending = 16;
+    google.protobuf.Empty suspending = 16;
     uint32 hot_key = 17;
     string hot_key_binding_failed = 18;
   }

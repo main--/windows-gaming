@@ -10,12 +10,6 @@ pub use self::proto::ga_cmd_in::Message as GaCmdIn;
 pub use self::proto::ga_cmd_out::Message as GaCmdOut;
 pub use self::proto::clipboard_message::Message as ClipboardMessage;
 
-use self::proto::Unit;
-
-/// Unit because protobuf is weird
-pub const O: Unit = Unit {};
-
-
 
 pub struct Codec;
 
@@ -39,11 +33,12 @@ impl Decoder for Codec {
                 }
             }
         }
-        if let Err(e) = res.as_ref() {
-            warn!("Unknown / invalid request ({}), skipping over: {:?}", e, &buf[..consumed]);
-        }
+
         buf.split_to(consumed);
-        res
+        res.or_else(|e| {
+            warn!("Unknown / invalid request ({}), skipping over: {:?}", e, &buf[..consumed]);
+            Ok(None)
+        })
     }
 }
 
@@ -56,6 +51,6 @@ impl Encoder for Codec {
 
         let len = cmd.encoded_len();
         buf.reserve(len + encoding::encoded_len_varint(len as u64));
-        cmd.encode_length_delimited(buf)
+        Ok(cmd.encode_length_delimited(buf)?)
     }
 }
