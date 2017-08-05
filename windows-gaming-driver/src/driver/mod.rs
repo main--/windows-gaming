@@ -142,7 +142,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     core.run(qemu.select2(joined).then(|x| {
         match x {
             Ok(future::Either::A((_, _))) => info!("qemu down first, all ok"),
-            Err(future::Either::A((e, _))) => return future::err(e).boxed(),//error!("Waiting for qemu errored: {}", e),
+            Err(future::Either::A((e, _))) => return future::err(e).boxed(),
             Ok(future::Either::B((_, _))) => unreachable!(), // we never return cleanly
             Err(future::Either::B((e, a))) => {
                 error!("We errored: {}", e);
