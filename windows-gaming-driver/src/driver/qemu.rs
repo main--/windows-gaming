@@ -269,8 +269,12 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
         }
     }
 
+    if let Some(ref cmd) = cfg.additional_qemu_cmdline {
+        qemu.args(cmd.split(' '));
+    }
+
     qemu.stdin(Stdio::null());
-    trace!("qemu: {:?}", qemu);
+    debug!("qemu: {:?}", qemu);
 
     // try to detach qemu from process group to enable better Ctrl+C support
     qemu.before_exec(|| unsafe {

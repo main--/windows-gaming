@@ -99,6 +99,7 @@ pub struct Config {
     pub sound: SoundConfig,
     pub samba: Option<SambaConfig>,
     pub setup: Option<SetupConfig>,
+    pub additional_qemu_cmdline: Option<String>,
 }
 
 #[serde(default)]
