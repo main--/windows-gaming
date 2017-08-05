@@ -222,16 +222,18 @@ impl Controller {
     }
 
     pub fn temporary_entry(&mut self, sender: UnboundedSender<ControlCmd>, x: i32, y: i32) -> bool {
-        if self.ga != State::Up && self.ga != State::Pinging {
-            return false;
+        match self.ga {
+            State::Up | State::Pinging => match self.io_state {
+                IoState::Detached => {
+                    self.write_ga(GaCmd::SetMousePosition(Point { x, y }));
+                    self.light_attach();
+                    self.io_state = IoState::TemporaryLightEntry(sender);
+                    true
+                }
+                _ => false
+            },
+            _ => false
         }
-        if let IoState::Detached = self.io_state {
-            self.write_ga(GaCmd::SetMousePosition(Point { x, y }));
-            self.light_attach();
-            self.io_state = IoState::TemporaryLightEntry(sender);
-            return true;
-        }
-        false
     }
 
     pub fn temporary_exit(&mut self) {

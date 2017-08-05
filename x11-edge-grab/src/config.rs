@@ -47,7 +47,7 @@ impl Rectangle {
 
 impl Config {
     pub fn load<P: AsRef<Path>>(path: P) -> Option<Config> {
-        let path = path.as_ref().with_extension("yml");
+        let path = path.as_ref();
         if !path.exists() {
             return None;
         }
