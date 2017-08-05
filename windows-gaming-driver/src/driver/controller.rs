@@ -13,7 +13,8 @@ use futures::future;
 
 use config::{UsbId, UsbPort, UsbBinding, MachineConfig, HotKeyAction, Action};
 use util;
-use driver::clientpipe::{GaCmdOut as GaCmd, ClipboardMessage, ClipboardType, ClipboardTypes, RegisterHotKey};
+use driver::clientpipe::{GaCmdOut, ClipboardMessage, ClipboardType, ClipboardTypes, RegisterHotKey, Point};
+use driver::control::ControlCmdOut;
 use driver::monitor::QmpCommand;
 use driver::sd_notify;
 use driver::libinput::Input;
@@ -37,10 +38,11 @@ enum State {
     Resuming,
 }
 
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(Clone)]
 enum IoState {
     Detached,
     LightEntry,
+    TemporaryLightEntry(UnboundedSender<ControlCmdOut>),
     AwaitingUpgrade,
     FullEntry,
 }
@@ -50,6 +52,7 @@ pub struct Controller {
 
     ga: State,
     io_state: IoState,
+    // senders to be sent to when windows finished suspending
     suspend_senders: Vec<Sender<()>>,
 
     input: Rc<RefCell<Input>>,
@@ -61,17 +64,17 @@ pub struct Controller {
 
     // write-only
     monitor: UnboundedSender<QmpCommand>,
-    clientpipe: UnboundedSender<GaCmd>,
+    clientpipe: UnboundedSender<GaCmdOut>,
 }
 
 impl Controller {
-    fn write_ga<C: Into<GaCmd>>(&mut self, cmd: C) {
+    fn write_ga<C: Into<GaCmdOut>>(&mut self, cmd: C) {
         (&self.clientpipe).send(cmd.into()).unwrap();
     }
 
     pub fn new(machine_config: MachineConfig,
                monitor: UnboundedSender<QmpCommand>,
-               clientpipe: UnboundedSender<GaCmd>,
+               clientpipe: UnboundedSender<GaCmdOut>,
                input: Rc<RefCell<Input>>,
                x11_clipboard: UnboundedSender<ClipboardRequestResponse>,
                x11_clipboard_grabber: UnboundedSender<()>,
@@ -102,14 +105,16 @@ impl Controller {
                 // the last ping wasn't even answered
                 // we conclude that the ga has died
                 self.ga = State::Down;
-                if self.io_state == IoState::FullEntry {
-                    self.io_detach();
+                match self.io_state {
+                    IoState::FullEntry => self.io_detach(),
+                    IoState::TemporaryLightEntry(_) => self.temporary_exit(),
+                    _ => ()
                 }
                 false
             }
             State::Up => {
                 self.ga = State::Pinging;
-                self.write_ga(GaCmd::Ping(()));
+                self.write_ga(GaCmdOut::Ping(()));
                 true
             }
             _ => false,
@@ -143,7 +148,7 @@ impl Controller {
 
         let ga = mem::replace(&mut self.ga, State::Up);
 
-        if self.io_state == IoState::AwaitingUpgrade {
+        if let IoState::AwaitingUpgrade = self.io_state {
             self.io_attach();
         }
 
@@ -174,19 +179,20 @@ impl Controller {
     pub fn ga_hotkey(&mut self, index: u32) {
         match self.machine_config.hotkeys.get(index as usize).map(|h| h.action.clone()) {
             None => warn!("Client sent invalid hotkey id"),
-            Some(HotKeyAction::Action(action)) => self.action(action),
+            Some(HotKeyAction::Action(action)) => {
+                if let IoState::TemporaryLightEntry(_) = self.io_state {
+                    info!("Got action-hotkey while in temporary light entry. Ignoring.");
+                    return;
+                }
+                match action {
+                    Action::IoUpgrade => self.io_attach(),
+                    Action::IoEntryForced => self.io_force_attach(),
+                    Action::IoExit => self.io_detach(),
+                }
+            }
             Some(HotKeyAction::Exec(cmd)) => {
                 Command::new("/bin/sh").arg("-c").arg(&cmd).spawn().unwrap();
             }
-        }
-    }
-
-    /// Executes given action
-    pub fn action(&mut self, action: Action) {
-        match action {
-            Action::IoUpgrade => self.io_attach(),
-            Action::IoEntryForced => self.io_force_attach(),
-            Action::IoExit => self.io_detach(),
         }
     }
 
@@ -215,6 +221,28 @@ impl Controller {
         }
     }
 
+    pub fn temporary_entry(&mut self, sender: UnboundedSender<ControlCmdOut>, x: i32, y: i32) -> bool {
+        match self.ga {
+            State::Up | State::Pinging => match self.io_state {
+                IoState::Detached => {
+                    self.write_ga(GaCmdOut::SetMousePosition(Point { x, y }));
+                    self.light_attach();
+                    self.io_state = IoState::TemporaryLightEntry(sender);
+                    true
+                }
+                _ => false
+            },
+            _ => false
+        }
+    }
+
+    pub fn temporary_exit(&mut self) {
+        // only detach if we are not already detached
+        if let IoState::TemporaryLightEntry(_) = self.io_state {
+            self.io_detach();
+        }
+    }
+
     pub fn light_attach(&mut self) {
         debug!("light entry");
 
@@ -225,7 +253,7 @@ impl Controller {
                 self.io_state = IoState::LightEntry;
             }
             IoState::AwaitingUpgrade => self.io_state = IoState::LightEntry,
-            IoState::LightEntry | IoState::FullEntry => (),
+            IoState::LightEntry | IoState::FullEntry | IoState::TemporaryLightEntry(_) => (),
         }
     }
 
@@ -237,6 +265,10 @@ impl Controller {
         match self.io_state {
             IoState::Detached => (),
             IoState::AwaitingUpgrade | IoState::LightEntry => self.input.borrow_mut().suspend(),
+            IoState::TemporaryLightEntry(ref mut sender) => {
+                self.input.borrow_mut().suspend();
+                sender.send(ControlCmdOut::TemporaryLightDetached).unwrap();
+            }
             IoState::FullEntry => return,
         }
 
@@ -269,7 +301,7 @@ impl Controller {
 
     pub fn prepare_entry(&mut self) {
         // release modifiers
-        self.write_ga(GaCmd::ReleaseModifiers(()));
+        self.write_ga(GaCmdOut::ReleaseModifiers(()));
     }
 
     /// Suspends Windows
@@ -281,7 +313,7 @@ impl Controller {
 
         if self.ga != State::Suspending {
             // only need to write suspend command to qemu if the system is not already suspending
-            self.write_ga(GaCmd::Suspend(()));
+            self.write_ga(GaCmdOut::Suspend(()));
         }
 
         let (sender, receiver) = oneshot::channel();
@@ -296,7 +328,7 @@ impl Controller {
 
         match self.io_state {
             IoState::Detached => (),
-            IoState::AwaitingUpgrade | IoState::LightEntry => {
+            IoState::AwaitingUpgrade | IoState::LightEntry | IoState::TemporaryLightEntry(_) => {
                 debug!("detaching light entry");
                 self.input.borrow_mut().suspend()
             },
@@ -360,6 +392,12 @@ impl Controller {
     /// Pasting on Windows, X11 responded with contents
     pub fn respond_win_clipboard(&mut self, buf: Vec<u8>) {
         self.write_ga(ClipboardMessage::ClipboardContents(buf));
+    }
+
+    pub fn mouse_edged(&mut self, x: i32, y: i32) {
+        if let IoState::TemporaryLightEntry(ref mut sender) = self.io_state {
+            sender.send(ControlCmdOut::MouseEdged { x, y }).unwrap();
+        }
     }
 }
 

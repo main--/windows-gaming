@@ -29,6 +29,11 @@ message RegisterHotKey {
   uint32 key = 3;
 }
 
+message Point {
+  int32 x = 1;
+  int32 y = 2;
+}
+
 message GaCmdOut {
   oneof message {
     google.protobuf.Empty ping = 1;
@@ -36,9 +41,9 @@ message GaCmdOut {
     google.protobuf.Empty release_modifiers = 16;
     google.protobuf.Empty suspend = 17;
     RegisterHotKey register_hot_key = 18;
+    Point set_mouse_position = 19;
   }
 }
-
 
 message GaCmdIn {
   oneof message {
@@ -48,5 +53,6 @@ message GaCmdIn {
     google.protobuf.Empty suspending = 16;
     uint32 hot_key = 17;
     string hot_key_binding_failed = 18;
+    Point mouse_edged = 19;
   }
 }

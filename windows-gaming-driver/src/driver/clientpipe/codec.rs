@@ -5,11 +5,10 @@ use bytes::{IntoBuf, Buf, BytesMut};
 use tokio_io::codec::{Encoder, Decoder};
 use prost::{encoding, Message};
 
-pub use self::proto::{RegisterHotKey, ClipboardType, ClipboardTypes};
+pub use self::proto::{RegisterHotKey, ClipboardType, ClipboardTypes, Point};
 pub use self::proto::ga_cmd_in::Message as GaCmdIn;
 pub use self::proto::ga_cmd_out::Message as GaCmdOut;
 pub use self::proto::clipboard_message::Message as ClipboardMessage;
-
 
 pub struct Codec;
 

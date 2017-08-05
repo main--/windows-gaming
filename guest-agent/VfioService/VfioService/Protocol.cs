@@ -32,28 +32,33 @@ namespace ClientpipeProtocol {
             "cxgEIAEoDEgAQgkKB21lc3NhZ2UiQwoOQ2xpcGJvYXJkVHlwZXMSMQoFdHlw",
             "ZXMYASADKA4yIi5jbGllbnRwaXBlX3Byb3RvY29sLkNsaXBib2FyZFR5cGUi",
             "PAoOUmVnaXN0ZXJIb3RLZXkSCgoCaWQYASABKA0SEQoJbW9kaWZpZXJzGAIg",
-            "ASgNEgsKA2tleRgDIAEoDSKaAgoIR2FDbWRPdXQSJgoEcGluZxgBIAEoCzIW",
-            "Lmdvb2dsZS5wcm90b2J1Zi5FbXB0eUgAEjoKCWNsaXBib2FyZBgCIAEoCzIl",
-            "LmNsaWVudHBpcGVfcHJvdG9jb2wuQ2xpcGJvYXJkTWVzc2FnZUgAEjMKEXJl",
-            "bGVhc2VfbW9kaWZpZXJzGBAgASgLMhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5",
-            "SAASKQoHc3VzcGVuZBgRIAEoCzIWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eUgA",
-            "Ej8KEHJlZ2lzdGVyX2hvdF9rZXkYEiABKAsyIy5jbGllbnRwaXBlX3Byb3Rv",
-            "Y29sLlJlZ2lzdGVySG90S2V5SABCCQoHbWVzc2FnZSKKAgoHR2FDbWRJbhIm",
-            "CgRwb25nGAEgASgLMhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5SAASLQoLcmVw",
-            "b3J0X2Jvb3QYAiABKAsyFi5nb29nbGUucHJvdG9idWYuRW1wdHlIABI6Cglj",
-            "bGlwYm9hcmQYAyABKAsyJS5jbGllbnRwaXBlX3Byb3RvY29sLkNsaXBib2Fy",
-            "ZE1lc3NhZ2VIABIsCgpzdXNwZW5kaW5nGBAgASgLMhYuZ29vZ2xlLnByb3Rv",
-            "YnVmLkVtcHR5SAASEQoHaG90X2tleRgRIAEoDUgAEiAKFmhvdF9rZXlfYmlu",
-            "ZGluZ19mYWlsZWQYEiABKAlIAEIJCgdtZXNzYWdlKi4KDUNsaXBib2FyZFR5",
-            "cGUSCAoETm9uZRAAEggKBFRleHQQARIJCgVJbWFnZRACYgZwcm90bzM="));
+            "ASgNEgsKA2tleRgDIAEoDSIdCgVQb2ludBIJCgF4GAEgASgFEgkKAXkYAiAB",
+            "KAUi1AIKCEdhQ21kT3V0EiYKBHBpbmcYASABKAsyFi5nb29nbGUucHJvdG9i",
+            "dWYuRW1wdHlIABI6CgljbGlwYm9hcmQYAiABKAsyJS5jbGllbnRwaXBlX3By",
+            "b3RvY29sLkNsaXBib2FyZE1lc3NhZ2VIABIzChFyZWxlYXNlX21vZGlmaWVy",
+            "cxgQIAEoCzIWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eUgAEikKB3N1c3BlbmQY",
+            "ESABKAsyFi5nb29nbGUucHJvdG9idWYuRW1wdHlIABI/ChByZWdpc3Rlcl9o",
+            "b3Rfa2V5GBIgASgLMiMuY2xpZW50cGlwZV9wcm90b2NvbC5SZWdpc3Rlckhv",
+            "dEtleUgAEjgKEnNldF9tb3VzZV9wb3NpdGlvbhgTIAEoCzIaLmNsaWVudHBp",
+            "cGVfcHJvdG9jb2wuUG9pbnRIAEIJCgdtZXNzYWdlIr0CCgdHYUNtZEluEiYK",
+            "BHBvbmcYASABKAsyFi5nb29nbGUucHJvdG9idWYuRW1wdHlIABItCgtyZXBv",
+            "cnRfYm9vdBgCIAEoCzIWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eUgAEjoKCWNs",
+            "aXBib2FyZBgDIAEoCzIlLmNsaWVudHBpcGVfcHJvdG9jb2wuQ2xpcGJvYXJk",
+            "TWVzc2FnZUgAEiwKCnN1c3BlbmRpbmcYECABKAsyFi5nb29nbGUucHJvdG9i",
+            "dWYuRW1wdHlIABIRCgdob3Rfa2V5GBEgASgNSAASIAoWaG90X2tleV9iaW5k",
+            "aW5nX2ZhaWxlZBgSIAEoCUgAEjEKC21vdXNlX2VkZ2VkGBMgASgLMhouY2xp",
+            "ZW50cGlwZV9wcm90b2NvbC5Qb2ludEgAQgkKB21lc3NhZ2UqLgoNQ2xpcGJv",
+            "YXJkVHlwZRIICgROb25lEAASCAoEVGV4dBABEgkKBUltYWdlEAJiBnByb3Rv",
+            "Mw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Google.Protobuf.WellKnownTypes.EmptyReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::ClientpipeProtocol.ClipboardType), }, new pbr::GeneratedClrTypeInfo[] {
             new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.ClipboardMessage), global::ClientpipeProtocol.ClipboardMessage.Parser, new[]{ "GrabClipboard", "RequestClipboardContents", "ContentTypes", "ClipboardContents" }, new[]{ "Message" }, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.ClipboardTypes), global::ClientpipeProtocol.ClipboardTypes.Parser, new[]{ "Types_" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.RegisterHotKey), global::ClientpipeProtocol.RegisterHotKey.Parser, new[]{ "Id", "Modifiers", "Key" }, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.GaCmdOut), global::ClientpipeProtocol.GaCmdOut.Parser, new[]{ "Ping", "Clipboard", "ReleaseModifiers", "Suspend", "RegisterHotKey" }, new[]{ "Message" }, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.GaCmdIn), global::ClientpipeProtocol.GaCmdIn.Parser, new[]{ "Pong", "ReportBoot", "Clipboard", "Suspending", "HotKey", "HotKeyBindingFailed" }, new[]{ "Message" }, null, null)
+            new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.Point), global::ClientpipeProtocol.Point.Parser, new[]{ "X", "Y" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.GaCmdOut), global::ClientpipeProtocol.GaCmdOut.Parser, new[]{ "Ping", "Clipboard", "ReleaseModifiers", "Suspend", "RegisterHotKey", "SetMousePosition" }, new[]{ "Message" }, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.GaCmdIn), global::ClientpipeProtocol.GaCmdIn.Parser, new[]{ "Pong", "ReportBoot", "Clipboard", "Suspending", "HotKey", "HotKeyBindingFailed", "MouseEdged" }, new[]{ "Message" }, null, null)
           }));
     }
     #endregion
@@ -601,6 +606,151 @@ namespace ClientpipeProtocol {
 
   }
 
+  public sealed partial class Point : pb::IMessage<Point> {
+    private static readonly pb::MessageParser<Point> _parser = new pb::MessageParser<Point>(() => new Point());
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public static pb::MessageParser<Point> Parser { get { return _parser; } }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public static pbr::MessageDescriptor Descriptor {
+      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[3]; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    pbr::MessageDescriptor pb::IMessage.Descriptor {
+      get { return Descriptor; }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public Point() {
+      OnConstruction();
+    }
+
+    partial void OnConstruction();
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public Point(Point other) : this() {
+      x_ = other.x_;
+      y_ = other.y_;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public Point Clone() {
+      return new Point(this);
+    }
+
+    /// <summary>Field number for the "x" field.</summary>
+    public const int XFieldNumber = 1;
+    private int x_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public int X {
+      get { return x_; }
+      set {
+        x_ = value;
+      }
+    }
+
+    /// <summary>Field number for the "y" field.</summary>
+    public const int YFieldNumber = 2;
+    private int y_;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public int Y {
+      get { return y_; }
+      set {
+        y_ = value;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public override bool Equals(object other) {
+      return Equals(other as Point);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public bool Equals(Point other) {
+      if (ReferenceEquals(other, null)) {
+        return false;
+      }
+      if (ReferenceEquals(other, this)) {
+        return true;
+      }
+      if (X != other.X) return false;
+      if (Y != other.Y) return false;
+      return true;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public override int GetHashCode() {
+      int hash = 1;
+      if (X != 0) hash ^= X.GetHashCode();
+      if (Y != 0) hash ^= Y.GetHashCode();
+      return hash;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public override string ToString() {
+      return pb::JsonFormatter.ToDiagnosticString(this);
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public void WriteTo(pb::CodedOutputStream output) {
+      if (X != 0) {
+        output.WriteRawTag(8);
+        output.WriteInt32(X);
+      }
+      if (Y != 0) {
+        output.WriteRawTag(16);
+        output.WriteInt32(Y);
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public int CalculateSize() {
+      int size = 0;
+      if (X != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeInt32Size(X);
+      }
+      if (Y != 0) {
+        size += 1 + pb::CodedOutputStream.ComputeInt32Size(Y);
+      }
+      return size;
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public void MergeFrom(Point other) {
+      if (other == null) {
+        return;
+      }
+      if (other.X != 0) {
+        X = other.X;
+      }
+      if (other.Y != 0) {
+        Y = other.Y;
+      }
+    }
+
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public void MergeFrom(pb::CodedInputStream input) {
+      uint tag;
+      while ((tag = input.ReadTag()) != 0) {
+        switch(tag) {
+          default:
+            input.SkipLastField();
+            break;
+          case 8: {
+            X = input.ReadInt32();
+            break;
+          }
+          case 16: {
+            Y = input.ReadInt32();
+            break;
+          }
+        }
+      }
+    }
+
+  }
+
   public sealed partial class GaCmdOut : pb::IMessage<GaCmdOut> {
     private static readonly pb::MessageParser<GaCmdOut> _parser = new pb::MessageParser<GaCmdOut>(() => new GaCmdOut());
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -608,7 +758,7 @@ namespace ClientpipeProtocol {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[3]; }
+      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[4]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -640,6 +790,9 @@ namespace ClientpipeProtocol {
           break;
         case MessageOneofCase.RegisterHotKey:
           RegisterHotKey = other.RegisterHotKey.Clone();
+          break;
+        case MessageOneofCase.SetMousePosition:
+          SetMousePosition = other.SetMousePosition.Clone();
           break;
       }
 
@@ -705,6 +858,17 @@ namespace ClientpipeProtocol {
       }
     }
 
+    /// <summary>Field number for the "set_mouse_position" field.</summary>
+    public const int SetMousePositionFieldNumber = 19;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public global::ClientpipeProtocol.Point SetMousePosition {
+      get { return messageCase_ == MessageOneofCase.SetMousePosition ? (global::ClientpipeProtocol.Point) message_ : null; }
+      set {
+        message_ = value;
+        messageCase_ = value == null ? MessageOneofCase.None : MessageOneofCase.SetMousePosition;
+      }
+    }
+
     private object message_;
     /// <summary>Enum of possible cases for the "message" oneof.</summary>
     public enum MessageOneofCase {
@@ -714,6 +878,7 @@ namespace ClientpipeProtocol {
       ReleaseModifiers = 16,
       Suspend = 17,
       RegisterHotKey = 18,
+      SetMousePosition = 19,
     }
     private MessageOneofCase messageCase_ = MessageOneofCase.None;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -745,6 +910,7 @@ namespace ClientpipeProtocol {
       if (!object.Equals(ReleaseModifiers, other.ReleaseModifiers)) return false;
       if (!object.Equals(Suspend, other.Suspend)) return false;
       if (!object.Equals(RegisterHotKey, other.RegisterHotKey)) return false;
+      if (!object.Equals(SetMousePosition, other.SetMousePosition)) return false;
       if (MessageCase != other.MessageCase) return false;
       return true;
     }
@@ -757,6 +923,7 @@ namespace ClientpipeProtocol {
       if (messageCase_ == MessageOneofCase.ReleaseModifiers) hash ^= ReleaseModifiers.GetHashCode();
       if (messageCase_ == MessageOneofCase.Suspend) hash ^= Suspend.GetHashCode();
       if (messageCase_ == MessageOneofCase.RegisterHotKey) hash ^= RegisterHotKey.GetHashCode();
+      if (messageCase_ == MessageOneofCase.SetMousePosition) hash ^= SetMousePosition.GetHashCode();
       hash ^= (int) messageCase_;
       return hash;
     }
@@ -788,6 +955,10 @@ namespace ClientpipeProtocol {
         output.WriteRawTag(146, 1);
         output.WriteMessage(RegisterHotKey);
       }
+      if (messageCase_ == MessageOneofCase.SetMousePosition) {
+        output.WriteRawTag(154, 1);
+        output.WriteMessage(SetMousePosition);
+      }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -807,6 +978,9 @@ namespace ClientpipeProtocol {
       }
       if (messageCase_ == MessageOneofCase.RegisterHotKey) {
         size += 2 + pb::CodedOutputStream.ComputeMessageSize(RegisterHotKey);
+      }
+      if (messageCase_ == MessageOneofCase.SetMousePosition) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(SetMousePosition);
       }
       return size;
     }
@@ -831,6 +1005,9 @@ namespace ClientpipeProtocol {
           break;
         case MessageOneofCase.RegisterHotKey:
           RegisterHotKey = other.RegisterHotKey;
+          break;
+        case MessageOneofCase.SetMousePosition:
+          SetMousePosition = other.SetMousePosition;
           break;
       }
 
@@ -889,6 +1066,15 @@ namespace ClientpipeProtocol {
             RegisterHotKey = subBuilder;
             break;
           }
+          case 154: {
+            global::ClientpipeProtocol.Point subBuilder = new global::ClientpipeProtocol.Point();
+            if (messageCase_ == MessageOneofCase.SetMousePosition) {
+              subBuilder.MergeFrom(SetMousePosition);
+            }
+            input.ReadMessage(subBuilder);
+            SetMousePosition = subBuilder;
+            break;
+          }
         }
       }
     }
@@ -902,7 +1088,7 @@ namespace ClientpipeProtocol {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[4]; }
+      get { return global::ClientpipeProtocol.ProtocolReflection.Descriptor.MessageTypes[5]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -937,6 +1123,9 @@ namespace ClientpipeProtocol {
           break;
         case MessageOneofCase.HotKeyBindingFailed:
           HotKeyBindingFailed = other.HotKeyBindingFailed;
+          break;
+        case MessageOneofCase.MouseEdged:
+          MouseEdged = other.MouseEdged.Clone();
           break;
       }
 
@@ -1013,6 +1202,17 @@ namespace ClientpipeProtocol {
       }
     }
 
+    /// <summary>Field number for the "mouse_edged" field.</summary>
+    public const int MouseEdgedFieldNumber = 19;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public global::ClientpipeProtocol.Point MouseEdged {
+      get { return messageCase_ == MessageOneofCase.MouseEdged ? (global::ClientpipeProtocol.Point) message_ : null; }
+      set {
+        message_ = value;
+        messageCase_ = value == null ? MessageOneofCase.None : MessageOneofCase.MouseEdged;
+      }
+    }
+
     private object message_;
     /// <summary>Enum of possible cases for the "message" oneof.</summary>
     public enum MessageOneofCase {
@@ -1023,6 +1223,7 @@ namespace ClientpipeProtocol {
       Suspending = 16,
       HotKey = 17,
       HotKeyBindingFailed = 18,
+      MouseEdged = 19,
     }
     private MessageOneofCase messageCase_ = MessageOneofCase.None;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1055,6 +1256,7 @@ namespace ClientpipeProtocol {
       if (!object.Equals(Suspending, other.Suspending)) return false;
       if (HotKey != other.HotKey) return false;
       if (HotKeyBindingFailed != other.HotKeyBindingFailed) return false;
+      if (!object.Equals(MouseEdged, other.MouseEdged)) return false;
       if (MessageCase != other.MessageCase) return false;
       return true;
     }
@@ -1068,6 +1270,7 @@ namespace ClientpipeProtocol {
       if (messageCase_ == MessageOneofCase.Suspending) hash ^= Suspending.GetHashCode();
       if (messageCase_ == MessageOneofCase.HotKey) hash ^= HotKey.GetHashCode();
       if (messageCase_ == MessageOneofCase.HotKeyBindingFailed) hash ^= HotKeyBindingFailed.GetHashCode();
+      if (messageCase_ == MessageOneofCase.MouseEdged) hash ^= MouseEdged.GetHashCode();
       hash ^= (int) messageCase_;
       return hash;
     }
@@ -1103,6 +1306,10 @@ namespace ClientpipeProtocol {
         output.WriteRawTag(146, 1);
         output.WriteString(HotKeyBindingFailed);
       }
+      if (messageCase_ == MessageOneofCase.MouseEdged) {
+        output.WriteRawTag(154, 1);
+        output.WriteMessage(MouseEdged);
+      }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1125,6 +1332,9 @@ namespace ClientpipeProtocol {
       }
       if (messageCase_ == MessageOneofCase.HotKeyBindingFailed) {
         size += 2 + pb::CodedOutputStream.ComputeStringSize(HotKeyBindingFailed);
+      }
+      if (messageCase_ == MessageOneofCase.MouseEdged) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(MouseEdged);
       }
       return size;
     }
@@ -1152,6 +1362,9 @@ namespace ClientpipeProtocol {
           break;
         case MessageOneofCase.HotKeyBindingFailed:
           HotKeyBindingFailed = other.HotKeyBindingFailed;
+          break;
+        case MessageOneofCase.MouseEdged:
+          MouseEdged = other.MouseEdged;
           break;
       }
 
@@ -1207,6 +1420,15 @@ namespace ClientpipeProtocol {
           }
           case 146: {
             HotKeyBindingFailed = input.ReadString();
+            break;
+          }
+          case 154: {
+            global::ClientpipeProtocol.Point subBuilder = new global::ClientpipeProtocol.Point();
+            if (messageCase_ == MessageOneofCase.MouseEdged) {
+              subBuilder.MergeFrom(MouseEdged);
+            }
+            input.ReadMessage(subBuilder);
+            MouseEdged = subBuilder;
             break;
           }
         }

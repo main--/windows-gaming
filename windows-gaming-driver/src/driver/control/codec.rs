@@ -1,11 +1,16 @@
 use std::io;
 use std::str;
-use bytes::BytesMut;
+use bytes::{BytesMut, BufMut, LittleEndian, IntoBuf, Buf};
 use tokio_io::codec::{Encoder, Decoder};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ControlCmdOut {
-    // none yet
+    MouseEdged {
+        x: i32,
+        y: i32,
+    },
+    TemporaryLightAttached,
+    TemporaryLightDetached,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -17,6 +22,10 @@ pub enum ControlCmdIn {
     ForceIoEntry,
     IoExit,
     Suspend,
+    TemporaryLightEntry {
+        x: i32,
+        y: i32,
+    },
 }
 
 pub struct Codec;
@@ -26,6 +35,7 @@ impl Decoder for Codec {
     type Error = io::Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<ControlCmdIn>> {
+        let mut size = 1;
         let ret = match buf.get(0).cloned() {
             Some(1) => ControlCmdIn::IoEntry,
             Some(2) => ControlCmdIn::Shutdown,
@@ -34,6 +44,14 @@ impl Decoder for Codec {
             Some(5) => ControlCmdIn::Suspend,
             Some(6) => ControlCmdIn::TryIoEntry,
             Some(7) => ControlCmdIn::LightEntry,
+            Some(8) => {
+                let mut bbuf = (&*buf).into_buf();
+                bbuf.advance(1); // skip cmd
+                let x = bbuf.get_i32::<LittleEndian>();
+                let y = bbuf.get_i32::<LittleEndian>();
+                size += 8;
+                ControlCmdIn::TemporaryLightEntry { x, y }
+            }
             Some(x) => {
                 warn!("control sent invalid request {}", x);
                 // no idea how to proceed as the request might have payload
@@ -42,7 +60,7 @@ impl Decoder for Codec {
             }
             None => return Ok(None),
         };
-        buf.split_to(1);
+        buf.split_to(size);
         Ok(Some(ret))
     }
 }
@@ -51,9 +69,19 @@ impl Encoder for Codec {
     type Item = ControlCmdOut;
     type Error = io::Error;
 
-    fn encode(&mut self, cmd: ControlCmdOut, _buf: &mut BytesMut) -> io::Result<()> {
+    fn encode(&mut self, cmd: ControlCmdOut, buf: &mut BytesMut) -> io::Result<()> {
+        buf.reserve(1);
         match cmd {
+            ControlCmdOut::MouseEdged { x, y } => {
+                buf.put_u8(1);
+                buf.reserve(8);
+                buf.put_i32::<LittleEndian>(x);
+                buf.put_i32::<LittleEndian>(y);
+            }
+            ControlCmdOut::TemporaryLightAttached => buf.put_u8(2),
+            ControlCmdOut::TemporaryLightDetached => buf.put_u8(3),
         }
+        Ok(())
     }
 }
 
