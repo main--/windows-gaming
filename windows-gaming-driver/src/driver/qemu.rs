@@ -138,8 +138,8 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
             let mut count = cfg.machine.usb_devices.iter().filter(|dev| dev.bus == typ).count();
 
             if typ == UsbBus::Xhci {
-                // account for lighthouse usb-mouse
-                count += 1;
+                // account for lighthouse usb-mouse and usb-kbd
+                count += 2;
             }
 
             let usable_ports = util::usable_ports(typ);
@@ -183,6 +183,11 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
             qemu.args(&["-device", &format!("usb-mouse,bus=xhci{}.0,port={}",
                                             port / usable_ports, (port % usable_ports) + 1)]);
             debug!("usb-mouse at xhci{}.0p{}", port / usable_ports, (port % usable_ports) + 1);
+            // add lighthouse usb-kbd
+            let port = i + 1;
+            qemu.args(&["-device", &format!("usb-kbd,bus=xhci{}.0,port={}",
+                                            port / usable_ports, (port % usable_ports) + 1)]);
+            debug!("usb-kbd at xhci{}.0p{}", port / usable_ports, (port % usable_ports) + 1);
         }
     }
 
