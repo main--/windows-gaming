@@ -66,7 +66,7 @@ fn main() {
         info!("File {} didn't exist", dev_iommu.display());
         panic!("No signs of an IOMMU. \
                 Check your hardware and/or linux cmdline parameters. \
-                Use intel_iommu=on or iommu=pt iommu=1");
+                Use `intel_iommu=on` or `iommu=pt iommu=1`");
     }
     
     let dev_reset = dev_sysfs.join("reset");

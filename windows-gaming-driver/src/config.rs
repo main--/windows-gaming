@@ -253,7 +253,7 @@ pub struct StorageDevice {
 pub struct VfioDevice {
     pub resettable: bool,
     pub slot: String,
-    pub device: PciId,
+    pub id: PciId,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

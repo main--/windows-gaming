@@ -41,7 +41,7 @@ pub fn is_enabled() -> bool {
 
 pub fn check_grouping(machine: &MachineConfig) -> Result<bool> {
     let udev = Context::new().expect("Failed to create udev context");
-    let first_id = machine.pci_devices[0].device; // FIXME
+    let first_id = machine.pci_devices[0].id; // FIXME
     let mut iter = Enumerator::new(&udev)?;
     iter.match_subsystem("pci")?;
     let mut iter = iter.scan_devices()?.map(PciDevice::new).filter(|x| x.id == first_id);

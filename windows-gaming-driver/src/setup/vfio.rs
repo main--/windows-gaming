@@ -9,8 +9,6 @@ use setup::ask;
 use setup::wizard;
 use pci_device::PciDevice;
 
-
-
 const KERNEL_MODULES: &'static str = "vfio vfio_iommu_type1 vfio_pci vfio_virqfd";
 
 pub fn setup(machine: &mut MachineConfig) -> bool {
@@ -94,7 +92,7 @@ fn select(machine: &mut MachineConfig) -> Result<()> {
                   |x| x.pci_class.starts_with("3") && x.pci_class.len() == 5)?;
     if ask::yesno("Would you like to pass aditional PCI devices?") {
         println!();
-        println!("Please choose aditional pci devices. These will be passed through to the VM on boot.");
+        println!("Please choose aditional pci devices. These will be passed through to the VM on its boot.");
         println!("Note: For this to work properly, the device has to support resetting.");
         println!("The devices will be bound to the vfio-pci driver on VM startup and unbound when it quits.");
         println!("You will not be able to use them on your host system while Windows is running.");
@@ -116,12 +114,11 @@ fn select(machine: &mut MachineConfig) -> Result<()> {
     Ok(())
 }
 
-fn select_device<P: Fn(&PciDevice) -> bool>(machine: &mut MachineConfig,
-                                            question: &str,
-                                            devices: &[PciDevice],
-                                            predicate: P) -> Result<bool> {
+fn select_device<P>(machine: &mut MachineConfig, question: &str, devices: &[PciDevice],
+                    predicate: P) -> Result<bool>
+                    where P: Fn(&PciDevice) -> bool {
     let askable_devices: Vec<_> = devices.iter()
-        .filter(|x| predicate(x) && !machine.pci_devices.iter().any(|y| y.device == x.id)).collect();
+        .filter(|x| predicate(x) && !machine.pci_devices.iter().any(|y| y.id == x.id)).collect();
 
     println!("{}", devices.len());
 
@@ -134,11 +131,11 @@ fn select_device<P: Fn(&PciDevice) -> bool>(machine: &mut MachineConfig,
 
     if let Some(selected_slot) = askable_devices.get(selection).map(|x| x.pci_slot.clone()) {
         for device in devices.iter()
-            .filter(|x| x.pci_slot[..x.pci_slot.len()-1] == selected_slot[..selected_slot.len()-1]) {
+                .filter(|x| x.pci_slot[..x.pci_slot.len()-1] == selected_slot[..selected_slot.len()-1]) {
             let vfio_device = VfioDevice {
                 resettable: device.resettable,
                 slot: device.pci_slot.clone(),
-                device: device.id,
+                id: device.id,
             };
 
             machine.pci_devices.push(vfio_device);
@@ -217,7 +214,7 @@ fn autoconfigure_mkinitcpio(has_modconf: &mut bool) -> Result<bool> {
 
 fn write_vfio_modconf(machine: &MachineConfig) {
     let vfio_params = machine.pci_devices.iter().filter(|x| !x.resettable)
-        .fold(String::new(), |s, i| s + &format!("{:04x}:{:04x},", i.device.vendor, i.device.device));
+        .fold(String::new(), |s, i| s + &format!("{:04x}:{:04x},", i.id.vendor, i.id.device));
     assert!(wizard::sudo_write_file("/etc/modprobe.d/vfio.conf", |x| {
         writeln!(x, "options vfio-pci ids={}", vfio_params)
     }).unwrap_or(false), "Failed to write modconf");
