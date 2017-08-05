@@ -9,6 +9,8 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using ClientpipeProtocol;
+using Google.Protobuf;
 
 namespace VfioService
 {
@@ -16,6 +18,7 @@ namespace VfioService
     {
         private readonly TcpClient TcpClient;
         private readonly NetworkStream Stream;
+
         public object WriteLock { get; } = new object();
         private readonly MainForm MainForm;
 
@@ -24,90 +27,167 @@ namespace VfioService
             TcpClient = new TcpClient("10.0.2.1", 31337);
             Stream = TcpClient.GetStream();
             MainForm = mainForm;
+
             new Thread(() =>
             {
                 while (true)
                 {
-                    var nextCommand = (CommandIn)Stream.ReadByte();
-                    switch (nextCommand)
+                    var outCmd = GaCmdOut.Parser.ParseDelimitedFrom(Stream);
+
+                    switch (outCmd.MessageCase)
                     {
-                        case CommandIn.Ping:
-                            SendCommand(CommandOut.Pong);
+                        case GaCmdOut.MessageOneofCase.Ping:
+                            Send(new GaCmdIn { Pong = new Unit() });
                             break;
-                        case CommandIn.RegisterHotKey:
-                            var id = ReadInt(Stream);
-                            var mods = ReadInt(Stream);
-                            var keys = ReadInt(Stream);
-                            var result = (string)MainForm.Invoke(new Func<int, int, int, string>(MainForm.RegisterHotKey), id, mods, keys);
-                            if (result != null)
-                            {
-                                // report error
-                                lock (WriteLock)
-                                {
-                                    SendCommand(CommandOut.HotKeyBindingFailed);
-                                    var data = Encoding.UTF8.GetBytes(result);
-                                    SendData(BitConverter.GetBytes(data.Length));
-                                    SendData(data);
-                                }
-                            }
+                        case GaCmdOut.MessageOneofCase.RegisterHotKey:
+                            HandleRegisterHotkey(outCmd.RegisterHotKey);
                             break;
-                        case CommandIn.ReleaseModifiers:
+                        case GaCmdOut.MessageOneofCase.ReleaseModifiers:
                             StuckKeyFix.ReleaseModifiers();
                             break;
-                        case CommandIn.Suspend:
+                        case GaCmdOut.MessageOneofCase.Suspend:
                             Application.SetSuspendState(PowerState.Suspend, false, false);
                             break;
-                        case CommandIn.GrabClipboard:
-                            MainForm.GrabClipboard();
+                        case GaCmdOut.MessageOneofCase.Clipboard:
+                            HandleClipboardMessage(outCmd.Clipboard);
                             break;
-                        case CommandIn.RequestClipboardContents:
-                            SendClipboardData(Stream.ReadByte());
-                            break;
-                        case CommandIn.ClipboardContents:
-                            var len = ReadInt(Stream);
-                            MainForm.SetClipboardResponse(ReadBytes(Stream, len));
-                            break;
+
                     }
                 }
             }).Start();
         }
 
-        private void SendClipboardData(int format)
+        private void HandleClipboardMessage(ClipboardMessage msg)
+        {
+            switch (msg.MessageCase)
+            {
+                case ClipboardMessage.MessageOneofCase.GrabClipboard:
+                    MainForm.GrabClipboard();
+                    break;
+                case ClipboardMessage.MessageOneofCase.RequestClipboardContents:
+                    SendClipboardData(msg.RequestClipboardContents);
+                    break;
+                case ClipboardMessage.MessageOneofCase.ClipboardContents:
+                    MainForm.SetClipboardResponse(msg.ClipboardContents);
+                    break;
+                case ClipboardMessage.MessageOneofCase.ContentTypes:
+                    MainForm.SetClipboardFormats(msg.ContentTypes.Types_.ToArray());
+                    break;
+
+            }
+        }
+
+        private void HandleRegisterHotkey(RegisterHotKey hotkey)
+        {
+            var result = (string)MainForm.Invoke(new Func<int, uint, uint, string>(MainForm.RegisterHotKey), (int)hotkey.Id, hotkey.Modifiers, hotkey.Key);
+            if (result != null)
+            {
+                Send(new GaCmdIn {
+                    HotKeyBindingFailed = result
+                });
+            }
+        }
+
+        private void SendClipboardData(ClipboardType type)
+        {
+            if (type == ClipboardType.None)
+            {
+                var types = (IEnumerable<ClipboardType>)MainForm.Invoke(new Func<IEnumerable<ClipboardType>>(MainForm.GetClipboardTypes));
+
+                var message = new GaCmdIn
+                {
+                    Clipboard = new ClipboardMessage
+                    {
+                        ContentTypes = new ClipboardTypes
+                        {
+                        }
+                    }
+                };
+
+                message.Clipboard.ContentTypes.Types_.AddRange(types);
+                Send(message);
+
+                return;
+            }
+            else if (type == ClipboardType.Text)
+            {
+                var clipboardText = (string)MainForm.Invoke(new Func<string>(MainForm.GetClipboardText));
+                if (clipboardText != null)
+                {
+                    var message = new GaCmdIn();
+                    message.Clipboard = new ClipboardMessage();
+                    message.Clipboard.ClipboardContents = ByteString.CopyFromUtf8(clipboardText.Replace(Environment.NewLine, "\n"));
+                    Send(message);
+                }
+            }
+            else if (type == ClipboardType.Image)
+            {
+                var image = (byte[])MainForm.Invoke(new Func<byte[]>(MainForm.GetClipboardImage));
+                if (image != null)
+                {
+                    var message = new GaCmdIn();
+                    message.Clipboard = new ClipboardMessage();
+                    message.Clipboard.ClipboardContents = ByteString.CopyFrom(image);
+                    Send(message);
+                }
+            }
+
+
+        }
+
+        public void SendHotkey(uint hotkey)
+        {
+            Send(new GaCmdIn
+            {
+                HotKey = hotkey
+            });
+        }
+
+        public void SendSuspending()
+        {
+            Send(new GaCmdIn
+            {
+                Suspending = new Unit()
+            });
+        }
+
+
+        public void ReportBoot()
+        {
+            Send(new GaCmdIn
+            {
+                ReportBoot = new Unit(),
+            });
+        }
+
+        public void GrabClipboard()
+        {
+            Send(new GaCmdIn
+            {
+                Clipboard = new ClipboardMessage
+                {
+                    GrabClipboard = new Unit()
+                }
+            });
+        }
+
+        public void RequestClipboardContents(ClipboardType type)
+        {
+            Send(new GaCmdIn
+            {
+                Clipboard = new ClipboardMessage
+                {
+                    RequestClipboardContents = type
+                }
+            });
+        }
+
+        private void Send(GaCmdIn toSend)
         {
             lock (WriteLock)
             {
-                SendCommand(CommandOut.ClipboardContents);
-                switch (format)
-                {
-                    case 0: // utf8 text
-                        var clipboardText = (string)MainForm.Invoke(new Func<string>(MainForm.GetClipboardText));
-                        if (clipboardText != null)
-                        {
-                            var data = Encoding.UTF8.GetBytes(clipboardText.Replace("\r\n", "\n"));
-                            SendData(BitConverter.GetBytes(data.Length));
-                            SendData(data);
-                            return;
-                        }
-                        break;
-                        /*
-                    case 1: // png image
-                        var clipboardImage = (Image)MainForm.Invoke(new Func<Image>(MainForm.GetClipboardImage));
-                        if (clipboardImage != null)
-                        {
-                            MemoryStream ms = new MemoryStream();
-                            clipboardImage.Save(ms, ImageFormat.Png);
-                            var data = ms.ToArray();
-
-                            SendData(BitConverter.GetBytes(data.Length));
-                            SendData(data);
-                            return;
-                        }
-                        break;
-                        */
-                }
-
-                // unknown or wrong format => send no data
-                SendData(BitConverter.GetBytes(0));
+                toSend.WriteDelimitedTo(Stream);
+                Stream.Flush();
             }
         }
 
@@ -115,39 +195,6 @@ namespace VfioService
         {
             Stream.Dispose();
             ((IDisposable)TcpClient).Dispose();
-        }
-
-
-        public void SendCommand(CommandOut c)
-        {
-            lock (WriteLock)
-            {
-                Stream.WriteByte((byte)c);
-            }
-        }
-
-        public void SendData(byte[] data)
-        {
-            if (!Monitor.IsEntered(WriteLock))
-                throw new InvalidOperationException();
-
-            Stream.Write(data, 0, data.Length);
-        }
-
-        private static byte[] ReadBytes(Stream s, int count)
-        {
-            var buf = new byte[count];
-            int read = -1;
-            for (int i = 0; i < count; i += read)
-                read = s.Read(buf, i, count - i);
-            if (read == 0)
-                throw new EndOfStreamException();
-            return buf;
-        }
-
-        private static int ReadInt(Stream s)
-        {
-            return BitConverter.ToInt32(ReadBytes(s, sizeof(int)), 0);
         }
     }
 }

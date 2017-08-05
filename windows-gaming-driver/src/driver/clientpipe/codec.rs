@@ -1,35 +1,15 @@
+extern crate clientpipe_proto as proto;
+
 use std::io;
-use std::str;
-use bytes::{IntoBuf, Buf, BufMut, BytesMut, LittleEndian};
+use bytes::{IntoBuf, Buf, BytesMut};
 use tokio_io::codec::{Encoder, Decoder};
+use prost::{encoding, Message};
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum GaCmdOut {
-    Ping,
-    RegisterHotKey {
-        id: u32,
-        key: (u32, u32),
-    },
-    ReleaseModifiers,
-    Suspend,
+pub use self::proto::{RegisterHotKey, ClipboardType, ClipboardTypes};
+pub use self::proto::ga_cmd_in::Message as GaCmdIn;
+pub use self::proto::ga_cmd_out::Message as GaCmdOut;
+pub use self::proto::clipboard_message::Message as ClipboardMessage;
 
-    GrabClipboard,
-    RequestClipboardContents(u8), // TODO: kind enum
-    ClipboardContents(Vec<u8>),
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum GaCmdIn {
-    ReportBoot,
-    Suspending,
-    Pong,
-    HotKey(u32),
-    HotKeyBindingFailed(String),
-
-    GrabClipboard,
-    RequestClipboardContents(u8), // TODO: kind enum
-    ClipboardContents(Vec<u8>),
-}
 
 pub struct Codec;
 
@@ -38,60 +18,27 @@ impl Decoder for Codec {
     type Error = io::Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<GaCmdIn>> {
-        trace!("Decoding client command {:?}", buf);
-        let mut size = 1;
-        let ret = match buf.get(0).cloned() {
-            Some(1) => GaCmdIn::ReportBoot,
-            Some(3) => GaCmdIn::Suspending,
-            Some(4) => GaCmdIn::Pong,
-            Some(5) if buf.len() < 5 => return Ok(None),
-            Some(5) => {
-                let mut buf = (&*buf).into_buf();
-                buf.advance(1); // skip cmd
-                let id = buf.get_u32::<LittleEndian>();
-                size += 4;
-                GaCmdIn::HotKey(id)
-            }
-            Some(6) if buf.len() < 5 => return Ok(None),
-            Some(6) => {
-                let mut bbuf = (&*buf).into_buf();
-                bbuf.advance(1); // skip cmd
-                let len = bbuf.get_u32::<LittleEndian>() as usize;
-                if buf.len() < len + 5 {
-                    return Ok(None);
+        let mut res = Ok(None);
+        let mut consumed = 0;
+        {
+            let mut rbuf = (&*buf).into_buf();
+            // prost's length delimiting functions are astonishingly useless because they return io::Error
+            if let Ok(len) = encoding::decode_varint(&mut rbuf) {
+                if rbuf.remaining() as u64 >= len {
+                    consumed = len as usize + encoding::encoded_len_varint(len);
+                    // Even if it's an error don't return early, as we want to
+                    // skip over the message.
+                    res = proto::GaCmdIn::decode(&mut rbuf.take(len as usize))
+                        .map(|x| x.message);
                 }
-                let s = String::from_utf8_lossy(&buf[5..5+len]).into_owned();
-                size += 4 + len;
-                GaCmdIn::HotKeyBindingFailed(s)
             }
-            Some(0xa) => GaCmdIn::GrabClipboard,
-            Some(0xb) if buf.len() < 2 => return Ok(None),
-            Some(0xb) => {
-                size += 1;
-                GaCmdIn::RequestClipboardContents(*buf.get(1).unwrap())
-            }
-            Some(0xc) if buf.len() < 5 => return Ok(None),
-            Some(0xc) => {
-                let mut bbuf = (&*buf).into_buf();
-                bbuf.advance(1); // skip cmd
-                let len = bbuf.get_u32::<LittleEndian>() as usize;
-                if buf.len() < len + 5 {
-                    return Ok(None);
-                }
-                let vec = buf[5..5+len].to_vec();
-                size += 4 + len;
-                GaCmdIn::ClipboardContents(vec)
-            }
-            Some(x) => {
-                warn!("client sent invalid request {}", x);
-                // no idea how to proceed as the request might have payload
-                // this essentially just hangs the connection forever
-                return Ok(None);
-            }
-            _ => return Ok(None),
-        };
-        buf.split_to(size);
-        Ok(Some(ret))
+        }
+
+        buf.split_to(consumed);
+        res.or_else(|e| {
+            warn!("Unknown / invalid request ({}), skipping over: {:?}", e, &buf[..consumed]);
+            Ok(None)
+        })
     }
 }
 
@@ -100,57 +47,10 @@ impl Encoder for Codec {
     type Error = io::Error;
 
     fn encode(&mut self, cmd: GaCmdOut, buf: &mut BytesMut) -> io::Result<()> {
-        buf.reserve(1);
-        match cmd {
-            GaCmdOut::Ping => buf.put_u8(0x01),
-            GaCmdOut::RegisterHotKey { id, key: (m, k) } => {
-                buf.put_u8(0x05);
-                buf.reserve(3 * 4);
-                buf.put_u32::<LittleEndian>(id);
-                buf.put_u32::<LittleEndian>(m);
-                buf.put_u32::<LittleEndian>(k);
-            }
-            GaCmdOut::ReleaseModifiers => buf.put_u8(0x03),
-            GaCmdOut::Suspend => buf.put_u8(0x04),
-            GaCmdOut::GrabClipboard => buf.put_u8(0x0a),
-            GaCmdOut::RequestClipboardContents(x) => {
-                buf.put_u8(0x0b);
-                buf.reserve(1);
-                buf.put_u8(x);
-            }
-            GaCmdOut::ClipboardContents(x) => {
-                buf.put_u8(0x0c);
-                buf.reserve(4 + x.len());
-                buf.put_u32::<LittleEndian>(x.len() as u32);
-                buf.put_slice(&x);
-            }
-        }
-        Ok(())
-    }
-}
+        let cmd = proto::GaCmdOut { message: Some(cmd) };
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    use tokio_io::codec::Decoder;
-    use bytes::{BytesMut, LittleEndian};
-
-    #[test]
-    fn hotkey() {
-        let mut bytes = BytesMut::with_capacity(5);
-        bytes.put_u8(5);
-        bytes.put_u32::<LittleEndian>(0x1337);
-        assert_eq!(bytes.len(), 5);
-        let res = Codec.decode(&mut bytes).unwrap();
-        assert_eq!(res, Some(GaCmdIn::HotKey(0x1337)));
-        assert_eq!(bytes.len(), 0);
-        let res = Codec.decode(&mut bytes).unwrap();
-        assert_eq!(res, None);
-
-        bytes.reserve(1);
-        bytes.put_u8(5);
-        let res = Codec.decode(&mut bytes).unwrap();
-        assert_eq!(res, None);
-        assert_eq!(bytes.len(), 1);
+        let len = cmd.encoded_len();
+        buf.reserve(len + encoding::encoded_len_varint(len as u64));
+        Ok(cmd.encode_length_delimited(buf)?)
     }
 }

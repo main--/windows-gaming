@@ -13,7 +13,7 @@ use futures::future;
 
 use config::{UsbId, UsbPort, UsbBinding, MachineConfig, HotKeyAction, Action};
 use util;
-use driver::clientpipe::GaCmdOut as GaCmd;
+use driver::clientpipe::{GaCmdOut as GaCmd, ClipboardMessage, ClipboardType, ClipboardTypes, RegisterHotKey};
 use driver::monitor::QmpCommand;
 use driver::sd_notify;
 use driver::libinput::Input;
@@ -56,7 +56,7 @@ pub struct Controller {
 
     x11_clipboard: UnboundedSender<ClipboardRequestResponse>,
     x11_clipboard_grabber: UnboundedSender<()>,
-    x11_clipboard_reader: UnboundedSender<()>,
+    x11_clipboard_reader: UnboundedSender<ClipboardType>,
     win_clipboard_request: Option<ClipboardRequestEvent>,
 
     // write-only
@@ -65,8 +65,8 @@ pub struct Controller {
 }
 
 impl Controller {
-    fn write_ga(&mut self, cmd: GaCmd) {
-        (&self.clientpipe).send(cmd).unwrap();
+    fn write_ga<C: Into<GaCmd>>(&mut self, cmd: C) {
+        (&self.clientpipe).send(cmd.into()).unwrap();
     }
 
     pub fn new(machine_config: MachineConfig,
@@ -75,7 +75,7 @@ impl Controller {
                input: Rc<RefCell<Input>>,
                x11_clipboard: UnboundedSender<ClipboardRequestResponse>,
                x11_clipboard_grabber: UnboundedSender<()>,
-               x11_clipboard_reader: UnboundedSender<()>) -> Controller {
+               x11_clipboard_reader: UnboundedSender<ClipboardType>) -> Controller {
         (&monitor).send(QmpCommand::QmpCapabilities).unwrap();
         Controller {
             machine_config,
@@ -109,7 +109,7 @@ impl Controller {
             }
             State::Up => {
                 self.ga = State::Pinging;
-                self.write_ga(GaCmd::Ping);
+                self.write_ga(GaCmd::Ping(()));
                 true
             }
             _ => false,
@@ -127,10 +127,8 @@ impl Controller {
 
         // send GA all hotkeys we want to register
         for (i, hotkey) in self.machine_config.hotkeys.clone().into_iter().enumerate() {
-            self.write_ga(GaCmd::RegisterHotKey {
-                id: i as u32,
-                key: hotkey.key.to_windows(),
-            });
+            let (modifiers, key) = hotkey.key.to_windows();
+            self.write_ga(RegisterHotKey { id: i as u32, modifiers, key });
         }
 
         // Whenever a ga_hello message arrives, we know that the GA just started.
@@ -271,7 +269,7 @@ impl Controller {
 
     pub fn prepare_entry(&mut self) {
         // release modifiers
-        self.write_ga(GaCmd::ReleaseModifiers);
+        self.write_ga(GaCmd::ReleaseModifiers(()));
     }
 
     /// Suspends Windows
@@ -283,7 +281,7 @@ impl Controller {
 
         if self.ga != State::Suspending {
             // only need to write suspend command to qemu if the system is not already suspending
-            self.write_ga(GaCmd::Suspend);
+            self.write_ga(GaCmd::Suspend(()));
         }
 
         let (sender, receiver) = oneshot::channel();
@@ -324,31 +322,44 @@ impl Controller {
     }
 
     /// Paste on Windows, so we have to request contents
-    pub fn read_x11_clipboard(&mut self) {
-        (&self.x11_clipboard_reader).send(()).unwrap();
+    pub fn read_x11_clipboard(&mut self, kind: ClipboardType) {
+        (&self.x11_clipboard_reader).send(kind).unwrap();
+    }
+
+    /// Windows asked what kind of data our clipboard has, X11 responded
+    pub fn respond_x11_types(&mut self, types: Vec<ClipboardType>) {
+        if let Some(event) = self.win_clipboard_request.take() {
+            (&self.x11_clipboard).send(event.reply_types(types)).unwrap();
+        }
     }
 
     /// Pasting on Linux, Windows responded with contents
     pub fn respond_x11_clipboard(&mut self, buf: Vec<u8>) {
         if let Some(event) = self.win_clipboard_request.take() {
-            (&self.x11_clipboard).send(event.reply(buf)).unwrap();
+            (&self.x11_clipboard).send(event.reply_data(buf)).unwrap();
         }
     }
 
     /// We lost the X11 clipboard, so we grab the Windows keyboard
     pub fn grab_win_clipboard(&mut self) {
-        self.write_ga(GaCmd::GrabClipboard);
+        self.write_ga(ClipboardMessage::GrabClipboard(()));
     }
 
     /// Paste on Linux, so we have to request contents
     pub fn read_win_clipboard(&mut self, event: ClipboardRequestEvent) {
+        self.write_ga(ClipboardMessage::RequestClipboardContents(event.desired_type().into()));
         self.win_clipboard_request = Some(event);
-        self.write_ga(GaCmd::RequestClipboardContents(0));
+    }
+
+    // Linux asked what kind of data our clipboard has, Windows responded
+    pub fn respond_win_types(&mut self, types: Vec<ClipboardType>) {
+        let types = types.into_iter().map(Into::into).collect();
+        self.write_ga(ClipboardMessage::ContentTypes(ClipboardTypes { types }));
     }
 
     /// Pasting on Windows, X11 responded with contents
     pub fn respond_win_clipboard(&mut self, buf: Vec<u8>) {
-        self.write_ga(GaCmd::ClipboardContents(buf));
+        self.write_ga(ClipboardMessage::ClipboardContents(buf));
     }
 }
 

@@ -24,7 +24,8 @@ arch:
     - rustup
     - mono
     - cdrkit
-    - libx11
+    - libxcb
+    - nuget
   script:
     - rustup default "$RUST_TOOLCHAIN"
     - export PATH=$HOME/.cargo/bin:$PATH
