@@ -69,8 +69,14 @@ fn main() {
                         }
                     }
                 }
-                2 => *unwrap!(state_r.lock()) = State::Attached,
-                3 => *unwrap!(state_r.lock()) = State::Detached,
+                2 => {
+                    *unwrap!(state_r.lock()) = State::Attached;
+                    println!("Attached");
+                },
+                3 => {
+                    *unwrap!(state_r.lock()) = State::Detached;
+                    println!("Detached");
+                },
                 _ => {
                     println!("Got unknown Packet");
                     ::std::process::exit(1);
@@ -107,11 +113,12 @@ fn main() {
 fn register(con: &Connection, window: Window) {
     xproto::grab_server(&con).request_check().unwrap();
     let values = &[(xproto::CW_EVENT_MASK, xproto::EVENT_MASK_POINTER_MOTION | xproto::EVENT_MASK_SUBSTRUCTURE_NOTIFY)];
-    xproto::change_window_attributes_checked(&con, window, values).request_check().unwrap();
+    let _ = xproto::change_window_attributes_checked(&con, window, values).request_check();
     xproto::ungrab_server(&con).request_check().unwrap();
-    let reply = xproto::query_tree(con, window).get_reply().unwrap();
-    let children = reply.children();
-    for child in children {
-        register(con, *child);
+    if let Ok(reply) = xproto::query_tree(con, window).get_reply() {
+        let children = reply.children();
+        for child in children {
+            register(con, *child);
+        }
     }
 }
