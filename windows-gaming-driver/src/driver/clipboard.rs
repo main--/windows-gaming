@@ -164,20 +164,22 @@ impl X11Clipboard {
                         event.property(), xcb::ATOM_ANY, 0, ::std::u32::MAX // FIXME reasonable buffer size
                     ).get_reply();
 
-                    if let Ok(reply) = reply {
-                        if reply.type_() == xcb::ATOM_ATOM {
-                            // this is type info (targets)
+                    if event.target() == self.atoms.targets {
+                        // this is type info (targets)
+                        let formats = reply.as_ref().map(|reply| {
                             let formats: &[Atom] = reply.value();
                             let formats = formats.iter().filter_map(|&x| self.atom_to_cliptype(x)).collect();
+                            formats
+                        }).unwrap_or(Vec::new());
 
-                            controller.borrow_mut().respond_win_types(formats);
-                        } else {
-                            controller.borrow_mut().respond_win_clipboard(reply.value().to_vec());
-                        }
-
-                        xcb::delete_property(&self.connection, self.window, self.atoms.property);
+                        controller.borrow_mut().respond_win_types(formats);
                     } else {
-                        controller.borrow_mut().respond_win_clipboard(Vec::new());
+                        let contents = reply.as_ref().map(|x| x.value().to_vec()).unwrap_or(Vec::new());
+                        controller.borrow_mut().respond_win_clipboard(contents);
+                    }
+
+                    if reply.is_ok() {
+                        xcb::delete_property(&self.connection, self.window, self.atoms.property);
                     }
                 }
                 PROPERTY_NOTIFY => trace!("Ignoring PROPERTY_NOTIFY event"),
