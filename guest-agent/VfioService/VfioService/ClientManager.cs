@@ -12,7 +12,6 @@ using System.Windows.Forms;
 using ClientpipeProtocol;
 using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
-using Point = System.Drawing.Point;
 
 namespace VfioService
 {
@@ -56,7 +55,7 @@ namespace VfioService
                             HandleClipboardMessage(outCmd.Clipboard);
                             break;
                         case GaCmdOut.MessageOneofCase.SetMousePosition:
-                            Cursor.Position = new Point(outCmd.SetMousePosition.X, outCmd.SetMousePosition.Y);
+                            Cursor.Position = new System.Drawing.Point(outCmd.SetMousePosition.X, outCmd.SetMousePosition.Y);
                             break;
                     }
                 }

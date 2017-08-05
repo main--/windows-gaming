@@ -16,23 +16,18 @@ namespace VfioService
         private const int WH_MOUSE_LL = 14;
         private const int WM_MOUSEMOVE = 0x0200;
 
-        private LowLevelMouseProc callback;
-        private IntPtr hookId = IntPtr.Zero;
+        private LowLevelMouseProc Callback;
+        private IntPtr HookId = IntPtr.Zero;
         private ClientManager ClientManager;
 
         public MouseHook(ClientManager clientManager)
         {
             ClientManager = clientManager;
-            callback = HookCallback;
+            Callback = HookCallback;
             SetProcessDpiAwareness(ProcessDPIAwareness.ProcessPerMonitorDPIAware);
             Process curProcess = Process.GetCurrentProcess();
             ProcessModule curModule = curProcess.MainModule;
-            hookId = SetWindowsHookEx(WH_MOUSE_LL, callback, GetModuleHandle(curModule.ModuleName), 0);
-        }
-
-        ~MouseHook()
-        {
-            UnhookWindowsHookEx(hookId);
+            HookId = SetWindowsHookEx(WH_MOUSE_LL, Callback, GetModuleHandle(curModule.ModuleName), 0);
         }
 
         private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
@@ -52,7 +47,7 @@ namespace VfioService
                     ClientManager.MouseEdged(hookStruct.pt.x, hookStruct.pt.y);
                 }
             }
-            return CallNextHookEx(hookId, nCode, wParam, lParam);
+            return CallNextHookEx(HookId, nCode, wParam, lParam);
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -76,7 +71,7 @@ namespace VfioService
 
         [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern IntPtr SetWindowsHookEx(int idHook,
-            LowLevelMouseProc lpfn, IntPtr hMod, uint dwThreadId);
+            [MarshalAs(UnmanagedType.FunctionPtr)] LowLevelMouseProc lpfn, IntPtr hMod, uint dwThreadId);
 
         [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
