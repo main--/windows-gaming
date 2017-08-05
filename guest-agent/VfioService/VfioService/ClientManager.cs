@@ -23,12 +23,14 @@ namespace VfioService
 
         public object WriteLock { get; } = new object();
         private readonly MainForm MainForm;
+        private readonly MouseHook MouseHook;
 
         public ClientManager(MainForm mainForm)
         {
             TcpClient = new TcpClient("10.0.2.1", 31337);
             Stream = TcpClient.GetStream();
             MainForm = mainForm;
+            MouseHook = new MouseHook(this);
 
             new Thread(() =>
             {

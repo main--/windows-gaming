@@ -11,37 +11,31 @@ using Point = System.Drawing.Point;
 
 namespace VfioService
 {
-    public class InterceptMouse
+    public class MouseHook
     {
         private const int WH_MOUSE_LL = 14;
         private const int WM_MOUSEMOVE = 0x0200;
 
-        private static LowLevelMouseProc _proc = HookCallback;
-        private static IntPtr _hookID = IntPtr.Zero;
-        public static ClientManager ClientManager { get; set; }
+        private LowLevelMouseProc callback;
+        private IntPtr hookId = IntPtr.Zero;
+        private ClientManager ClientManager;
 
-        public static void Start()
+        public MouseHook(ClientManager clientManager)
         {
+            ClientManager = clientManager;
+            callback = HookCallback;
             SetProcessDpiAwareness(ProcessDPIAwareness.ProcessPerMonitorDPIAware);
-            _hookID = SetHook(_proc);
+            Process curProcess = Process.GetCurrentProcess();
+            ProcessModule curModule = curProcess.MainModule;
+            hookId = SetWindowsHookEx(WH_MOUSE_LL, callback, GetModuleHandle(curModule.ModuleName), 0);
         }
-        public static void Stop()
+
+        ~MouseHook()
         {
-            UnhookWindowsHookEx(_hookID);
+            UnhookWindowsHookEx(hookId);
         }
 
-        private static IntPtr SetHook(LowLevelMouseProc proc)
-        {
-            using (Process curProcess = Process.GetCurrentProcess())
-            using (ProcessModule curModule = curProcess.MainModule)
-            {
-                return SetWindowsHookEx(WH_MOUSE_LL, proc, GetModuleHandle(curModule.ModuleName), 0);
-            }
-        }
-
-        private delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
-
-        private static IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
+        private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
         {
             if (nCode >= 0 && wParam.ToInt32() == WM_MOUSEMOVE)
             {
@@ -49,6 +43,8 @@ namespace VfioService
                 var inside = false;
                 foreach (var s in Screen.AllScreens)
                 {
+                    // When a border is hit, the x and y coordinates are outside of the screen's bounds.
+                    // If hitting the left border, a negative x value will be returned.
                     inside |= s.Bounds.Contains(new Point(hookStruct.pt.x, hookStruct.pt.y));
                 }
                 if (!inside)
@@ -56,9 +52,8 @@ namespace VfioService
                     ClientManager.MouseEdged(hookStruct.pt.x, hookStruct.pt.y);
                 }
             }
-            return CallNextHookEx(_hookID, nCode, wParam, lParam);
+            return CallNextHookEx(hookId, nCode, wParam, lParam);
         }
-
 
         [StructLayout(LayoutKind.Sequential)]
         private struct POINT
@@ -76,6 +71,8 @@ namespace VfioService
             public uint time;
             public IntPtr dwExtraInfo;
         }
+
+        private delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
 
         [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
         private static extern IntPtr SetWindowsHookEx(int idHook,
