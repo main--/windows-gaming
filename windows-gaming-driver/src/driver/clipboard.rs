@@ -159,10 +159,12 @@ impl X11Clipboard {
                 }
                 SELECTION_NOTIFY => {
                     let event: &SelectionNotifyEvent = unsafe { xcb::cast_event(&event) };
-                    if let Ok(reply) = xcb::get_property(
+                    let reply = xcb::get_property(
                         &self.connection, false, self.window,
                         event.property(), xcb::ATOM_ANY, 0, ::std::u32::MAX // FIXME reasonable buffer size
-                    ).get_reply() {
+                    ).get_reply();
+
+                    if let Ok(reply) = reply {
                         if reply.type_() == xcb::ATOM_ATOM {
                             // this is type info (targets)
                             let formats: &[Atom] = reply.value();
