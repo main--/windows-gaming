@@ -1,5 +1,12 @@
+extern crate xdg;
 extern crate xcb;
 extern crate byteorder;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_yaml;
+
+mod config;
 
 use std::os::unix::net::UnixStream;
 use std::io::Write;
@@ -10,6 +17,8 @@ use std::sync::{Arc, Mutex};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use xcb::Connection;
 use xcb::xproto::{self, Window};
+
+use config::Config;
 
 macro_rules! unwrap {
     ($e:expr) => {
@@ -32,7 +41,11 @@ enum State {
 }
 
 fn main() {
-    let mut writer = UnixStream::connect("/run/user/1000/windows-gaming-driver/control.sock").unwrap();
+    let xdg_dir = xdg::BaseDirectories::with_prefix("windows-gaming-driver").unwrap();
+    let cfg_file = xdg_dir.place_config_file("x11-edge-grab.yml").unwrap();
+    let config = Config::load(cfg_file).unwrap();
+    let control_socket = xdg_dir.place_runtime_file("control.sock").unwrap();
+    let mut writer = UnixStream::connect(control_socket).unwrap();
     let mut reader = writer.try_clone().unwrap();
     let (con, _) = Connection::connect(None).unwrap();
     let root = con.get_setup().roots().take(1).next().unwrap().root();
@@ -40,43 +53,47 @@ fn main() {
     let state = Arc::new(Mutex::new(State::Detached));
 
     let state_r = state.clone();
+    let cfg = config.clone();
     thread::spawn(move || {
         loop {
             match unwrap!(reader.read_u8()) {
                 1 => {
-                    let x = unwrap!(reader.read_i32::<LittleEndian>());
-                    let y = unwrap!(reader.read_i32::<LittleEndian>());
+                    let xwin = unwrap!(reader.read_i32::<LittleEndian>());
+                    let ywin = unwrap!(reader.read_i32::<LittleEndian>());
                     if *unwrap!(state_r.lock()) != State::Attached {
                         continue;
                     }
-                    println!("{}:{}", x, y);
-                    if x <= 0 && y >= 540 && y < 1080+540
-                        || x >= 3839 && y >= 540 && y < 1080+540 {
-                        println!("exit");
-                        let x = x + 1920;
+                    // for now we only support one windows monitor
+                    let windows_monitor = cfg.monitors.iter().find(|m| m.is_windows).unwrap();
+                    // transform to linux coordinates
+                    let right = xwin >= windows_monitor.bounds.width - 1;
+                    let down = ywin >= windows_monitor.bounds.height - 1;
+                    let xlin = if right && !windows_monitor.connected {
+                        xwin + windows_monitor.bounds.x - windows_monitor.bounds.width
+                    } else {
+                        xwin + windows_monitor.bounds.x
+                    };
+                    let ylin = if down && !windows_monitor.connected {
+                        ywin + windows_monitor.bounds.y - windows_monitor.bounds.height
+                    } else {
+                        ywin + windows_monitor.bounds.y
+                    };
+                    if cfg.monitors.iter().any(|m| m.bounds.contains((xlin, ylin)) && !m.is_windows) {
                         unwrap!(reader.write_u8(4));
-                        println!("written");
                         unwrap!(reader.flush());
                         *unwrap!(state_r.lock()) = State::TryDetach;
-                        println!("flushed");
                         let mut cmd = Command::new("xdotool");
                         cmd.arg("mousemove")
-                            .arg(x.to_string())
-                            .arg(y.to_string());
+                            .arg(xlin.to_string())
+                            .arg(ylin.to_string());
                         if !unwrap!(cmd.status()).success() {
                             println!("Got nonzero exit status");
                             ::std::process::exit(1);
                         }
                     }
                 }
-                2 => {
-                    *unwrap!(state_r.lock()) = State::Attached;
-                    println!("Attached");
-                },
-                3 => {
-                    *unwrap!(state_r.lock()) = State::Detached;
-                    println!("Detached");
-                },
+                2 => *unwrap!(state_r.lock()) = State::Attached,
+                3 => *unwrap!(state_r.lock()) = State::Detached,
                 _ => {
                     println!("Got unknown Packet");
                     ::std::process::exit(1);
@@ -84,6 +101,8 @@ fn main() {
             }
         }
     });
+    // initialize with first non-windows monitor to avoid bugs
+    let mut old_monitor = config.monitors.iter().find(|m| !m.is_windows).unwrap();
     while let Some(evt) = con.wait_for_event() {
         match evt.response_type() {
             xproto::MOTION_NOTIFY => {
@@ -92,15 +111,24 @@ fn main() {
                 }
                 let query = xproto::query_pointer(&con, root);
                 let reply = query.get_reply().unwrap();
-                let x = reply.root_x();
-                let y = reply.root_y();
-                if x >= 1920 && x < 1920+3840 {
-                    println!("entry: {}:{}", x, y);
+                let x = reply.root_x() as i32;
+                let y = reply.root_y() as i32;
+                let monitor = config.monitors.iter().find(|m| m.bounds.contains((x,y)))
+                    .expect("The mouse is not on a monitor???");
+                if monitor.is_windows && monitor != old_monitor {
+                    let right = old_monitor.bounds.x > monitor.bounds.x + monitor.bounds.width - 1;
+                    let x = if right && !monitor.connected {
+                        x - monitor.bounds.x + monitor.bounds.width - 1
+                    } else {
+                        x - monitor.bounds.x
+                    };
+                    let y = y + monitor.bounds.y;
                     writer.write_u8(8).unwrap();
-                    writer.write_i32::<LittleEndian>(x as i32 - 1920).unwrap();
-                    writer.write_i32::<LittleEndian>(y as i32 + 540).unwrap();
+                    writer.write_i32::<LittleEndian>(x).unwrap();
+                    writer.write_i32::<LittleEndian>(y).unwrap();
                     *state.lock().unwrap() = State::TryAttach;
                 }
+                old_monitor = monitor;
             }
             xproto::CREATE_NOTIFY => {
                 register(&con, root);
