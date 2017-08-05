@@ -15,7 +15,8 @@ $(DRIVER):
 	cd windows-gaming-driver && cargo build --release --locked
 
 $(GA_EXE): guest-agent/VfioService/VfioService.sln $(wildcard guest-agent/VfioService/VfioService/*.*) $(wildcard guest-agent/VfioService/VfioService/Properties/*)
-	cd guest-agent && xbuild /p:Configuration=Release VfioService/VfioService.sln
+	cd guest-agent/VfioService && nuget restore
+	xbuild /p:Configuration=Release guest-agent/VfioService/VfioService.sln
 	cp --preserve=timestamps guest-agent/VfioService/VfioService/bin/x86/Release/VfioService.exe guest-agent
 
 $(GA_ISO): $(GA_EXE) guest-agent/install.bat guest-agent/uninstall.bat
