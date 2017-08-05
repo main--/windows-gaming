@@ -13,8 +13,8 @@ use futures::future;
 
 use config::{UsbId, UsbPort, UsbBinding, MachineConfig, HotKeyAction, Action};
 use util;
-use driver::clientpipe::{GaCmdOut as GaCmd, ClipboardMessage, ClipboardType, ClipboardTypes, RegisterHotKey, Point};
-use driver::control::ControlCmdOut as ControlCmd;
+use driver::clientpipe::{GaCmdOut, ClipboardMessage, ClipboardType, ClipboardTypes, RegisterHotKey, Point};
+use driver::control::ControlCmdOut;
 use driver::monitor::QmpCommand;
 use driver::sd_notify;
 use driver::libinput::Input;
@@ -42,7 +42,7 @@ enum State {
 enum IoState {
     Detached,
     LightEntry,
-    TemporaryLightEntry(UnboundedSender<ControlCmd>),
+    TemporaryLightEntry(UnboundedSender<ControlCmdOut>),
     AwaitingUpgrade,
     FullEntry,
 }
@@ -64,17 +64,17 @@ pub struct Controller {
 
     // write-only
     monitor: UnboundedSender<QmpCommand>,
-    clientpipe: UnboundedSender<GaCmd>,
+    clientpipe: UnboundedSender<GaCmdOut>,
 }
 
 impl Controller {
-    fn write_ga<C: Into<GaCmd>>(&mut self, cmd: C) {
+    fn write_ga<C: Into<GaCmdOut>>(&mut self, cmd: C) {
         (&self.clientpipe).send(cmd.into()).unwrap();
     }
 
     pub fn new(machine_config: MachineConfig,
                monitor: UnboundedSender<QmpCommand>,
-               clientpipe: UnboundedSender<GaCmd>,
+               clientpipe: UnboundedSender<GaCmdOut>,
                input: Rc<RefCell<Input>>,
                x11_clipboard: UnboundedSender<ClipboardRequestResponse>,
                x11_clipboard_grabber: UnboundedSender<()>,
@@ -114,7 +114,7 @@ impl Controller {
             }
             State::Up => {
                 self.ga = State::Pinging;
-                self.write_ga(GaCmd::Ping(()));
+                self.write_ga(GaCmdOut::Ping(()));
                 true
             }
             _ => false,
@@ -221,11 +221,11 @@ impl Controller {
         }
     }
 
-    pub fn temporary_entry(&mut self, sender: UnboundedSender<ControlCmd>, x: i32, y: i32) -> bool {
+    pub fn temporary_entry(&mut self, sender: UnboundedSender<ControlCmdOut>, x: i32, y: i32) -> bool {
         match self.ga {
             State::Up | State::Pinging => match self.io_state {
                 IoState::Detached => {
-                    self.write_ga(GaCmd::SetMousePosition(Point { x, y }));
+                    self.write_ga(GaCmdOut::SetMousePosition(Point { x, y }));
                     self.light_attach();
                     self.io_state = IoState::TemporaryLightEntry(sender);
                     true
@@ -257,7 +257,6 @@ impl Controller {
         }
     }
 
-
     /// Attaches all configured devices regardless of GA state
     pub fn io_force_attach(&mut self) {
         debug!("full entry");
@@ -268,7 +267,7 @@ impl Controller {
             IoState::AwaitingUpgrade | IoState::LightEntry => self.input.borrow_mut().suspend(),
             IoState::TemporaryLightEntry(ref mut sender) => {
                 self.input.borrow_mut().suspend();
-                sender.send(ControlCmd::TemporaryLightDetached).unwrap();
+                sender.send(ControlCmdOut::TemporaryLightDetached).unwrap();
             }
             IoState::FullEntry => return,
         }
@@ -302,7 +301,7 @@ impl Controller {
 
     pub fn prepare_entry(&mut self) {
         // release modifiers
-        self.write_ga(GaCmd::ReleaseModifiers(()));
+        self.write_ga(GaCmdOut::ReleaseModifiers(()));
     }
 
     /// Suspends Windows
@@ -314,7 +313,7 @@ impl Controller {
 
         if self.ga != State::Suspending {
             // only need to write suspend command to qemu if the system is not already suspending
-            self.write_ga(GaCmd::Suspend(()));
+            self.write_ga(GaCmdOut::Suspend(()));
         }
 
         let (sender, receiver) = oneshot::channel();
@@ -397,7 +396,7 @@ impl Controller {
 
     pub fn mouse_edged(&mut self, x: i32, y: i32) {
         if let IoState::TemporaryLightEntry(ref mut sender) = self.io_state {
-            sender.send(ControlCmd::MouseEdged { x, y }).unwrap();
+            sender.send(ControlCmdOut::MouseEdged { x, y }).unwrap();
         }
     }
 }

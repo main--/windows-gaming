@@ -21,7 +21,6 @@ namespace VfioService
                 manager.ReportBoot();
 
                 var _ = form.Handle; // create form without showing
-                
                 Application.Run();
             }
         }

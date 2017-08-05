@@ -77,7 +77,7 @@ pub fn create<'a>(socket: StdUnixListener, handle: &'a Handle, controller: Rc<Re
             Box::new(future::ok(()))
         }).then(|_| Ok(()));
 
-        handle.spawn(writer.select(reader).map(|_| ()).map_err(|_| ()));
+        handle.spawn(writer.select(reader).then(|_| Ok(())));
         Ok(())
     });
     Box::new(handler)
