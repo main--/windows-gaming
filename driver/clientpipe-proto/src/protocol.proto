@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package clientpipe_protocol;
+
+import "google/protobuf/empty.proto";
+
+enum ClipboardType {
+  None = 0;
+  Text = 1;
+  Image = 2;
+}
+
+message ClipboardMessage {
+  oneof message {
+    google.protobuf.Empty grab_clipboard = 1;
+    ClipboardType request_clipboard_contents = 2;
+    ClipboardTypes content_types = 3;
+    bytes clipboard_contents = 4;
+  }
+}
+
+message ClipboardTypes {
+  repeated ClipboardType types = 1;
+}
+
+message RegisterHotKey {
+  uint32 id = 1;
+  uint32 modifiers = 2;
+  uint32 key = 3;
+}
+
+message Point {
+  int32 x = 1;
+  int32 y = 2;
+}
+
+message GaCmdOut {
+  oneof message {
+    google.protobuf.Empty ping = 1;
+    ClipboardMessage clipboard = 2;
+    google.protobuf.Empty release_modifiers = 16;
+    google.protobuf.Empty suspend = 17;
+    RegisterHotKey register_hot_key = 18;
+    Point set_mouse_position = 19;
+  }
+}
+
+message GaCmdIn {
+  oneof message {
+    google.protobuf.Empty pong = 1;
+    google.protobuf.Empty report_boot = 2;
+    ClipboardMessage clipboard = 3;
+    google.protobuf.Empty suspending = 16;
+    uint32 hot_key = 17;
+    string hot_key_binding_failed = 18;
+    Point mouse_edged = 19;
+  }
+}
