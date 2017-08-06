@@ -1,22 +1,17 @@
-DRIVER := windows-gaming-driver/target/release/windows-gaming-driver
-VFIO_UBIND := vfio-ubind/target/release/vfio-ubind
 GA_EXE := guest-agent/VfioService.exe
 GA_ISO := guest-agent/windows-gaming-ga.iso
 OVMF   := ovmf-x64/OVMF_CODE-pure-efi.fd ovmf-x64/OVMF_VARS-pure-efi.fd
 
-all: $(DRIVER) $(GA_ISO) $(OVMF) $(VFIO_UBIND)
+all: cargo $(GA_ISO) $(OVMF)
 
 clippy:
-	cd windows-gaming-driver && rustup run nightly cargo clippy
+	rustup run nightly cargo clippy
 
 test:
-	cd windows-gaming-driver && cargo test --release --locked && cargo test --locked
+	cargo test --all --release --locked && cargo test --all --locked
 
-$(DRIVER):
-	cd windows-gaming-driver && cargo build --release --locked
-
-$(VFIO_UBIND):
-	cd vfio-ubind && cargo build --release --locked
+cargo: # Simply always run cargo instead of tracking all the rs sources in here
+	cargo build --all --release --locked
 
 $(GA_EXE): guest-agent/VfioService/VfioService.sln $(wildcard guest-agent/VfioService/VfioService/*.*) $(wildcard guest-agent/VfioService/VfioService/Properties/*)
 	cd guest-agent/VfioService && nuget restore
@@ -25,7 +20,7 @@ $(GA_EXE): guest-agent/VfioService/VfioService.sln $(wildcard guest-agent/VfioSe
 	cp --preserve=timestamps guest-agent/VfioService/VfioService/bin/x86/Release/Google.Protobuf.dll guest-agent
 
 $(GA_ISO): $(GA_EXE) guest-agent/install.bat guest-agent/uninstall.bat
-	cd guest-agent && mkisofs -m VfioService -o windows-gaming-ga.iso -r -J -input-charset iso8859-1 -V "windows-gaming-ga" .
+	cd guest-agent && mkisofs -m VfioService -m .gitignore -m update-proto.bat -o windows-gaming-ga.iso -r -J -input-charset iso8859-1 -V "windows-gaming-ga" .
 
 ovmf.rpm:
 	curl -o ovmf.rpm "https://www.kraxel.org/repos/jenkins/edk2/$(shell curl -s 'https://www.kraxel.org/repos/jenkins/edk2/' | grep -Eo 'edk2.git-ovmf-x64-[-\.a-z0-9]+\.noarch\.rpm' | head -n1)"
@@ -34,21 +29,22 @@ ovmf-x64/OVMF_CODE-pure-efi%fd ovmf-x64/OVMF_VARS-pure-efi%fd: ovmf%rpm
 	rpm2cpio ovmf.rpm | bsdtar -xvmf - --strip-components 4 './usr/share/edk2.git/ovmf-x64/OVMF_CODE-pure-efi.fd' './usr/share/edk2.git/ovmf-x64/OVMF_VARS-pure-efi.fd'
 
 
-guest-agent/VfioService/VfioService/Protocol.cs:clientpipe-proto/src/protocol.proto
-	protoc clientpipe-proto/src/protocol.proto --csharp_out=guest-agent/VfioService/VfioService/
+guest-agent/VfioService/VfioService/Protocol.cs: windows-gaming/driver/clientpipe-proto/src/protocol.proto
+	protoc windows-gaming/driver/clientpipe-proto/src/protocol.proto --csharp_out=guest-agent/VfioService/VfioService/
 
 
 clean:
 	$(RM) ovmf.rpm $(OVMF)
 	$(RM) $(GA_EXE) $(GA_ISO)
 	cd guest-agent && xbuild /p:Configuration=Release /t:clean VfioService/VfioService.sln
-	cd windows-gaming-driver && cargo clean --release
+	cargo clean --release
 
 
 
 install: all
-	install -D $(DRIVER) $(DESTDIR)/usr/bin/windows-gaming-driver
-	install -D -m4755 $(VFIO_UBIND) $(DESTDIR)/usr/lib/windows-gaming/vfio-ubind
+	install -D target/release/windows-gaming $(DESTDIR)/usr/bin/windows-gaming
+	install -D target/release/windows-edge-grab $(DESTDIR)/usr/bin/windows-edge-grab
+	install -D -m4755 target/release/vfio-ubind $(DESTDIR)/usr/lib/windows-gaming/vfio-ubind
 	install -D -m644 ovmf-x64/OVMF_CODE-pure-efi.fd $(DESTDIR)/usr/lib/windows-gaming/ovmf-code.fd
 	install -D -m644 ovmf-x64/OVMF_VARS-pure-efi.fd $(DESTDIR)/usr/lib/windows-gaming/ovmf-vars.fd
 	install -D -m644 $(GA_ISO) $(DESTDIR)/usr/lib/windows-gaming/windows-gaming-ga.iso
@@ -60,4 +56,4 @@ install: all
 
 
 
-.PHONY: OVMF clean all install $(DRIVER) # Simply always run cargo instead of tracking all the rs sources in here
+.PHONY: OVMF clean all install cargo
