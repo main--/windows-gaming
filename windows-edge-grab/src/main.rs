@@ -42,7 +42,7 @@ enum State {
 
 fn main() {
     let xdg_dir = xdg::BaseDirectories::with_prefix("windows-gaming-driver").unwrap();
-    let cfg_file = xdg_dir.place_config_file("x11-edge-grab.yml").unwrap();
+    let cfg_file = xdg_dir.place_config_file("windows-edge-grab.yml").unwrap();
     let config = Config::load(cfg_file).unwrap();
     let control_socket = xdg_dir.place_runtime_file("control.sock").unwrap();
     let mut writer = UnixStream::connect(control_socket).unwrap();
