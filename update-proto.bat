@@ -6,4 +6,4 @@ IF %ERRORLEVEL% NEQ 0 (
   EXIT
 )
 
-protoc clientpipe-proto/src/protocol.proto --csharp_out=guest-agent\VfioService\VfioService\
+protoc windows-gaming/driver/clientpipe-proto/src/protocol.proto --csharp_out=guest-agent\VfioService\VfioService\
