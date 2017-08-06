@@ -1,6 +1,6 @@
 mod codec;
 
-pub use self::codec::ControlCmdOut;
+pub use self::codec::{ControlCmdOut, ControlCmdIn};
 
 use std::os::unix::net::{UnixListener as StdUnixListener};
 use std::io::Error;
@@ -14,7 +14,7 @@ use tokio_io::AsyncRead;
 use tokio_uds::UnixListener as TokioUnixListener;
 
 use controller::Controller;
-use self::codec::{Codec, ControlCmdIn};
+use self::codec::Codec;
 
 type Handler<'a> = Box<Future<Item=(), Error=Error> + 'a>;
 
