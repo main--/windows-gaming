@@ -1,8 +1,9 @@
 GA_EXE := guest-agent/VfioService.exe
 GA_ISO := guest-agent/windows-gaming-ga.iso
 OVMF   := ovmf-x64/OVMF_CODE-pure-efi.fd ovmf-x64/OVMF_VARS-pure-efi.fd
+BASH_COMPLETION := target/release/windows-gaming.bash-completion
 
-all: cargo $(GA_ISO) $(OVMF)
+all: cargo $(GA_ISO) $(OVMF) $(BASH_COMPLETION)
 
 clippy:
 	rustup run nightly cargo clippy
@@ -32,6 +33,8 @@ ovmf-x64/OVMF_CODE-pure-efi%fd ovmf-x64/OVMF_VARS-pure-efi%fd: ovmf%rpm
 guest-agent/VfioService/VfioService/Protocol.cs: windows-gaming/driver/clientpipe-proto/src/protocol.proto
 	protoc windows-gaming/driver/clientpipe-proto/src/protocol.proto --csharp_out=guest-agent/VfioService/VfioService/
 
+$(BASH_COMPLETION): cargo
+	cd target/release/ && ./windows-gaming --generate-bash-completions > windows-gaming.bash-completion
 
 clean:
 	$(RM) ovmf.rpm $(OVMF)
@@ -45,6 +48,7 @@ install: all
 	install -D target/release/windows-gaming $(DESTDIR)/usr/bin/windows-gaming
 	install -D target/release/windows-edge-grab $(DESTDIR)/usr/bin/windows-edge-grab
 	install -D -m4755 target/release/vfio-ubind $(DESTDIR)/usr/lib/windows-gaming/vfio-ubind
+	install -D -m644 $(BASH_COMPLETION) $(DESTDIR)/usr/share/bash-completion/completions/windows-gaming
 	install -D -m644 ovmf-x64/OVMF_CODE-pure-efi.fd $(DESTDIR)/usr/lib/windows-gaming/ovmf-code.fd
 	install -D -m644 ovmf-x64/OVMF_VARS-pure-efi.fd $(DESTDIR)/usr/lib/windows-gaming/ovmf-vars.fd
 	install -D -m644 $(GA_ISO) $(DESTDIR)/usr/lib/windows-gaming/windows-gaming-ga.iso
