@@ -27,6 +27,7 @@ extern crate prost;
 extern crate common;
 
 pub mod qemu;
+pub use control::ControlCmdIn;
 
 mod control;
 mod monitor;
