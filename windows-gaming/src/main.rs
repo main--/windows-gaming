@@ -6,7 +6,7 @@ extern crate env_logger;
 extern crate time;
 extern crate common;
 extern crate driver;
-extern crate setup;
+extern crate wizard;
 
 mod logger;
 
@@ -65,6 +65,6 @@ fn main() {
 
     match cfg {
         Some(ref cfg) if cfg.setup.is_none() => driver::run(cfg, &workdir_path, Path::new(DATA_FOLDER)),
-        cfg => setup::run(cfg, &config_path, &workdir_path, Path::new(DATA_FOLDER)),
+        cfg => wizard::run(cfg, &config_path, &workdir_path, Path::new(DATA_FOLDER)),
     }
 }
