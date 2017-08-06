@@ -12,9 +12,9 @@ mod logger;
 
 use std::path::Path;
 use std::os::unix::net::UnixStream;
-use std::io::Write;
+use std::io::{self, Write};
 
-use clap::{Arg, App, SubCommand, AppSettings, ArgGroup};
+use clap::{Arg, App, SubCommand, AppSettings, ArgGroup, Shell};
 use nix::unistd;
 
 use common::config::Config;
@@ -29,7 +29,7 @@ const DATA_FOLDER: &'static str = "/usr/lib/windows-gaming";
 fn main() {
     logger::init().expect("Error initializing env_logger");
 
-    let matches = App::new(crate_name!())
+    let mut cli = App::new(crate_name!())
         .version(crate_version!())
         .about("Windows Gaming")
         .setting(AppSettings::DeriveDisplayOrder)
@@ -42,6 +42,10 @@ fn main() {
             .help("Config to use")
             .takes_value(true)
             .global(true)
+        ).arg(Arg::with_name("generate-bash-completions")
+            .long("generate-bash-completions")
+            .hidden(true)
+            .takes_value(false)
         ).subcommand(SubCommand::with_name("run")
             .about("Starts Windows")
             .visible_alias("start")
@@ -76,7 +80,13 @@ fn main() {
             ).subcommand(SubCommand::with_name("suspend")
                 .about("Suspends Windows")
             )
-        ).get_matches();
+        );
+    let matches = cli.clone().get_matches();
+
+    if matches.is_present("generate-bash-completions") {
+        cli.gen_completions_to(crate_name!(), Shell::Bash, &mut io::stdout());
+        return;
+    }
 
     let mode = if unistd::getuid() == 0 {
         debug!("Running in system mode");
