@@ -20,7 +20,7 @@ $(GA_EXE): guest-agent/VfioService/VfioService.sln $(wildcard guest-agent/VfioSe
 	cp --preserve=timestamps guest-agent/VfioService/VfioService/bin/x86/Release/Google.Protobuf.dll guest-agent
 
 $(GA_ISO): $(GA_EXE) guest-agent/install.bat guest-agent/uninstall.bat
-	cd guest-agent && mkisofs -m VfioService -o windows-gaming-ga.iso -r -J -input-charset iso8859-1 -V "windows-gaming-ga" .
+	cd guest-agent && mkisofs -m VfioService -m .gitignore -m update-proto.bat -o windows-gaming-ga.iso -r -J -input-charset iso8859-1 -V "windows-gaming-ga" .
 
 ovmf.rpm:
 	curl -o ovmf.rpm "https://www.kraxel.org/repos/jenkins/edk2/$(shell curl -s 'https://www.kraxel.org/repos/jenkins/edk2/' | grep -Eo 'edk2.git-ovmf-x64-[-\.a-z0-9]+\.noarch\.rpm' | head -n1)"
