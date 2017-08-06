@@ -11,4 +11,4 @@ env_logger = "0.4.3"
 time = "0.1.37"
 common = { path = "common" }
 driver = { path = "driver" }
-setup = { path = "setup" }
+wizard = { path = "wizard" }
