@@ -14,7 +14,7 @@ test:
 cargo: # Simply always run cargo instead of tracking all the rs sources in here
 	cargo build --all --release --locked
 
-$(GA_EXE): guest-agent/VfioService/VfioService.sln $(wildcard guest-agent/VfioService/VfioService/*.*) $(wildcard guest-agent/VfioService/VfioService/Properties/*)
+$(GA_EXE): guest-agent/VfioService/VfioService.sln $(wildcard guest-agent/VfioService/VfioService/*.*) $(wildcard guest-agent/VfioService/VfioService/Properties/*) guest-agent/VfioService/VfioService/Resources/Version.txt
 	cd guest-agent/VfioService && nuget restore
 	xbuild /p:Configuration=Release guest-agent/VfioService/VfioService.sln
 	cp --preserve=timestamps guest-agent/VfioService/VfioService/bin/x86/Release/VfioService.exe guest-agent
