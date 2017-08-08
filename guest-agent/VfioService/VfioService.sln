@@ -5,6 +5,8 @@ VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VfioService", "VfioService\VfioService.csproj", "{E9E97AB0-FCA9-4541-A039-18CC5BFDAC58}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Loader", "Loader\Loader.csproj", "{2AE96B06-36C4-425B-BA80-55D7154FB195}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x86 = Debug|x86
@@ -15,6 +17,10 @@ Global
 		{E9E97AB0-FCA9-4541-A039-18CC5BFDAC58}.Debug|x86.Build.0 = Debug|x86
 		{E9E97AB0-FCA9-4541-A039-18CC5BFDAC58}.Release|x86.ActiveCfg = Release|x86
 		{E9E97AB0-FCA9-4541-A039-18CC5BFDAC58}.Release|x86.Build.0 = Release|x86
+		{2AE96B06-36C4-425B-BA80-55D7154FB195}.Debug|x86.ActiveCfg = Debug|x86
+		{2AE96B06-36C4-425B-BA80-55D7154FB195}.Debug|x86.Build.0 = Debug|x86
+		{2AE96B06-36C4-425B-BA80-55D7154FB195}.Release|x86.ActiveCfg = Release|x86
+		{2AE96B06-36C4-425B-BA80-55D7154FB195}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

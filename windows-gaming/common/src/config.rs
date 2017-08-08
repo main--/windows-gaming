@@ -100,6 +100,7 @@ pub struct Config {
     pub samba: Option<SambaConfig>,
     pub setup: Option<SetupConfig>,
     pub additional_qemu_cmdline: Option<String>,
+    pub data_directory_override: Option<String>,
 }
 
 #[serde(default)]
