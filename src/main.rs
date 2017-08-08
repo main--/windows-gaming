@@ -120,9 +120,14 @@ fn main() {
 
     let control_socket = xdg_dirs.place_runtime_file("control.sock").unwrap();
 
+    let data_folder = Path::new(match cfg {
+        Some(Config { data_directory_override: Some(ref x), .. }) => x.as_str(),
+        _ => DATA_FOLDER,
+    }).to_owned();
+
     match matches.subcommand() {
-        ("run", _) => driver::run(&cfg.unwrap(), &workdir_path, Path::new(DATA_FOLDER)),
-        ("wizard", _) => wizard::run(cfg, &config_path, &workdir_path, Path::new(DATA_FOLDER)),
+        ("run", _) => driver::run(&cfg.unwrap(), &workdir_path, &data_folder),
+        ("wizard", _) => wizard::run(cfg, &config_path, &workdir_path, &data_folder),
         ("control", cmd) => {
             match cmd.unwrap().subcommand() {
                 ("attach", cmd) => {
@@ -144,8 +149,8 @@ fn main() {
             }
         }
         _ => match cfg {
-            Some(ref cfg) if cfg.setup.is_none() => driver::run(cfg, &workdir_path, Path::new(DATA_FOLDER)),
-            cfg => wizard::run(cfg, &config_path, &workdir_path, Path::new(DATA_FOLDER)),
+            Some(ref cfg) if cfg.setup.is_none() => driver::run(cfg, &workdir_path, &data_folder),
+            cfg => wizard::run(cfg, &config_path, &workdir_path, &data_folder),
         }
     }
 }
