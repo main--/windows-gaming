@@ -46,9 +46,6 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
         debug!("Samba started");
     }
 
-    let ga = data.join("windows-gaming-ga.iso");
-    assert!(ga.exists());
-
     notify_systemd(false, "Starting qemu ...");
     trace!("starting qemu setup");
     let mut qemu = Command::new(QEMU);
@@ -71,9 +68,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
                          data.join("ovmf-code.fd").display()),
                 "-drive",
                 &format!("if=pflash,format=raw,file={}", efivars_file.display()),
-                "-device", "virtio-scsi-pci,id=scsi",
-                "-drive", &format!("if=none,id=iso,media=cdrom,file={}", ga.display()),
-                "-device", "scsi-cd,id=cdrom,drive=iso"]);
+                "-device", "virtio-scsi-pci,id=scsi"]);
     // "-monitor",
     // "telnet:127.0.0.1:31338,server,nowait"
 

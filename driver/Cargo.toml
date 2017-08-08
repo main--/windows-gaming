@@ -26,7 +26,6 @@ tokio-signal = "0.1"
 dbus = "0.5"
 input = "0.2"
 xcb = "0.8"
-semver = "0.7"
 prost = { git = "https://github.com/danburkert/prost.git" }
 clientpipe-proto = { path = "clientpipe-proto" }
 common = { path = "../common" }
