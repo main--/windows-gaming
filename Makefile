@@ -14,11 +14,10 @@ test:
 cargo: # Simply always run cargo instead of tracking all the rs sources in here
 	cargo build --all --release --locked
 
-$(GA_EXE): guest-agent/VfioService/VfioService.sln $(wildcard guest-agent/VfioService/VfioService/*.*) $(wildcard guest-agent/VfioService/VfioService/Properties/*) guest-agent/VfioService/VfioService/Resources/Version.txt
+$(GA_EXE): guest-agent/VfioService/VfioService.sln $(wildcard guest-agent/VfioService/VfioService/*.*) $(wildcard guest-agent/VfioService/VfioService/Properties/*) guest-agent/VfioService/VfioService/Resources/Version.txt $(wildcard guest-agent/VfioService/Loader/*.*)
 	cd guest-agent/VfioService && nuget restore
 	xbuild /p:Configuration=Release guest-agent/VfioService/VfioService.sln
-	cp --preserve=timestamps guest-agent/VfioService/VfioService/bin/x86/Release/VfioService.exe guest-agent
-	cp --preserve=timestamps guest-agent/VfioService/VfioService/bin/x86/Release/Google.Protobuf.dll guest-agent
+	cp --preserve=timestamps guest-agent/VfioService/Loader/bin/Release/Loader.exe guest-agent/VfioService/VfioService/bin/x86/Release/VfioService.exe guest-agent/VfioService/VfioService/bin/x86/Release/Google.Protobuf.dll guest-agent
 
 $(GA_ISO): $(GA_EXE) guest-agent/install.bat guest-agent/uninstall.bat
 	cd guest-agent && mkisofs -m VfioService -m .gitignore -m update-proto.bat -o windows-gaming-ga.iso -r -J -input-charset iso8859-1 -V "windows-gaming-ga" .
