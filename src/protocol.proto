@@ -42,14 +42,13 @@ message GaCmdOut {
     google.protobuf.Empty suspend = 17;
     RegisterHotKey register_hot_key = 18;
     Point set_mouse_position = 19;
-    google.protobuf.Empty auto_update = 20;
   }
 }
 
 message GaCmdIn {
   oneof message {
     google.protobuf.Empty pong = 1;
-    string report_boot = 2;
+    google.protobuf.Empty report_boot = 2;
     ClipboardMessage clipboard = 3;
     google.protobuf.Empty suspending = 16;
     uint32 hot_key = 17;
