@@ -23,7 +23,6 @@ extern crate tokio_signal;
 extern crate dbus as libdbus;
 extern crate input;
 extern crate xcb;
-extern crate semver;
 extern crate prost;
 extern crate common;
 
