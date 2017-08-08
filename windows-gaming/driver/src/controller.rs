@@ -10,6 +10,7 @@ use futures::unsync::mpsc::UnboundedSender;
 use futures::unsync::oneshot::{self, Sender};
 use futures::Future;
 use futures::future;
+use semver::Version;
 
 use common::config::{UsbId, UsbPort, UsbBinding, MachineConfig, HotKeyAction, Action};
 use common::util;
@@ -127,8 +128,24 @@ impl Controller {
         }
     }
 
-    pub fn ga_hello(&mut self) -> bool {
+    pub fn ga_hello(&mut self, version: String) -> bool {
         sd_notify::notify_systemd(true, "Ready");
+
+        // check for autoupdate
+        let latest = Version::parse(include_str!("../../../guest-agent/VfioService/VfioService/Resources/Version.txt")).unwrap();
+        match Version::parse(&version) {
+            Ok(version) => {
+                if version < latest {
+                    info!("GA is outdated, requesting autoupdate ...");
+                    self.write_ga(GaCmdOut::AutoUpdate(()));
+                    return false;
+                }
+            }
+            Err(e) => {
+                error!("GA sent invalid version {:?}: {}", version, e);
+                return false;
+            }
+        }
 
         // send GA all hotkeys we want to register
         for (i, hotkey) in self.machine_config.hotkeys.clone().into_iter().enumerate() {

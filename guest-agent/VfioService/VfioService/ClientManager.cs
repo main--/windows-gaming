@@ -1,17 +1,14 @@
-﻿using System;
+﻿using ClientpipeProtocol;
+using Google.Protobuf;
+using Google.Protobuf.WellKnownTypes;
+using System;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Drawing.Imaging;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Forms;
-using ClientpipeProtocol;
-using Google.Protobuf;
-using Google.Protobuf.WellKnownTypes;
 
 namespace VfioService
 {
@@ -57,9 +54,28 @@ namespace VfioService
                         case GaCmdOut.MessageOneofCase.SetMousePosition:
                             Cursor.Position = new System.Drawing.Point(outCmd.SetMousePosition.X, outCmd.SetMousePosition.Y);
                             break;
+                        case GaCmdOut.MessageOneofCase.AutoUpdate:
+                            AutoUpdate();
+                            break;
                     }
                 }
             }).Start();
+        }
+
+        private void AutoUpdate()
+        {
+            var drive = DriveInfo.GetDrives().Single(x => x.DriveType == DriveType.CDRom && x.VolumeLabel == "windows-gaming-g");
+            var installer = drive.RootDirectory.GetFiles("install.bat").Single();
+            var psi = new ProcessStartInfo
+            {
+                CreateNoWindow = true,
+                FileName = installer.FullName,
+                Arguments = "update",
+                UseShellExecute = false,
+                WorkingDirectory = drive.RootDirectory.FullName,
+            };
+            Process.Start(psi);
+            Environment.Exit(0);
         }
 
         private void HandleClipboardMessage(ClipboardMessage msg)
@@ -161,7 +177,7 @@ namespace VfioService
         {
             Send(new GaCmdIn
             {
-                ReportBoot = new Empty(),
+                ReportBoot = Properties.Resources.Version,
             });
         }
 

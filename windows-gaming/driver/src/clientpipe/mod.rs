@@ -24,8 +24,8 @@ type Read = Box<Stream<Item=GaCmdIn, Error=Error>>;
 type Handler<'a> = Box<Future<Item=(), Error=Error> + 'a>;
 
 pub struct Clientpipe {
-    pub send: Option<Send>,
-    pub sender: Option<Sender>,
+    send: Option<Send>,
+    sender: Option<Sender>,
     read: Option<Read>,
 }
 
@@ -58,10 +58,10 @@ impl Clientpipe {
             let mut controller = controller_rc.borrow_mut();
 
             match cmd {
-                GaCmdIn::ReportBoot(()) => {
+                GaCmdIn::ReportBoot(version) => {
                     info!("client is now alive!");
 
-                    if controller.ga_hello() {
+                    if controller.ga_hello(version) {
                         let controller = controller_rc.clone();
                         let timer = Timer::default().interval(Duration::new(5, 0))
                             .map_err(|_| ())
@@ -89,10 +89,7 @@ impl Clientpipe {
                     Some(ClipboardMessage::ClipboardContents(buf)) => controller.respond_x11_clipboard(buf),
                     None => error!("Windows sent an empty clipboard message??"),
                 },
-                GaCmdIn::MouseEdged(Point { x, y }) => {
-                    trace!("Mouse Edged: {}:{}", x, y);
-                    controller.mouse_edged(x, y);
-                }
+                GaCmdIn::MouseEdged(Point { x, y }) => controller.mouse_edged(x, y),
             }
             Ok(())
         });

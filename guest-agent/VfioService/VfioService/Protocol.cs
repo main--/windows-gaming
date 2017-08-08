@@ -33,23 +33,24 @@ namespace ClientpipeProtocol {
             "DkNsaXBib2FyZFR5cGVzEjEKBXR5cGVzGAEgAygOMiIuY2xpZW50cGlwZV9w",
             "cm90b2NvbC5DbGlwYm9hcmRUeXBlIjwKDlJlZ2lzdGVySG90S2V5EgoKAmlk",
             "GAEgASgNEhEKCW1vZGlmaWVycxgCIAEoDRILCgNrZXkYAyABKA0iHQoFUG9p",
-            "bnQSCQoBeBgBIAEoBRIJCgF5GAIgASgFItQCCghHYUNtZE91dBImCgRwaW5n",
+            "bnQSCQoBeBgBIAEoBRIJCgF5GAIgASgFIoMDCghHYUNtZE91dBImCgRwaW5n",
             "GAEgASgLMhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5SAASOgoJY2xpcGJvYXJk",
             "GAIgASgLMiUuY2xpZW50cGlwZV9wcm90b2NvbC5DbGlwYm9hcmRNZXNzYWdl",
             "SAASMwoRcmVsZWFzZV9tb2RpZmllcnMYECABKAsyFi5nb29nbGUucHJvdG9i",
             "dWYuRW1wdHlIABIpCgdzdXNwZW5kGBEgASgLMhYuZ29vZ2xlLnByb3RvYnVm",
             "LkVtcHR5SAASPwoQcmVnaXN0ZXJfaG90X2tleRgSIAEoCzIjLmNsaWVudHBp",
             "cGVfcHJvdG9jb2wuUmVnaXN0ZXJIb3RLZXlIABI4ChJzZXRfbW91c2VfcG9z",
-            "aXRpb24YEyABKAsyGi5jbGllbnRwaXBlX3Byb3RvY29sLlBvaW50SABCCQoH",
-            "bWVzc2FnZSK9AgoHR2FDbWRJbhImCgRwb25nGAEgASgLMhYuZ29vZ2xlLnBy",
-            "b3RvYnVmLkVtcHR5SAASLQoLcmVwb3J0X2Jvb3QYAiABKAsyFi5nb29nbGUu",
-            "cHJvdG9idWYuRW1wdHlIABI6CgljbGlwYm9hcmQYAyABKAsyJS5jbGllbnRw",
-            "aXBlX3Byb3RvY29sLkNsaXBib2FyZE1lc3NhZ2VIABIsCgpzdXNwZW5kaW5n",
-            "GBAgASgLMhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5SAASEQoHaG90X2tleRgR",
-            "IAEoDUgAEiAKFmhvdF9rZXlfYmluZGluZ19mYWlsZWQYEiABKAlIABIxCgtt",
-            "b3VzZV9lZGdlZBgTIAEoCzIaLmNsaWVudHBpcGVfcHJvdG9jb2wuUG9pbnRI",
-            "AEIJCgdtZXNzYWdlKi4KDUNsaXBib2FyZFR5cGUSCAoETm9uZRAAEggKBFRl",
-            "eHQQARIJCgVJbWFnZRACYgZwcm90bzM="));
+            "aXRpb24YEyABKAsyGi5jbGllbnRwaXBlX3Byb3RvY29sLlBvaW50SAASLQoL",
+            "YXV0b191cGRhdGUYFCABKAsyFi5nb29nbGUucHJvdG9idWYuRW1wdHlIAEIJ",
+            "CgdtZXNzYWdlIqUCCgdHYUNtZEluEiYKBHBvbmcYASABKAsyFi5nb29nbGUu",
+            "cHJvdG9idWYuRW1wdHlIABIVCgtyZXBvcnRfYm9vdBgCIAEoCUgAEjoKCWNs",
+            "aXBib2FyZBgDIAEoCzIlLmNsaWVudHBpcGVfcHJvdG9jb2wuQ2xpcGJvYXJk",
+            "TWVzc2FnZUgAEiwKCnN1c3BlbmRpbmcYECABKAsyFi5nb29nbGUucHJvdG9i",
+            "dWYuRW1wdHlIABIRCgdob3Rfa2V5GBEgASgNSAASIAoWaG90X2tleV9iaW5k",
+            "aW5nX2ZhaWxlZBgSIAEoCUgAEjEKC21vdXNlX2VkZ2VkGBMgASgLMhouY2xp",
+            "ZW50cGlwZV9wcm90b2NvbC5Qb2ludEgAQgkKB21lc3NhZ2UqLgoNQ2xpcGJv",
+            "YXJkVHlwZRIICgROb25lEAASCAoEVGV4dBABEgkKBUltYWdlEAJiBnByb3Rv",
+            "Mw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Google.Protobuf.WellKnownTypes.EmptyReflection.Descriptor, },
           new pbr::GeneratedClrTypeInfo(new[] {typeof(global::ClientpipeProtocol.ClipboardType), }, new pbr::GeneratedClrTypeInfo[] {
@@ -57,7 +58,7 @@ namespace ClientpipeProtocol {
             new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.ClipboardTypes), global::ClientpipeProtocol.ClipboardTypes.Parser, new[]{ "Types_" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.RegisterHotKey), global::ClientpipeProtocol.RegisterHotKey.Parser, new[]{ "Id", "Modifiers", "Key" }, null, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.Point), global::ClientpipeProtocol.Point.Parser, new[]{ "X", "Y" }, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.GaCmdOut), global::ClientpipeProtocol.GaCmdOut.Parser, new[]{ "Ping", "Clipboard", "ReleaseModifiers", "Suspend", "RegisterHotKey", "SetMousePosition" }, new[]{ "Message" }, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.GaCmdOut), global::ClientpipeProtocol.GaCmdOut.Parser, new[]{ "Ping", "Clipboard", "ReleaseModifiers", "Suspend", "RegisterHotKey", "SetMousePosition", "AutoUpdate" }, new[]{ "Message" }, null, null),
             new pbr::GeneratedClrTypeInfo(typeof(global::ClientpipeProtocol.GaCmdIn), global::ClientpipeProtocol.GaCmdIn.Parser, new[]{ "Pong", "ReportBoot", "Clipboard", "Suspending", "HotKey", "HotKeyBindingFailed", "MouseEdged" }, new[]{ "Message" }, null, null)
           }));
     }
@@ -794,6 +795,9 @@ namespace ClientpipeProtocol {
         case MessageOneofCase.SetMousePosition:
           SetMousePosition = other.SetMousePosition.Clone();
           break;
+        case MessageOneofCase.AutoUpdate:
+          AutoUpdate = other.AutoUpdate.Clone();
+          break;
       }
 
     }
@@ -869,6 +873,17 @@ namespace ClientpipeProtocol {
       }
     }
 
+    /// <summary>Field number for the "auto_update" field.</summary>
+    public const int AutoUpdateFieldNumber = 20;
+    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
+    public global::Google.Protobuf.WellKnownTypes.Empty AutoUpdate {
+      get { return messageCase_ == MessageOneofCase.AutoUpdate ? (global::Google.Protobuf.WellKnownTypes.Empty) message_ : null; }
+      set {
+        message_ = value;
+        messageCase_ = value == null ? MessageOneofCase.None : MessageOneofCase.AutoUpdate;
+      }
+    }
+
     private object message_;
     /// <summary>Enum of possible cases for the "message" oneof.</summary>
     public enum MessageOneofCase {
@@ -879,6 +894,7 @@ namespace ClientpipeProtocol {
       Suspend = 17,
       RegisterHotKey = 18,
       SetMousePosition = 19,
+      AutoUpdate = 20,
     }
     private MessageOneofCase messageCase_ = MessageOneofCase.None;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -911,6 +927,7 @@ namespace ClientpipeProtocol {
       if (!object.Equals(Suspend, other.Suspend)) return false;
       if (!object.Equals(RegisterHotKey, other.RegisterHotKey)) return false;
       if (!object.Equals(SetMousePosition, other.SetMousePosition)) return false;
+      if (!object.Equals(AutoUpdate, other.AutoUpdate)) return false;
       if (MessageCase != other.MessageCase) return false;
       return true;
     }
@@ -924,6 +941,7 @@ namespace ClientpipeProtocol {
       if (messageCase_ == MessageOneofCase.Suspend) hash ^= Suspend.GetHashCode();
       if (messageCase_ == MessageOneofCase.RegisterHotKey) hash ^= RegisterHotKey.GetHashCode();
       if (messageCase_ == MessageOneofCase.SetMousePosition) hash ^= SetMousePosition.GetHashCode();
+      if (messageCase_ == MessageOneofCase.AutoUpdate) hash ^= AutoUpdate.GetHashCode();
       hash ^= (int) messageCase_;
       return hash;
     }
@@ -959,6 +977,10 @@ namespace ClientpipeProtocol {
         output.WriteRawTag(154, 1);
         output.WriteMessage(SetMousePosition);
       }
+      if (messageCase_ == MessageOneofCase.AutoUpdate) {
+        output.WriteRawTag(162, 1);
+        output.WriteMessage(AutoUpdate);
+      }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -981,6 +1003,9 @@ namespace ClientpipeProtocol {
       }
       if (messageCase_ == MessageOneofCase.SetMousePosition) {
         size += 2 + pb::CodedOutputStream.ComputeMessageSize(SetMousePosition);
+      }
+      if (messageCase_ == MessageOneofCase.AutoUpdate) {
+        size += 2 + pb::CodedOutputStream.ComputeMessageSize(AutoUpdate);
       }
       return size;
     }
@@ -1008,6 +1033,9 @@ namespace ClientpipeProtocol {
           break;
         case MessageOneofCase.SetMousePosition:
           SetMousePosition = other.SetMousePosition;
+          break;
+        case MessageOneofCase.AutoUpdate:
+          AutoUpdate = other.AutoUpdate;
           break;
       }
 
@@ -1075,6 +1103,15 @@ namespace ClientpipeProtocol {
             SetMousePosition = subBuilder;
             break;
           }
+          case 162: {
+            global::Google.Protobuf.WellKnownTypes.Empty subBuilder = new global::Google.Protobuf.WellKnownTypes.Empty();
+            if (messageCase_ == MessageOneofCase.AutoUpdate) {
+              subBuilder.MergeFrom(AutoUpdate);
+            }
+            input.ReadMessage(subBuilder);
+            AutoUpdate = subBuilder;
+            break;
+          }
         }
       }
     }
@@ -1110,7 +1147,7 @@ namespace ClientpipeProtocol {
           Pong = other.Pong.Clone();
           break;
         case MessageOneofCase.ReportBoot:
-          ReportBoot = other.ReportBoot.Clone();
+          ReportBoot = other.ReportBoot;
           break;
         case MessageOneofCase.Clipboard:
           Clipboard = other.Clipboard.Clone();
@@ -1150,11 +1187,11 @@ namespace ClientpipeProtocol {
     /// <summary>Field number for the "report_boot" field.</summary>
     public const int ReportBootFieldNumber = 2;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    public global::Google.Protobuf.WellKnownTypes.Empty ReportBoot {
-      get { return messageCase_ == MessageOneofCase.ReportBoot ? (global::Google.Protobuf.WellKnownTypes.Empty) message_ : null; }
+    public string ReportBoot {
+      get { return messageCase_ == MessageOneofCase.ReportBoot ? (string) message_ : ""; }
       set {
-        message_ = value;
-        messageCase_ = value == null ? MessageOneofCase.None : MessageOneofCase.ReportBoot;
+        message_ = pb::ProtoPreconditions.CheckNotNull(value, "value");
+        messageCase_ = MessageOneofCase.ReportBoot;
       }
     }
 
@@ -1251,7 +1288,7 @@ namespace ClientpipeProtocol {
         return true;
       }
       if (!object.Equals(Pong, other.Pong)) return false;
-      if (!object.Equals(ReportBoot, other.ReportBoot)) return false;
+      if (ReportBoot != other.ReportBoot) return false;
       if (!object.Equals(Clipboard, other.Clipboard)) return false;
       if (!object.Equals(Suspending, other.Suspending)) return false;
       if (HotKey != other.HotKey) return false;
@@ -1288,7 +1325,7 @@ namespace ClientpipeProtocol {
       }
       if (messageCase_ == MessageOneofCase.ReportBoot) {
         output.WriteRawTag(18);
-        output.WriteMessage(ReportBoot);
+        output.WriteString(ReportBoot);
       }
       if (messageCase_ == MessageOneofCase.Clipboard) {
         output.WriteRawTag(26);
@@ -1319,7 +1356,7 @@ namespace ClientpipeProtocol {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Pong);
       }
       if (messageCase_ == MessageOneofCase.ReportBoot) {
-        size += 1 + pb::CodedOutputStream.ComputeMessageSize(ReportBoot);
+        size += 1 + pb::CodedOutputStream.ComputeStringSize(ReportBoot);
       }
       if (messageCase_ == MessageOneofCase.Clipboard) {
         size += 1 + pb::CodedOutputStream.ComputeMessageSize(Clipboard);
@@ -1388,12 +1425,7 @@ namespace ClientpipeProtocol {
             break;
           }
           case 18: {
-            global::Google.Protobuf.WellKnownTypes.Empty subBuilder = new global::Google.Protobuf.WellKnownTypes.Empty();
-            if (messageCase_ == MessageOneofCase.ReportBoot) {
-              subBuilder.MergeFrom(ReportBoot);
-            }
-            input.ReadMessage(subBuilder);
-            ReportBoot = subBuilder;
+            ReportBoot = input.ReadString();
             break;
           }
           case 26: {
