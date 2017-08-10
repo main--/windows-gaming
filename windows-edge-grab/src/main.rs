@@ -106,6 +106,7 @@ fn main() {
     while let Some(evt) = con.wait_for_event() {
         match evt.response_type() {
             xproto::MOTION_NOTIFY => {
+                println!("notify");
                 if *state.lock().unwrap() != State::Detached {
                     continue;
                 }
@@ -113,6 +114,7 @@ fn main() {
                 let reply = query.get_reply().unwrap();
                 let x = reply.root_x() as i32;
                 let y = reply.root_y() as i32;
+                println!("{}:{}", x,y);
                 let monitor = config.monitors.iter().find(|m| m.bounds.contains((x,y)))
                     .expect("The mouse is not on a monitor???");
                 if monitor.is_windows && monitor != old_monitor {

@@ -11,12 +11,12 @@ use std::time::Duration;
 use futures::unsync::mpsc::{self, UnboundedSender};
 use futures::{Stream, Sink, Future};
 use tokio_core::reactor::Handle;
-use tokio_io::AsyncRead;
+use tokio_io::codec::length_delimited::Builder;
 use tokio_uds::UnixStream as TokioUnixStream;
 use tokio_timer::Timer;
 
 use controller::Controller;
-use self::codec::{Codec, GaCmdIn};
+use self::codec::GaCmdIn;
 
 type Send = UnboundedSender<GaCmdOut>;
 type Sender = Box<Future<Item=(), Error=Error>>;
@@ -32,7 +32,14 @@ pub struct Clientpipe {
 impl Clientpipe {
     pub fn new(stream: StdUnixStream, handle: &Handle) -> Clientpipe {
         let stream = TokioUnixStream::from_stream(stream, &handle).unwrap();
-        let (write, read) = stream.framed(Codec).split();
+        let length_delimited = Builder::new()
+            .max_frame_length(128 * 1_024 * 1_024)
+            .varint()
+            .new_framed(stream);
+        let (write, read) = length_delimited.split();
+        let write = write.with(|msg| Ok(codec::encode(msg)));
+        let read = read.filter_map(codec::decode);
+
         let (send, recv) = mpsc::unbounded();
         let recv = recv.map_err(|()| Error::new(ErrorKind::Other, "Failed to write to clientpipe"));
         let sender = write.send_all(recv).map(|_| ());

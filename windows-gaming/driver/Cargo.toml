@@ -18,6 +18,7 @@ mio = "0.6"
 bytes = "0.4"
 futures = "0.1"
 tokio-io = "0.1"
+#tokio-io = { path = "../../../tokio-io" }
 tokio-core = "0.1"
 tokio-uds = "0.1"
 tokio-timer = "0.1"
