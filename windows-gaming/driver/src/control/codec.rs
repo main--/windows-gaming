@@ -44,6 +44,7 @@ impl Decoder for Codec {
             Some(5) => ControlCmdIn::Suspend,
             Some(6) => ControlCmdIn::TryIoEntry,
             Some(7) => ControlCmdIn::LightEntry,
+            Some(8) if buf.len() < 9 => return Ok(None),
             Some(8) => {
                 let mut bbuf = (&*buf).into_buf();
                 bbuf.advance(1); // skip cmd
