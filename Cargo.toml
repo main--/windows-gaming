@@ -1,2 +1,7 @@
 [workspace]
-members = ["windows-gaming", "vfio-ubind", "windows-edge-grab"]
+members = [
+    "windows-gaming",
+    "vfio-ubind",
+    "windows-edge-grab",
+    "windows-gaming/config", # FIXME: use this somewhere instead of listing it here
+]

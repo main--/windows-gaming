@@ -5,8 +5,9 @@ use std::path::Path;
 
 use common::config::{MachineConfig, SetupConfig, StorageDevice};
 use driver::qemu;
-use ask;
 
+// TODO: completely restructure this
+/*
 pub fn setup(setup: &mut SetupConfig, machine: &mut MachineConfig, datadir: &Path) -> bool {
     println!("Step 7: VM setup");
     println!("Looks like everything is working fine so far! Time to configure your VM!");
@@ -69,3 +70,4 @@ pub fn memory(machine: &mut MachineConfig) -> bool {
     }
     true
 }
+*/

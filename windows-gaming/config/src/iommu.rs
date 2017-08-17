@@ -5,41 +5,16 @@ use libudev::{Context, Enumerator};
 
 use common::config::{SetupConfig, MachineConfig};
 use common::pci_device::PciDevice;
-use ask;
-
-pub fn enable(setup: &mut SetupConfig) -> bool {
-    println!("Step 1: Enable IOMMU");
-    println!("It's as simple as adding 'intel_iommu=on' or 'amd_iommu=on' to your kernel command line.");
-    println!("Do this now, then continue here. Don't reboot yet, there's more we need to configure.");
-    println!();
-    if is_enabled() {
-        if ask::yesno("IOMMU is already enabled. Do you want to skip this step?") {
-            return true;
-        }
-    }
-    if setup.iommu_commanded {
-        println!("Troubleshooting (since you apparently already did this):");
-        println!("This is a kernel parameter, so it won't be active before you reboot. But if you already did that, \
-                  the kernel fails to enable it for some reason. IOMMU (aka VT-d) is disabled by default on many \
-                  mainboards, please check your firmware settings to make sure it's enabled. If that doesn't work \
-                  it's possible that your hardware just doesn't support it. If that's the reason, you're out of luck \
-                  though. IOMMU is a critical component of this setup and there's no way it can work without that. Sorry.");
-    }
-
-    if !ask::yesno("Done?") {
-        println!("Aborted.");
-        return false;
-    }
-    setup.iommu_commanded = true;
-    println!();
-    true
-}
 
 pub fn is_enabled() -> bool {
     fs::read_dir("/sys/devices/virtual/iommu/").ok().and_then(|mut x| x.next()).is_some()
 }
 
+// FIXME: rewrite this
 pub fn check_grouping(machine: &MachineConfig) -> Result<bool> {
+    unimplemented!();
+
+    /*
     let udev = Context::new().expect("Failed to create udev context");
     let first_id = machine.pci_devices[0].id; // FIXME
     let mut iter = Enumerator::new(&udev)?;
@@ -92,5 +67,6 @@ pub fn check_grouping(machine: &MachineConfig) -> Result<bool> {
 
     // FIXME assert!(setup.vfio_devs.iter().cloned().eq(related_devices.iter().cloned()));
     Ok(true)
+     */
 }
 
