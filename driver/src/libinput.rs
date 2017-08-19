@@ -2,6 +2,7 @@ use std::io;
 use std::iter;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::borrow::Cow;
 use std::os::unix::io::RawFd;
 
 use tokio_core::reactor::{Handle, PollEvented};
@@ -166,14 +167,14 @@ pub fn create_handler<'a>(input_events: UnboundedReceiver<Event>, hotkey_binding
         Some(match event {
             Event::Pointer(PointerEvent::Motion(m)) =>
                 QmpCommand::InputSendEvent {
-                    events: vec![
+                    events: Cow::from(vec![
                         InputEvent::Rel { axis: "x", value: m.dx() as u32 },
                         InputEvent::Rel { axis: "y", value: m.dy() as u32 },
-                    ]
+                    ])
                 },
             Event::Pointer(PointerEvent::Button(b)) =>
                 QmpCommand::InputSendEvent {
-                    events: vec![InputEvent::Btn {
+                    events: Cow::from(vec![InputEvent::Btn {
                         down: b.button_state() == ButtonState::Pressed,
                         button: match b.button() {
                             BTN_LEFT => InputButton::Left,
@@ -186,7 +187,7 @@ pub fn create_handler<'a>(input_events: UnboundedReceiver<Event>, hotkey_binding
                                 return None;
                             }
                         }
-                    }]
+                    }])
                 },
             Event::Pointer(PointerEvent::Axis(ref a)) if a.has_axis(Axis::Vertical) => {
                 let steps = a.axis_value_discrete(Axis::Vertical).map(|x| x as i32).unwrap_or(0);
@@ -201,12 +202,12 @@ pub fn create_handler<'a>(input_events: UnboundedReceiver<Event>, hotkey_binding
                     InputButton::WheelUp
                 };
 
-                QmpCommand::InputSendEvent {
-                    events: iter::repeat(direction).take(steps.abs() as usize).flat_map(|b| vec![
-                        InputEvent::Btn { down: true, button: b },
-                        InputEvent::Btn { down: false, button: b },
-                    ]).collect(),
-                }
+                let events: Vec<_> = iter::repeat(direction).take(steps.abs() as usize).flat_map(|b| vec![
+                    InputEvent::Btn { down: true, button: b },
+                    InputEvent::Btn { down: false, button: b },
+                ]).collect();
+
+                QmpCommand::InputSendEvent { events: Cow::from(events) }
             },
             Event::Keyboard(KeyboardEvent::Key(k)) => {
                 let down = k.key_state() == KeyState::Pressed;
@@ -215,16 +216,21 @@ pub fn create_handler<'a>(input_events: UnboundedReceiver<Event>, hotkey_binding
                     None => return None,
                 };
 
-                for hk in hotkeys {
+                for &hk in &hotkeys {
                     controller.borrow_mut().ga_hotkey(hk as u32);
+                }
+                if !hotkeys.is_empty() {
+                    // If this was an IoExit hotkey, we just released all keys.
+                    // To avoid hung keys, do not forward keypresses that trigger hotkeys.
+                    return None;
                 }
 
                 match qcode {
                     Some(qcode) => QmpCommand::InputSendEvent {
-                        events: vec![ InputEvent::Key {
+                        events: Cow::from(vec![InputEvent::Key {
                             down,
                             key: KeyValue::Qcode(qcode),
-                        }]
+                        }])
                     },
                     None => return None
                 }
