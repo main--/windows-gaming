@@ -3,6 +3,7 @@ use std::rc::Rc;
 use std::ffi::OsStr;
 use std::cell::RefCell;
 use std::process::Command;
+use std::borrow::Cow;
 
 use itertools::Itertools;
 use libudev::{Result as UdevResult, Context, Enumerator};
@@ -19,6 +20,7 @@ use monitor::QmpCommand;
 use sd_notify;
 use libinput::Input;
 use clipboard::{ClipboardRequestEvent, ClipboardRequestResponse};
+use release_all_keys::EVENTS as RELEASE_ALL_KEYS;
 
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -330,7 +332,10 @@ impl Controller {
             IoState::Detached => (),
             IoState::AwaitingUpgrade | IoState::LightEntry | IoState::TemporaryLightEntry(_) => {
                 debug!("detaching light entry");
-                self.input.borrow_mut().suspend()
+                self.input.borrow_mut().suspend();
+                (&self.monitor).send(QmpCommand::InputSendEvent {
+                    events: Cow::from(RELEASE_ALL_KEYS),
+                }).unwrap();
             },
             IoState::FullEntry => {
                 debug!("detaching full entry");
