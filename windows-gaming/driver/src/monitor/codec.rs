@@ -1,5 +1,6 @@
 use std::io;
 use std::str;
+use std::borrow::Cow;
 use bytes::BytesMut;
 use tokio_io::codec::{Encoder, Decoder};
 use serde_json;
@@ -21,7 +22,7 @@ pub enum QmpCommand {
     SystemWakeup,
     #[serde(rename = "input-send-event")]
     InputSendEvent {
-        events: Vec<InputEvent>,
+        events: Cow<'static, [InputEvent]>,
     },
 }
 
