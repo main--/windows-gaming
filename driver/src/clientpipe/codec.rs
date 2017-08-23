@@ -33,9 +33,9 @@ impl Decoder for Codec {
             }
         }
 
-        buf.split_to(consumed);
+        let skipped = buf.split_to(consumed);
         res.or_else(|e| {
-            warn!("Unknown / invalid request ({}), skipping over: {:?}", e, &buf[..consumed]);
+            warn!("Unknown / invalid request ({}), skipping over: {:?}", e, skipped);
             Ok(None)
         })
     }
