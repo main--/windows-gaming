@@ -3,7 +3,7 @@ Description=Windows VM
 
 [Service]
 Type=notify
-ExecStart=/usr/bin/windows-gaming
+ExecStart=/usr/bin/windows-gaming start
 PassEnvironment=XDG_CONFIG_HOME
 NotifyAccess=main
 KillMode=mixed
