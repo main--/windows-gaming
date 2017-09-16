@@ -263,7 +263,7 @@ pub struct NetworkConfig {
     pub bridges: Vec<String>, // TODO: custom usernet
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct SambaConfig {
     pub user: String,
     pub path: String,
