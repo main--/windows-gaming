@@ -1,2 +1,10 @@
 [workspace]
-members = ["windows-gaming", "vfio-ubind", "windows-edge-grab"]
+members = [
+    "windows-gaming",
+    "vfio-ubind",
+    "windows-edge-grab",
+    "windows-gaming/config", # FIXME: use this somewhere instead of listing it here
+]
+
+[replace]
+"enum_derive:0.1.7" = { git = "https://github.com/main--/rust-custom-derive.git", branch = "trait" }

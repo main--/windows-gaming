@@ -141,10 +141,21 @@ impl Default for SoundSettings {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+macro_attr! {
+    #[derive(Deserialize, Serialize, Debug, Clone, EnumDisplay!, EnumFromStr!, IterVariantNames!(SoundFormats))]
+    pub enum SoundFixedFormat {
+        U8, S8, U16, S16, U32, S32
+    }
+}
+
+impl Default for SoundFixedFormat {
+    fn default() -> SoundFixedFormat { SoundFixedFormat::S16 }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct SoundFixedSettings {
     pub frequency: usize,
-    pub format: String,
+    pub format: SoundFixedFormat,
     pub channels: usize,
 }
 
@@ -263,7 +274,7 @@ pub struct NetworkConfig {
     pub bridges: Vec<String>, // TODO: custom usernet
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct SambaConfig {
     pub user: String,
     pub path: String,

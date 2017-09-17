@@ -6,7 +6,6 @@ extern crate time;
 #[macro_use] extern crate clap;
 extern crate common;
 extern crate driver;
-extern crate wizard;
 
 mod logger;
 
@@ -127,7 +126,7 @@ fn main() {
 
     match matches.subcommand() {
         ("run", _) => driver::run(&cfg.unwrap(), &workdir_path, &data_folder),
-        ("wizard", _) => wizard::run(cfg, &config_path, &workdir_path, &data_folder),
+        ("wizard", _) => unimplemented!(),
         ("control", cmd) => {
             match cmd.unwrap().subcommand() {
                 ("attach", cmd) => {
@@ -150,7 +149,7 @@ fn main() {
         }
         _ => match cfg {
             Some(ref cfg) if cfg.setup.is_none() => driver::run(cfg, &workdir_path, &data_folder),
-            cfg => wizard::run(cfg, &config_path, &workdir_path, &data_folder),
+            _ => unimplemented!(),
         }
     }
 }

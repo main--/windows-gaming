@@ -1,5 +1,5 @@
 [package]
-name = "wizard"
+name = "config"
 version = "0.1.0"
 authors = ["main() <main@ehvag.de>"]
 
@@ -7,4 +7,4 @@ authors = ["main() <main@ehvag.de>"]
 libudev = "0.2.0"
 num_cpus = "1.2.0"
 common = { path = "../common" }
-driver = { path = "../driver" }
+enum_derive = "0.1"
