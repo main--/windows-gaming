@@ -141,10 +141,35 @@ impl Default for SoundSettings {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+pub trait IterVariantNames {
+    type Iter: Iterator<Item=&'static str>;
+
+    fn iter_variant_names() -> Self::Iter;
+}
+
+macro_attr! {
+    #[derive(Deserialize, Serialize, Debug, Clone, EnumDisplay!, EnumFromStr!, IterVariantNames!(SoundFormats))]
+    pub enum SoundFixedFormat {
+        U8, S8, U16, S16, U32, S32
+    }
+}
+
+impl IterVariantNames for SoundFixedFormat {
+    type Iter = SoundFormats;
+
+    fn iter_variant_names() -> SoundFormats {
+        SoundFixedFormat::iter_variant_names()
+    }
+}
+
+impl Default for SoundFixedFormat {
+    fn default() -> SoundFixedFormat { SoundFixedFormat::S16 }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct SoundFixedSettings {
     pub frequency: usize,
-    pub format: String,
+    pub format: SoundFixedFormat,
     pub channels: usize,
 }
 

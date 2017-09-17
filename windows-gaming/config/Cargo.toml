@@ -7,4 +7,3 @@ authors = ["main() <main@ehvag.de>"]
 libudev = "0.2.0"
 num_cpus = "1.2.0"
 common = { path = "../common" }
-driver = { path = "../driver" }
