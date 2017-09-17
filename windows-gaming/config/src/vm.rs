@@ -4,7 +4,7 @@ use std::env;
 use std::path::Path;
 
 use common::config::{MachineConfig, SetupConfig, StorageDevice};
-use driver::qemu;
+//use driver::qemu;
 
 // TODO: completely restructure this
 /*

@@ -1,6 +1,7 @@
 extern crate libudev;
 extern crate num_cpus;
 extern crate common;
+extern crate enum_derive;
 
 pub mod iommu;
 pub mod usb;
@@ -92,7 +93,7 @@ struct GenericFiniteStrings<T, F: Fn(&mut Config) -> &mut T + Sync>(F);
 
 use std::fmt::Display;
 use std::str::FromStr;
-use common::config::IterVariantNames;
+use enum_derive::IterVariantNames;
 
 pub trait FiniteStrings : Sync {
     fn read(&self, cfg: &mut Config) -> String;

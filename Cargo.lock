@@ -160,6 +160,7 @@ name = "config"
 version = "0.1.0"
 dependencies = [
  "common 0.1.0",
+ "enum_derive 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "libudev 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "num_cpus 1.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -266,7 +267,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "enum_derive"
 version = "0.1.7"
+source = "git+https://github.com/main--/rust-custom-derive.git?branch=trait#90498168440078f610ac52cb845ac1319ccb2c8b"
+
+[[package]]
+name = "enum_derive"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+replace = "enum_derive 0.1.7 (git+https://github.com/main--/rust-custom-derive.git?branch=trait)"
 
 [[package]]
 name = "env_logger"
@@ -1091,6 +1098,7 @@ dependencies = [
 "checksum dbus 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)" = "4aee01fb76ada3e5e7ca642ea6664ebf7308a810739ca2aca44909a1191ac254"
 "checksum dtoa 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "80c8b71fd71146990a9742fc06dcbbde19161a267e0ad4e572c35162f4578c90"
 "checksum either 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "18785c1ba806c258137c937e44ada9ee7e69a37e3c72077542cd2f069d78562a"
+"checksum enum_derive 0.1.7 (git+https://github.com/main--/rust-custom-derive.git?branch=trait)" = "<none>"
 "checksum enum_derive 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "406ac2a8c9eedf8af9ee1489bee9e50029278a6456c740f7454cf8a158abc816"
 "checksum env_logger 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "3ddf21e73e016298f5cb37d6ef8e8da8e39f91f9ec8b0df44b7deb16a9f8cd5b"
 "checksum error-chain 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d9435d864e017c3c6afeac1654189b06cdb491cf2ff73dbf0d73b0f292f42ff8"
