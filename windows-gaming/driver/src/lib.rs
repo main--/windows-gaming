@@ -44,11 +44,12 @@ mod release_all_keys;
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::os::unix::net::{UnixListener as StdUnixListener};
+use std::os::unix::net::{UnixListener as StdUnixListener, UnixStream};
 use std::fs::{self, Permissions};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::Command;
+use std::io::ErrorKind;
 
 use tokio_core::reactor::Core;
 use tokio_signal::unix::{Signal, SIGINT, SIGTERM};
@@ -64,6 +65,21 @@ use libinput::Input;
 use clipboard::X11Clipboard;
 
 pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
+    let control_socket_file = tmp.join("control.sock");
+    // first check for running sessions
+    match UnixStream::connect(&control_socket_file) {
+        Err(e) => match e.kind() {
+            ErrorKind::ConnectionRefused => (), // previous instance existed but is down now
+            ErrorKind::NotFound => (), // no previous instance
+            _ => warn!("Error while checking for running instances: {:?}", e), // ??? (but continue anyway)
+        },
+        Ok(_) => {
+            error!("An instance of windows-gaming is already running in this runtime directory.");
+            error!("Either quit that or select a different runtime directory.");
+            return;
+        }
+    }
+
     let _ = fs::remove_dir_all(tmp); // may fail - we dont care
     fs::create_dir(tmp).expect("Failed to create TMP_FOLDER"); // may not fail - has to be new
     trace!("created tmp dir");
@@ -78,7 +94,6 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
         .expect("Failed to create clientpipe socket");
     debug!("Started Clientpipe");
 
-    let control_socket_file = tmp.join("control.sock");
     let control_socket = StdUnixListener::bind(&control_socket_file)
         .expect("Failed to create control socket");
     fs::set_permissions(control_socket_file, Permissions::from_mode(0o777))
