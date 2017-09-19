@@ -107,7 +107,7 @@ impl Wizard {
                 return;
             }
 
-            driver::run(&config, workdir, datadir);
+            driver::run(&config, workdir, datadir, config.setup.as_ref().unwrap().gui);
 
             // TODO:
             // * ask if it worked, offer to retry or abort

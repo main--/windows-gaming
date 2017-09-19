@@ -63,7 +63,7 @@ use clientpipe::Clientpipe;
 use libinput::Input;
 use clipboard::X11Clipboard;
 
-pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
+pub fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
     let _ = fs::remove_dir_all(tmp); // may fail - we dont care
     fs::create_dir(tmp).expect("Failed to create TMP_FOLDER"); // may not fail - has to be new
     trace!("created tmp dir");
@@ -88,7 +88,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
-    let qemu = qemu::run(cfg, tmp, data, &clientpipe_socket_file, &monitor_socket_file, &handle)
+    let qemu = qemu::run(cfg, tmp, data, &clientpipe_socket_file, &monitor_socket_file, &handle, enable_gui)
         .map(|code| {
             if !code.success() {
                 warn!("QEMU returned with an error code: {}", code);
