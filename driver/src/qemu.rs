@@ -29,7 +29,7 @@ pub fn has_gtk_support() -> bool {
 }
 
 pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monitor_path: &Path,
-           handle: &Handle) -> Child {
+           handle: &Handle, enable_gui: bool) -> Child {
     trace!("qemu::run");
     let machine = &cfg.machine;
 
@@ -76,12 +76,12 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
                 "-device", "scsi-cd,id=cdrom,drive=iso",
     ]);
 
-    if let Some(ref setup) = cfg.setup {
-        if setup.gui {
-            qemu.args(&["-display", "gtk", "-vga", "qxl"]);
-            debug!("Applied gtk to qemu");
-        }
+    if enable_gui {
+        qemu.args(&["-display", "gtk", "-vga", "qxl"]);
+        debug!("Applied gtk to qemu");
+    }
 
+    if let Some(ref setup) = cfg.setup {
         if let Some(ref cdrom) = setup.cdrom {
             qemu.arg("-cdrom").arg(cdrom);
             debug!("Forward cdrom {:?}", cdrom);

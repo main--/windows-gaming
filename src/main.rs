@@ -49,6 +49,10 @@ fn main() {
         ).subcommand(SubCommand::with_name("run")
             .about("Starts Windows")
             .visible_alias("start")
+            .arg(Arg::with_name("virtual-gpu")
+                .long("virtual-gpu")
+                .help("Run QEMU with a virtual QXL GPU that draws to a GUI window (useful for troubleshooting)")
+                .takes_value(false))
         ).subcommand(SubCommand::with_name("wizard")
             .about("Runs the wizard")
         ).subcommand(SubCommand::with_name("control")
@@ -131,7 +135,7 @@ fn main() {
     };
 
     match matches.subcommand() {
-        ("run", _) => driver::run(&cfg.unwrap(), &workdir_path, &data_folder),
+        ("run", cmd) => driver::run(cfg.as_ref().unwrap(), &workdir_path, &data_folder, cmd.unwrap().is_present("virtual-gpu")),
         ("wizard", _) => wizard::run(cfg, &config_path, &workdir_path, &data_folder),
         ("control", cmd) => {
             match cmd.unwrap().subcommand() {
@@ -154,7 +158,7 @@ fn main() {
             }
         }
         _ => match cfg {
-            Some(ref cfg) if cfg.setup.is_none() => driver::run(cfg, &workdir_path, &data_folder),
+            Some(ref cfg) if cfg.setup.is_none() => driver::run(cfg, &workdir_path, &data_folder, false),
             cfg => wizard::run(cfg, &config_path, &workdir_path, &data_folder),
         }
     }
