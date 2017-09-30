@@ -129,6 +129,11 @@ fn main() {
         _ => DATA_FOLDER,
     }).to_owned();
 
+    let workdir_path = match cfg {
+        Some(Config { runtime_directory_override: Some(ref x), .. }) => Path::new(x).to_path_buf(),
+        _ => workdir_path,
+    };
+
     match matches.subcommand() {
         ("run", cmd) => driver::run(cfg.as_ref().unwrap(), &workdir_path, &data_folder, cmd.unwrap().is_present("virtual-gpu")),
         ("wizard", _) => wizard::run(cfg, &config_path, &workdir_path, &data_folder),
