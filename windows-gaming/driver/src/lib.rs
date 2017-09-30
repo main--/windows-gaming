@@ -64,7 +64,7 @@ use clientpipe::Clientpipe;
 use libinput::Input;
 use clipboard::X11Clipboard;
 
-pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
+pub fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
     let control_socket_file = tmp.join("control.sock");
     // first check for running sessions
     match UnixStream::connect(&control_socket_file) {
@@ -103,7 +103,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path) {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
-    let qemu = qemu::run(cfg, tmp, data, &clientpipe_socket_file, &monitor_socket_file, &handle)
+    let qemu = qemu::run(cfg, tmp, data, &clientpipe_socket_file, &monitor_socket_file, &handle, enable_gui)
         .map(|code| {
             if !code.success() {
                 warn!("QEMU returned with an error code: {}", code);
