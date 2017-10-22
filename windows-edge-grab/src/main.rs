@@ -78,7 +78,8 @@ fn main() {
                     } else {
                         ywin + windows_monitor.bounds.y
                     };
-                    if cfg.monitors.iter().any(|m| m.bounds.contains((xlin, ylin)) && !m.is_windows) {
+                                        
+                    if cfg.monitors.iter().any(|m| m.vbounds.contains((xwin, ywin)) && !m.is_windows) {
                         unwrap!(reader.write_u8(4));
                         unwrap!(reader.flush());
                         *unwrap!(state_r.lock()) = State::TryDetach;
@@ -113,16 +114,20 @@ fn main() {
                 let reply = query.get_reply().unwrap();
                 let x = reply.root_x() as i32;
                 let y = reply.root_y() as i32;
-                let monitor = config.monitors.iter().find(|m| m.bounds.contains((x,y)))
+                let curr_monitor = config.monitors.iter().find(|m| !m.is_windows && m.bounds.contains((x,y)))
+                .expect("The mouse is not on a monitor???");;
+                let vx = x + curr_monitor.vbounds.x;
+                let vy = y + curr_monitor.vbounds.y;
+                let monitor = config.monitors.iter().find(|m| m.vbounds.contains((vx,vy)))
                     .expect("The mouse is not on a monitor???");
                 if monitor.is_windows && monitor != old_monitor {
                     let right = old_monitor.bounds.x > monitor.bounds.x + monitor.bounds.width - 1;
                     let x = if right && !monitor.connected {
-                        x - monitor.bounds.x + monitor.bounds.width - 1
+                        x - monitor.vbounds.x + monitor.vbounds.width - 1
                     } else {
-                        x - monitor.bounds.x
-                    };
-                    let y = y + monitor.bounds.y;
+                        x - monitor.vbounds.x
+                    } + curr_monitor.vbounds.x;
+                    let y = y + monitor.vbounds.y + curr_monitor.vbounds.y;
                     writer.write_u8(8).unwrap();
                     writer.write_i32::<LittleEndian>(x).unwrap();
                     writer.write_i32::<LittleEndian>(y).unwrap();

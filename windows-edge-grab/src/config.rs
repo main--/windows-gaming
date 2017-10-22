@@ -12,6 +12,8 @@ pub struct Config {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Monitor {
     pub bounds: Rectangle,
+    //you need to set this, if both monitors use the same x and y coordiantes
+    pub vbounds: Rectangle,
     pub is_windows: bool,
     /// whether this monitor is still connected after switching inputs to Windows
     #[serde(default)]
