@@ -1,9 +1,10 @@
 GA_EXE := guest-agent/VfioService.exe
 GA_ISO := guest-agent/windows-gaming-ga.iso
+AUTOSETUP_ISO := autosetup/autosetup.iso
 OVMF   := ovmf-x64/OVMF_CODE-pure-efi.fd ovmf-x64/OVMF_VARS-pure-efi.fd
 BASH_COMPLETION := target/release/windows-gaming.bash-completion
 
-all: cargo $(GA_ISO) $(OVMF) $(BASH_COMPLETION)
+all: cargo $(GA_ISO) $(OVMF) $(BASH_COMPLETION) $(AUTOSETUP_ISO)
 
 clippy:
 	rustup run nightly cargo clippy
@@ -21,6 +22,28 @@ $(GA_EXE): guest-agent/VfioService/VfioService.sln $(wildcard guest-agent/VfioSe
 
 $(GA_ISO): $(GA_EXE) guest-agent/install.bat guest-agent/uninstall.bat
 	cd guest-agent && mkisofs -m VfioService -m .gitignore -m update-proto.bat -o windows-gaming-ga.iso -r -J -input-charset iso8859-1 -V "windows-gaming-ga" .
+
+$(AUTOSETUP_ISO): $(GA_EXE) autosetup/autounattend.xml autosetup/install.bat ../virtio-win.iso
+	mkdir -p autosetup/drivers/w7
+	mkdir -p autosetup/drivers/w8
+	mkdir -p autosetup/drivers/w8.1
+	mkdir -p autosetup/drivers/w10
+
+	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W7/AMD64/VIOSCSI.INF;1' > autosetup/drivers/w7/vioscsi.inf 2> /dev/null
+	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W7/AMD64/VIOSCSI.CAT;1' > autosetup/drivers/w7/vioscsi.cat 2> /dev/null
+	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W7/AMD64/VIOSCSI.SYS;1' > autosetup/drivers/w7/vioscsi.sys 2> /dev/null
+	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W8/AMD64/VIOSCSI.INF;1' > autosetup/drivers/w8/vioscsi.inf 2> /dev/null
+	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W8/AMD64/VIOSCSI.CAT;1' > autosetup/drivers/w8/vioscsi.cat 2> /dev/null
+	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W8/AMD64/VIOSCSI.SYS;1' > autosetup/drivers/w8/vioscsi.sys 2> /dev/null
+	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W8.1/AMD64/VIOSCSI.INF;1' > autosetup/drivers/w8.1/vioscsi.inf 2> /dev/null
+	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W8.1/AMD64/VIOSCSI.CAT;1' > autosetup/drivers/w8.1/vioscsi.cat 2> /dev/null
+	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W8.1/AMD64/VIOSCSI.SYS;1' > autosetup/drivers/w8.1/vioscsi.sys 2> /dev/null
+	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W10/AMD64/VIOSCSI.INF;1' > autosetup/drivers/w10/vioscsi.inf 2> /dev/null
+	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W10/AMD64/VIOSCSI.CAT;1' > autosetup/drivers/w10/vioscsi.cat 2> /dev/null
+	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W10/AMD64/VIOSCSI.SYS;1' > autosetup/drivers/w10/vioscsi.sys 2> /dev/null
+
+	cp --preserve=timestamps guest-agent/Loader.exe autosetup
+	cd autosetup && mkisofs -o autosetup.iso -r -J -V "wg-autosetup" .
 
 ovmf.rpm:
 	curl -o ovmf.rpm "https://www.kraxel.org/repos/jenkins/edk2/$(shell curl -s 'https://www.kraxel.org/repos/jenkins/edk2/' | grep -Eo 'edk2.git-ovmf-x64-[-\.a-z0-9]+\.noarch\.rpm' | head -n1)"
@@ -51,7 +74,7 @@ install: all
 	install -D -m644 ovmf-x64/OVMF_CODE-pure-efi.fd $(DESTDIR)/usr/lib/windows-gaming/ovmf-code.fd
 	install -D -m644 ovmf-x64/OVMF_VARS-pure-efi.fd $(DESTDIR)/usr/lib/windows-gaming/ovmf-vars.fd
 	install -D -m644 $(GA_ISO) $(DESTDIR)/usr/lib/windows-gaming/windows-gaming-ga.iso
-	install -D -m644 ../virtio-win_amd64.vfd $(DESTDIR)/usr/lib/windows-gaming/virtio-win.vfd #FIXME
+	install -D -m644 $(AUTOSETUP_ISO) $(DESTDIR)/usr/lib/windows-gaming/autosetup.iso
 	install -D -m644 misc/windows.service $(DESTDIR)/lib/systemd/system/windows.service
 	install -D -m644 misc/windows.service $(DESTDIR)/lib/systemd/user/windows.service
 	install -D -m644 misc/80-vfio.rules $(DESTDIR)/lib/udev/rules.d/80-vfio.rules
