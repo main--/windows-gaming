@@ -23,7 +23,7 @@ arch:
     - libarchive
     - rustup
     - mono
-    - cdrkit
+    - cdrtools
     - libxcb
     - nuget
     - protobuf
