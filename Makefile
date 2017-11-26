@@ -29,18 +29,18 @@ $(AUTOSETUP_ISO): $(GA_EXE) autosetup/autounattend.xml autosetup/install.bat ../
 	mkdir -p autosetup/drivers/w8.1
 	mkdir -p autosetup/drivers/w10
 
-	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W7/AMD64/VIOSCSI.INF;1' > autosetup/drivers/w7/vioscsi.inf 2> /dev/null
-	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W7/AMD64/VIOSCSI.CAT;1' > autosetup/drivers/w7/vioscsi.cat 2> /dev/null
-	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W7/AMD64/VIOSCSI.SYS;1' > autosetup/drivers/w7/vioscsi.sys 2> /dev/null
-	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W8/AMD64/VIOSCSI.INF;1' > autosetup/drivers/w8/vioscsi.inf 2> /dev/null
-	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W8/AMD64/VIOSCSI.CAT;1' > autosetup/drivers/w8/vioscsi.cat 2> /dev/null
-	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W8/AMD64/VIOSCSI.SYS;1' > autosetup/drivers/w8/vioscsi.sys 2> /dev/null
-	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W8.1/AMD64/VIOSCSI.INF;1' > autosetup/drivers/w8.1/vioscsi.inf 2> /dev/null
-	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W8.1/AMD64/VIOSCSI.CAT;1' > autosetup/drivers/w8.1/vioscsi.cat 2> /dev/null
-	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W8.1/AMD64/VIOSCSI.SYS;1' > autosetup/drivers/w8.1/vioscsi.sys 2> /dev/null
-	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W10/AMD64/VIOSCSI.INF;1' > autosetup/drivers/w10/vioscsi.inf 2> /dev/null
-	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W10/AMD64/VIOSCSI.CAT;1' > autosetup/drivers/w10/vioscsi.cat 2> /dev/null
-	isoinfo -i /tmp/virtio-win.iso -x '/VIOSCSI/W10/AMD64/VIOSCSI.SYS;1' > autosetup/drivers/w10/vioscsi.sys 2> /dev/null
+	isoinfo -i ../virtio-win.iso -x '/VIOSCSI/W7/AMD64/VIOSCSI.INF;1' > autosetup/drivers/w7/vioscsi.inf 2> /dev/null
+	isoinfo -i ../virtio-win.iso -x '/VIOSCSI/W7/AMD64/VIOSCSI.CAT;1' > autosetup/drivers/w7/vioscsi.cat 2> /dev/null
+	isoinfo -i ../virtio-win.iso -x '/VIOSCSI/W7/AMD64/VIOSCSI.SYS;1' > autosetup/drivers/w7/vioscsi.sys 2> /dev/null
+	isoinfo -i ../virtio-win.iso -x '/VIOSCSI/W8/AMD64/VIOSCSI.INF;1' > autosetup/drivers/w8/vioscsi.inf 2> /dev/null
+	isoinfo -i ../virtio-win.iso -x '/VIOSCSI/W8/AMD64/VIOSCSI.CAT;1' > autosetup/drivers/w8/vioscsi.cat 2> /dev/null
+	isoinfo -i ../virtio-win.iso -x '/VIOSCSI/W8/AMD64/VIOSCSI.SYS;1' > autosetup/drivers/w8/vioscsi.sys 2> /dev/null
+	isoinfo -i ../virtio-win.iso -x '/VIOSCSI/W8.1/AMD64/VIOSCSI.INF;1' > autosetup/drivers/w8.1/vioscsi.inf 2> /dev/null
+	isoinfo -i ../virtio-win.iso -x '/VIOSCSI/W8.1/AMD64/VIOSCSI.CAT;1' > autosetup/drivers/w8.1/vioscsi.cat 2> /dev/null
+	isoinfo -i ../virtio-win.iso -x '/VIOSCSI/W8.1/AMD64/VIOSCSI.SYS;1' > autosetup/drivers/w8.1/vioscsi.sys 2> /dev/null
+	isoinfo -i ../virtio-win.iso -x '/VIOSCSI/W10/AMD64/VIOSCSI.INF;1' > autosetup/drivers/w10/vioscsi.inf 2> /dev/null
+	isoinfo -i ../virtio-win.iso -x '/VIOSCSI/W10/AMD64/VIOSCSI.CAT;1' > autosetup/drivers/w10/vioscsi.cat 2> /dev/null
+	isoinfo -i ../virtio-win.iso -x '/VIOSCSI/W10/AMD64/VIOSCSI.SYS;1' > autosetup/drivers/w10/vioscsi.sys 2> /dev/null
 
 	cp --preserve=timestamps guest-agent/Loader.exe autosetup
 	cd autosetup && mkisofs -o autosetup.iso -r -J -V "wg-autosetup" .
