@@ -23,7 +23,7 @@ arch:
     - libarchive
     - rustup
     - mono
-    - cdrkit
+    - cdrtools
     - libxcb
     - nuget
     - protobuf
@@ -33,6 +33,7 @@ arch:
     - export PROTOC=/usr/bin/protoc
     - export PROTOC_INCLUDE=/usr/include
     - if [ "$RUST_TOOLCHAIN" = "nightly" ]; then cargo install clippy; fi
+    - curl -o ../virtio-win.iso 'https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso'
     - make all test
     - if [ "$RUST_TOOLCHAIN" = "nightly" ]; then make clippy; fi
 
