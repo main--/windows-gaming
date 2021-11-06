@@ -219,7 +219,7 @@ impl<'a> IntoIterator for &'a MimeTypesGuard<'a> {
     type IntoIter = MimeTypesIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        MimeTypesIter((&*self.0).into_iter())
+        MimeTypesIter((&*self.0).iter())
     }
 }
 impl<'a> Debug for MimeTypesGuard<'a> {

@@ -45,7 +45,7 @@ impl WaylandClipboard {
                 // shutting down
                 //
                 // TODO: cleanup work maybe?
-                return Ok::<_, anyhow::Error>(());
+                Ok::<_, anyhow::Error>(())
             };
 
             tokio::select! {

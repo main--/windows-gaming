@@ -80,12 +80,11 @@ impl WaylandEventLoop {
             loop {
                 let mut guard = self.queue.readable().await?;
                 let prepared_read = guard.get_inner().queue.read().unwrap().prepare_read();
-                match prepared_read {
-                    Some(res) => match guard.try_io(|_| res.read_events()) {
+                if let Some(res) = prepared_read {
+                    match guard.try_io(|_| res.read_events()) {
                         Ok(r) => r?,
                         Err(_) => continue,
-                    },
-                    None => (),
+                    }
                 }
                 guard.get_inner().queue.write().unwrap().dispatch_pending(&mut (), |_, _, _| {})?;
             }

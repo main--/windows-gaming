@@ -12,5 +12,5 @@ pub fn make_cancelable<T>(f: impl Future<Output=T>) -> (impl Future<Output=Optio
             _ = token.cancelled() => None,
         }
     };
-    return (task, guard)
+    (task, guard)
 }
