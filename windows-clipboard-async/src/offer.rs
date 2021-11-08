@@ -17,15 +17,20 @@ pub struct ClipboardOffer {
     formats: Vec<CLIPBOARD_FORMATS>,
 }
 
+/// An error while receiving clipboard contents.
 #[non_exhaustive]
 #[derive(Error, Debug)]
 pub enum Error {
+    /// The clipboard offer has expired
     #[error("The clipboard offer has expired.")]
     ClipboardOfferExpired,
+    /// The requested format is not available
     #[error("The requested format is not available.")]
     FormatNotAvailable,
+    /// The Windows API reported an error
     #[error(transparent)]
     Windows(#[from] windows::runtime::Error),
+    /// Decoding the image data failed
     #[cfg(feature = "image")]
     #[error(transparent)]
     Image(#[from] image::ImageError),
@@ -36,9 +41,15 @@ impl ClipboardOffer {
     pub(crate) fn new(sequence: u32, formats: Vec<CLIPBOARD_FORMATS>) -> Self {
         ClipboardOffer { sequence, formats }
     }
+
+    /// Iterates over the formats currently available on the clipboard
     pub fn formats(&self) -> impl Iterator<Item=CLIPBOARD_FORMATS> + '_ {
         self.formats.iter().copied()
     }
+
+    /// Receive any clipboard format as a `HANDLE`.
+    ///
+    /// The type of handle depends entirely on the format.
     pub fn receive_handle(&self, format: CLIPBOARD_FORMATS) -> Result<HANDLE> {
         if !self.formats().any(|f| f == format) {
             return Err(Error::FormatNotAvailable);
@@ -51,9 +62,23 @@ impl ClipboardOffer {
 
         Ok(clipboard.receive(format)?)
     }
+
+    /// Receive any clipboard format as a memory buffer.
+    ///
+    /// This method only works for clipboard formats that are represented as handles
+    /// to memory buffers.
+    /// If the format is not a memory buffer (e.g. `CF_HBITMAP`), it returns an error.
     pub fn receive_bytes(&self, format: CLIPBOARD_FORMATS) -> Result<raw::GlobalMemory> {
         Ok(raw::GlobalMemory::try_from(self.receive_handle(format)?)?)
     }
+
+    /// Checks whether this clipboard offer contains image data.
+    pub fn has_image(&self) -> bool {
+        self.formats().any(|x| x == format::CF_DIBV5)
+    }
+    /// Receive a bitmap image from the clipboard.
+    ///
+    /// Returns the `FormatNotAvailable` error if there is no image data on the clipboard.
     #[cfg(feature = "image")]
     pub fn receive_image(&self) -> Result<image::DynamicImage> {
         use std::mem;
@@ -77,6 +102,14 @@ impl ClipboardOffer {
 
         Ok(image::load(multi, ImageFormat::Bmp)?)
     }
+
+    /// Checks whether this clipboard offer contains text.
+    pub fn has_string(&self) -> bool {
+        self.formats().any(|x| x == format::CF_UNICODETEXT)
+    }
+    /// Receive a string from the clipboard.
+    ///
+    /// Returns the `FormatNotAvailable` error if there is no text on the clipboard.
     pub fn receive_string(&self) -> Result<String> {
         let memory = self.receive_bytes(format::CF_UNICODETEXT)?;
         unsafe {
