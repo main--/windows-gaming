@@ -1,3 +1,5 @@
+//! Offering data on the clipboard.
+
 use std::{ffi::OsString, io::{BufRead, Read, Seek, SeekFrom}, os::windows::prelude::OsStringExt};
 use windows::{Win32::{Foundation::{HANDLE, HWND}, System::SystemServices::CLIPBOARD_FORMATS}};
 use thiserror::Error;
@@ -67,9 +69,19 @@ impl ClipboardOffer {
     ///
     /// This method only works for clipboard formats that are represented as handles
     /// to memory buffers.
-    /// If the format is not a memory buffer (e.g. `CF_HBITMAP`), it returns an error.
-    pub fn receive_bytes(&self, format: CLIPBOARD_FORMATS) -> Result<raw::GlobalMemory> {
-        Ok(raw::GlobalMemory::try_from(self.receive_handle(format)?)?)
+    /// If the format is not a memory buffer (e.g. handle-based like `CF_HBITMAP`), it returns an error.
+    pub fn receive_bytes(&self, format: CLIPBOARD_FORMATS) -> Result<Vec<u8>> {
+        if !self.formats().any(|f| f == format) {
+            return Err(Error::FormatNotAvailable);
+        }
+
+        let clipboard = raw::WindowsClipboard::open(HWND(0));
+        if clipboard.sequence_number() != self.sequence {
+            return Err(Error::ClipboardOfferExpired);
+        }
+
+        let buf = clipboard.receive_buffer(format)?;
+        Ok(buf.to_owned())
     }
 
     /// Checks whether this clipboard offer contains image data.
@@ -96,7 +108,7 @@ impl ClipboardOffer {
 
         // std::io::Chain would solve this perfectly, if only it would implement Seek :((
         let multi = MultiCursor {
-            bufs: &[b"BM", &[0; 8], &u32::try_from(mem::size_of::<BITMAPV5HEADER>()).unwrap().to_le_bytes(), &*mem],
+            bufs: &[b"BM", &[0; 8], &u32::try_from(mem::size_of::<BITMAPV5HEADER>()).unwrap().to_le_bytes(), &mem],
             position: 0,
         };
 

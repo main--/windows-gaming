@@ -1,11 +1,27 @@
+//! Direct access to the clipboard on the current thread.
+//!
+//! While this interface tries to paper over them, there are still some footguns
+//! if you try hard enough (e.g. leaking a `WindowsClipboard`).
+//! This module is used by the crate internally and probably not useful for you.
+//! You have been warned.
+
 use std::{ffi::c_void, marker::PhantomData, ops::Deref, thread};
 
 use windows::{runtime::Result, Win32::Foundation::*, Win32::System::DataExchange::*, Win32::System::Memory::*, Win32::System::SystemServices::*, runtime::{Error, Handle}};
 
-use crate::offer::ClipboardOffer;
-
-pub struct WindowsClipboard(());
+/// This struct is a zero-sized marker which makes sure that `OpenClipboard` and `CloseClipboard` are called correctly.
+///
+/// Do not hold this value for extended periods of time. You must not invoke any blocking operations while holding it.
+///
+/// While it might *technically* be valid to send this value across threads, this crate currently doesn't allow it.
+/// Doing so would be a terrible idea regardless.
+pub struct WindowsClipboard(PhantomData<*mut ()>);
 impl WindowsClipboard {
+    /// Open the clipboard with a given window handle (may be zero).
+    ///
+    /// This function invokes `try_open` until it succeeds.
+    /// This is a potential deadlock if an application leaves the clipboard open forever, but
+    /// in that case many things will break so it should be fine for most cases.
     pub fn open(window: HWND) -> Self {
         loop {
             if let Some(x) = Self::try_open(window) {
@@ -14,26 +30,46 @@ impl WindowsClipboard {
             thread::yield_now();
         }
     }
+
+    /// Try to open the clipboard with a given window handle (may be zero).
     pub fn try_open(window: HWND) -> Option<Self> {
         let success = unsafe { OpenClipboard(window) }.as_bool();
         if success {
-            Some(WindowsClipboard(()))
+            Some(WindowsClipboard(PhantomData))
         } else {
             None
         }
     }
+
+    /// Enumerate the formats that are available on the clipboard right now.
     pub fn enum_formats(&self) -> EnumClipboardFormats {
         EnumClipboardFormats {
             current: 0,
             marker: PhantomData
         }
     }
+
+    /// Receive data from the clipboard in a given format as a `HANDLE`.
     pub fn receive(&self, format: CLIPBOARD_FORMATS) -> Result<HANDLE> {
         unsafe { GetClipboardData(format.0) }.ok()
     }
-    pub fn clear(&self) -> Result<()> {
+    /// Receive data from the clipboard in a given format as a memory buffer.
+    pub fn receive_buffer<'a>(&'a self, format: CLIPBOARD_FORMATS) -> Result<GlobalMemory<'a>> {
+        Ok(GlobalMemory::new(self.receive(format)?)?)
+    }
+
+    /// Clear the clipboard, taking ownership over it.
+    pub fn clear(&mut self) -> Result<()> {
         unsafe { EmptyClipboard() }.ok()
     }
+
+    /// Query the clipboard sequence number.
+    ///
+    /// The clipboard sequence number changes whenever the clipboard changes.
+    ///
+    /// Note: technically, this function does not require the clipboard to be open.
+    /// However, using it without opening the clipboard is virtually useless, as that
+    /// would still leave you open to TOCTTOU race conditions.
     pub fn sequence_number(&self) -> u32 {
         unsafe { GetClipboardSequenceNumber() }
     }
@@ -44,35 +80,37 @@ impl Drop for WindowsClipboard {
     }
 }
 
-pub struct GlobalMemory {
+/// Describes a memory buffer received from the clipboard.
+pub struct GlobalMemory<'a> {
+    marker: PhantomData<&'a WindowsClipboard>,
     hglobal: HANDLE,
     ptr: *mut c_void,
     size: usize,
 }
-impl TryFrom<HANDLE> for GlobalMemory {
-    type Error = Error;
-
-    fn try_from(hglobal: HANDLE) -> Result<Self> {
+impl<'a> GlobalMemory<'a> {
+    fn new(hglobal: HANDLE) -> Result<Self> {
         unsafe {
             let ptr = GlobalLock(hglobal.0);
             if ptr.is_null() {
                 return Err(Error::from_win32());
             }
             let size = GlobalSize(hglobal.0);
-            Ok(GlobalMemory { hglobal, ptr, size })
+            Ok(GlobalMemory { marker: PhantomData, hglobal, ptr, size })
         }
     }
-}
-impl GlobalMemory {
+
+    /// Pointer to the memory buffer.
     pub fn ptr(&self) -> *mut c_void {
         self.ptr
     }
+    /// Memory buffer size in bytes.
     pub fn size(&self) -> usize {
         self.size
     }
 }
+
 // implementing deref mut is not safe because hglobals are shared
-impl Deref for GlobalMemory {
+impl<'a> Deref for GlobalMemory<'a> {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
@@ -81,15 +119,17 @@ impl Deref for GlobalMemory {
         }
     }
 }
-impl Drop for GlobalMemory {
+
+impl<'a> Drop for GlobalMemory<'a> {
     fn drop(&mut self) {
         unsafe { GlobalUnlock(self.hglobal.0) }.ok().unwrap();
     }
 }
 
+/// Iterator over formats currently on the clipboard.
 pub struct EnumClipboardFormats<'a> {
     current: u32,
-    marker: PhantomData<*mut &'a WindowsClipboard>,
+    marker: PhantomData<&'a WindowsClipboard>,
 }
 impl<'a> Iterator for EnumClipboardFormats<'a> {
     type Item = Result<CLIPBOARD_FORMATS>;
@@ -107,16 +147,4 @@ impl<'a> Iterator for EnumClipboardFormats<'a> {
             Some(Ok(CLIPBOARD_FORMATS::from(self.current)))
         }
     }
-}
-
-pub fn read_clipboard(window: HWND) -> Result<Option<ClipboardOffer>> {
-    let clipboard = WindowsClipboard::open(window);
-    let formats: Vec<_> = clipboard.enum_formats().collect::<Result<_>>()?;
-    let offer = if formats.is_empty() {
-        None
-    } else {
-        let sequence = clipboard.sequence_number();
-        Some(ClipboardOffer::new(sequence, formats))
-    };
-    Ok(offer)
 }

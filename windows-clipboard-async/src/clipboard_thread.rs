@@ -70,7 +70,7 @@ extern "system" fn wndproc(window: HWND, message: u32, wparam: WPARAM, lparam: L
             WM_CLIPBOARDUPDATE => {
                 let mywin = &mut *(GetWindowLongPtrA(window, GWLP_USERDATA) as *mut WindowData);
 
-                let offer = raw::read_clipboard(window).unwrap_or(None);
+                let offer = crate::read_clipboard(window).unwrap_or(None);
                 let _ = mywin.upd.send(offer);
                 // we don't care if there's nobody to receive
                 LRESULT(0)
