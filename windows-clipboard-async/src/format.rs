@@ -200,11 +200,12 @@ CF_UNICODETEXT -> CF_TEXT;
 */
 
 
-use std::{ffi::OsStr, os::windows::prelude::OsStrExt};
+use std::{ffi::{OsStr, OsString}, fmt::Debug, os::windows::prelude::{OsStrExt, OsStringExt}};
 
-use windows::Win32::{Foundation::PWSTR, System::{DataExchange::RegisterClipboardFormatW, SystemServices::{CF_PRIVATEFIRST, CF_PRIVATELAST, CF_GDIOBJFIRST, CF_GDIOBJLAST}}};
+use windows::Win32::{Foundation::PWSTR, System::{DataExchange::{GetClipboardFormatNameW, RegisterClipboardFormatW}, SystemServices::{CF_PRIVATEFIRST, CF_PRIVATELAST, CF_GDIOBJFIRST, CF_GDIOBJLAST}}};
+/// Clipboard format wrapper type from the `windows` crate.
+pub use windows::Win32::System::SystemServices::CLIPBOARD_FORMATS;
 pub use windows::Win32::System::SystemServices::{
-    CLIPBOARD_FORMATS,
     CF_BITMAP,
     CF_DIB,
     CF_DIBV5,
@@ -263,5 +264,68 @@ pub fn registered(name: &str) -> CLIPBOARD_FORMATS {
     let mut str: Vec<u16> = str.encode_wide().chain([0]).collect();
     unsafe {
         CLIPBOARD_FORMATS(RegisterClipboardFormatW(PWSTR(str.as_mut_ptr())))
+    }
+}
+
+/// Better Debug implementation for `[CLIPBOARD_FORMATS]`.
+pub struct DebugFormats<'a>(pub &'a [CLIPBOARD_FORMATS]);
+impl<'a> Debug for DebugFormats<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut debug = f.debug_list();
+        for &o in self.0 {
+            let dbg = DebugFormat::from(o);
+            debug.entry(&dbg);
+        }
+        debug.finish()
+    }
+}
+
+/// Better Debug implementation for `CLIPBOARD_FORMATS`.
+#[derive(Debug)]
+pub enum DebugFormat {
+    #[doc(hidden)]
+    CF(&'static str),
+    #[doc(hidden)]
+    Registered(String),
+    #[doc(hidden)]
+    Private(CLIPBOARD_FORMATS),
+}
+impl From<CLIPBOARD_FORMATS> for DebugFormat {
+    fn from(o: CLIPBOARD_FORMATS) -> DebugFormat {
+        match o {
+            CF_BITMAP => DebugFormat::CF("CF_BITMAP"),
+            CF_DIB => DebugFormat::CF("CF_DIB"),
+            CF_DIBV5 => DebugFormat::CF("CF_DIBV5"),
+            CF_DIF => DebugFormat::CF("CF_DIF"),
+            CF_DSPBITMAP => DebugFormat::CF("CF_DSPBITMAP"),
+            CF_DSPENHMETAFILE => DebugFormat::CF("CF_DSPENHMETAFILE"),
+            CF_DSPMETAFILEPICT => DebugFormat::CF("CF_DSPMETAFILEPICT"),
+            CF_DSPTEXT => DebugFormat::CF("CF_DSPTEXT"),
+            CF_ENHMETAFILE => DebugFormat::CF("CF_ENHMETAFILE"),
+            CF_HDROP => DebugFormat::CF("CF_HDROP"),
+            CF_LOCALE => DebugFormat::CF("CF_LOCALE"),
+            CF_METAFILEPICT => DebugFormat::CF("CF_METAFILEPICT"),
+            CF_OEMTEXT => DebugFormat::CF("CF_OEMTEXT"),
+            CF_OWNERDISPLAY => DebugFormat::CF("CF_OWNERDISPLAY"),
+            CF_PALETTE => DebugFormat::CF("CF_PALETTE"),
+            CF_PENDATA => DebugFormat::CF("CF_PENDATA"),
+            CF_RIFF => DebugFormat::CF("CF_RIFF"),
+            CF_SYLK => DebugFormat::CF("CF_SYLK"),
+            CF_TEXT => DebugFormat::CF("CF_TEXT"),
+            CF_TIFF => DebugFormat::CF("CF_TIFF"),
+            CF_UNICODETEXT => DebugFormat::CF("CF_UNICODETEXT"),
+            CF_WAVE => DebugFormat::CF("CF_WAVE"),
+            custom => {
+                unsafe {
+                    let mut buf = [0u16; 128];
+                    let len = GetClipboardFormatNameW(custom.0, PWSTR(&mut buf[0]), 128);
+                    if len == 0 {
+                        DebugFormat::Private(custom)
+                    } else {
+                        DebugFormat::Registered(OsString::from_wide(&buf[..len as usize]).to_string_lossy().into_owned())
+                    }
+                }
+            }
+        }
     }
 }

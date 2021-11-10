@@ -1,19 +1,39 @@
-#[tokio::main(flavor = "current_thread")]
+use image::GenericImageView;
+use tokio::sync::oneshot;
+use windows_clipboard_async::send::{ClipboardContents, ClipboardFormatContent, ClipboardFormatData};
+
+#[tokio::main]
 async fn main() {
-    let x = windows_clipboard_async::WindowsClipboard::init().await.unwrap();
-    let mut rxo = x.rx_offers.clone();
-    loop {
-        let borrow_and_update = rxo.borrow_and_update();
-        let offer = borrow_and_update.as_ref().unwrap();
-        println!("{:?}", offer);
-        if offer.formats().any(|x| x == windows_clipboard_async::format::CF_UNICODETEXT) {
-            println!("recv: {:?}", offer.receive_string());
-        } else {
-            let memes = offer.receive_image().unwrap();
-            let memes = memes.to_owned();
-            println!("recv: {:?}", memes);
+    let clipboard = windows_clipboard_async::WindowsClipboard::init().await.unwrap();
+
+    let (txd, rxd) = oneshot::channel::<oneshot::Sender<ClipboardFormatData>>();
+    tokio::spawn(async move {
+        if let Ok(lel) = rxd.await {
+            println!("delay rendering!");
+            lel.send(ClipboardFormatData::Text("delayed".to_owned())).unwrap();
         }
-        drop(borrow_and_update);
-        rxo.changed().await.unwrap();
+    });
+
+    clipboard.send(ClipboardContents(vec![
+        (windows_clipboard_async::format::CF_UNICODETEXT, ClipboardFormatContent::DelayRendered(txd))
+    ])).await.ok().unwrap();
+
+    let mut watch = clipboard.watch();
+    for _ in 0..10 {
+        let guard = watch.borrow_and_update();
+        let offer = guard.as_ref().unwrap();
+
+        if offer.has_string() {
+            println!("got text: {:?}", offer.receive_string());
+        } else if offer.has_image() {
+            let img = offer.receive_image().unwrap();
+            println!("got image with {:?} pixels", img.dimensions());
+        } else {
+            println!("got something else: {:?}", offer);
+        }
+        drop(guard);
+        watch.changed().await.unwrap();
     }
+
+    clipboard.shutdown().await.unwrap();
 }

@@ -9,7 +9,7 @@ use std::{ffi::c_void, marker::PhantomData, ops::Deref, thread};
 
 use windows::{runtime::Result, Win32::Foundation::*, Win32::System::DataExchange::*, Win32::System::Memory::*, Win32::System::SystemServices::*, runtime::{Error, Handle}};
 
-/// This struct is a zero-sized marker which makes sure that `OpenClipboard` and `CloseClipboard` are called correctly.
+/// Zero-sized marker which makes sure that `OpenClipboard` and `CloseClipboard` are called correctly.
 ///
 /// Do not hold this value for extended periods of time. You must not invoke any blocking operations while holding it.
 ///
@@ -59,8 +59,11 @@ impl WindowsClipboard {
     }
 
     /// Clear the clipboard, taking ownership over it.
-    pub fn clear(&mut self) -> Result<()> {
-        unsafe { EmptyClipboard() }.ok()
+    pub fn clear<'a>(&'a mut self) -> Result<WindowsClipboardOwned<'a>> {
+        unsafe {
+            EmptyClipboard().ok()?;
+            Ok(WindowsClipboardOwned(PhantomData))
+        }
     }
 
     /// Query the clipboard sequence number.
@@ -79,6 +82,37 @@ impl Drop for WindowsClipboard {
         unsafe { CloseClipboard() }.ok().unwrap();
     }
 }
+/// Zero-sized marker that represents the state where you are holding the clipboard.
+///
+/// Produced from `WindowsClipboard::clear`.
+pub struct WindowsClipboardOwned<'a>(PhantomData<&'a WindowsClipboard>);
+impl WindowsClipboardOwned<'static> {
+    /// Obtain this type without having cleared the clipboard.
+    ///
+    /// This is mostly useful for implementing WM_RENDERFORMAT.
+    pub unsafe fn assert() -> Self {
+        WindowsClipboardOwned(PhantomData)
+    }
+}
+fn success_is_good(r: Result<()>) -> Result<()> {
+    match r {
+        Err(e) if e.code() == S_OK => Ok(()),
+        x => x,
+    }
+}
+impl<'a> WindowsClipboardOwned<'a> {
+    /// Places data on the clipboard in a specified clipboard format.
+    pub fn send(&mut self, format: CLIPBOARD_FORMATS, handle: HANDLE) -> Result<()> {
+        success_is_good(unsafe { SetClipboardData(format.0, handle).ok().map(|_| ()) })
+    }
+    /// Places delay-rendered data on the clipboard in a specified clipboard format.
+    ///
+    /// This is a convenience wrapper for `send(format, HANDLE(0))`.
+    pub fn send_delay_rendered(&mut self, format: CLIPBOARD_FORMATS) -> Result<()> {
+        self.send(format, HANDLE(0))
+    }
+}
+
 
 /// Describes a memory buffer received from the clipboard.
 pub struct GlobalMemory<'a> {
@@ -122,7 +156,7 @@ impl<'a> Deref for GlobalMemory<'a> {
 
 impl<'a> Drop for GlobalMemory<'a> {
     fn drop(&mut self) {
-        unsafe { GlobalUnlock(self.hglobal.0) }.ok().unwrap();
+        unsafe { GlobalUnlock(self.hglobal.0) };
     }
 }
 

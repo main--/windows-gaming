@@ -1,10 +1,10 @@
 //! Offering data on the clipboard.
 
-use std::{ffi::OsString, io::{BufRead, Read, Seek, SeekFrom}, os::windows::prelude::OsStringExt};
+use std::{ffi::OsString, fmt::Debug, io::{BufRead, Read, Seek, SeekFrom}, os::windows::prelude::OsStringExt};
 use windows::{Win32::{Foundation::{HANDLE, HWND}, System::SystemServices::CLIPBOARD_FORMATS}};
 use thiserror::Error;
 
-use crate::{format, raw};
+use crate::{format::{self, DebugFormats}, raw};
 
 /// An application is offering data on the clipboard.
 ///
@@ -13,11 +13,34 @@ use crate::{format, raw};
 /// While this type may be cloned and moved arbitrarily, it is only useful as long as the
 /// clipboard contents have not changed.
 /// Once the clipboard contents change, it is no longer possible to receive contents through this offer.
-#[derive(Debug, Clone)]
+///
+/// ## Potential deadlock when receiving from yourself
+///
+/// When receiving delay-rendered content from an offer that your application put onto the clipboard
+/// using the tokio current_thread runtime, you will run into the following deadlock:
+///
+/// - you call a the (synchronous) receive function
+/// - windows asks the clipboard thread to render the delay-rendered content
+/// - the clipboard thread asks your delay renderer to render its content
+/// - your delay renderer can't run because your application thread is blocked waiting for
+///   the clipboard contents to arrive
+///
+/// This deadlock "resolves" itself once Windows times out the clipboard request (after several seconds!).
+/// Note that in this case, your delay-rendered content is removed from the clipboard by Windows.
+#[derive(Clone)]
 pub struct ClipboardOffer {
     sequence: u32,
     formats: Vec<CLIPBOARD_FORMATS>,
 }
+impl Debug for ClipboardOffer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClipboardOffer")
+            .field("sequence", &self.sequence)
+            .field("formats", &DebugFormats(&self.formats))
+            .finish()
+    }
+}
+
 
 /// An error while receiving clipboard contents.
 #[non_exhaustive]
@@ -108,7 +131,7 @@ impl ClipboardOffer {
 
         // std::io::Chain would solve this perfectly, if only it would implement Seek :((
         let multi = MultiCursor {
-            bufs: &[b"BM", &[0; 8], &u32::try_from(mem::size_of::<BITMAPV5HEADER>()).unwrap().to_le_bytes(), &mem],
+            bufs: &[b"BM", &[0; 8], &(mem::size_of::<BITMAPV5HEADER>() as u32).to_le_bytes(), &mem],
             position: 0,
         };
 
@@ -126,7 +149,8 @@ impl ClipboardOffer {
         let memory = self.receive_bytes(format::CF_UNICODETEXT)?;
         unsafe {
             let (_, stringmem, _) = memory.align_to::<u16>();
-            let str = OsString::from_wide(stringmem);
+            // remove null terminator
+            let str = OsString::from_wide(&stringmem[..stringmem.len() - 1]);
             Ok(str.to_string_lossy().into_owned())
         }
     }
