@@ -18,8 +18,8 @@ use wayland_protocols::wlr::unstable::data_control::v1::client::zwlr_data_contro
 use wayland_protocols::wlr::unstable::data_control::v1::client::zwlr_data_control_offer_v1::{self, ZwlrDataControlOfferV1};
 use wayland_protocols::wlr::unstable::data_control::v1::client::zwlr_data_control_source_v1;
 
-use crate::cancel::make_cancelable;
-use crate::eventloop::WaylandEventLoop;
+use super::cancel::make_cancelable;
+use super::eventloop::WaylandEventLoop;
 
 pub struct WaylandClipboardInternal {
     clipboard_manager: Main<ZwlrDataControlManagerV1>,

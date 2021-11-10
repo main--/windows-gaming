@@ -7,8 +7,8 @@ use tokio::sync::oneshot;
 use windows::Win32::System::Memory::GlobalFree;
 use windows::Win32::{Foundation::HANDLE, System::{Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalLock, GlobalUnlock}, SystemServices::CLIPBOARD_FORMATS}};
 
-use crate::format;
-use crate::raw::WindowsClipboardOwned;
+use super::format;
+use super::raw::WindowsClipboardOwned;
 
 /// A set of data in different formats to be put onto the clipboard.
 #[derive(Debug)]

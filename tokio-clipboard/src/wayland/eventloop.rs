@@ -6,7 +6,7 @@ use tokio::sync::Notify;
 use wayland_client::{Attached, Display, EventQueue};
 use wayland_client::protocol::wl_display;
 
-use crate::cancel::make_cancelable;
+use super::cancel::make_cancelable;
 
 struct EventQueueWrapper {
     queue: RwLock<EventQueue>,

@@ -1,8 +1,8 @@
 use tokio::sync::{mpsc, oneshot, watch};
 
-use crate::ClipboardRequest;
-use crate::eventloop::WaylandEventLoop;
-use crate::clipboard_internal::{ClipboardOffer, WaylandClipboardInternal};
+use super::ClipboardRequest;
+use super::eventloop::WaylandEventLoop;
+use super::clipboard_internal::{ClipboardOffer, WaylandClipboardInternal};
 
 
 enum Command {

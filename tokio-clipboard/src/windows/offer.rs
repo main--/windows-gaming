@@ -4,7 +4,7 @@ use std::{ffi::OsString, fmt::Debug, io::{BufRead, Read, Seek, SeekFrom}, os::wi
 use windows::{Win32::{Foundation::{HANDLE, HWND}, System::SystemServices::CLIPBOARD_FORMATS}};
 use thiserror::Error;
 
-use crate::{format::{self, DebugFormats}, raw};
+use super::{format::{self, DebugFormats}, raw};
 
 /// An application is offering data on the clipboard.
 ///

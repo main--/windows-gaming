@@ -4,8 +4,8 @@ use windows::{Win32::Foundation::*, Win32::System::DataExchange::*, Win32::Syste
 
 use tokio::{runtime::{Handle, Runtime}, sync::{mpsc, oneshot, watch}};
 
-use crate::send::DelayRenderedClipboardData;
-use crate::{offer::ClipboardOffer, raw::{WindowsClipboard, WindowsClipboardOwned}, send::{ClipboardContents, ClipboardFormatContent}};
+use super::send::DelayRenderedClipboardData;
+use super::{offer::ClipboardOffer, raw::{WindowsClipboard, WindowsClipboardOwned}, send::{ClipboardContents, ClipboardFormatContent}};
 
 struct WindowData {
     upd: watch::Sender<Option<ClipboardOffer>>,
@@ -109,7 +109,7 @@ extern "system" fn wndproc(window: HWND, message: u32, wparam: WPARAM, lparam: L
                 LRESULT(0)
             }
             WM_CLIPBOARDUPDATE => {
-                let offer = crate::read_clipboard(window).unwrap_or(None);
+                let offer = super::read_clipboard(window).unwrap_or(None);
                 let _ = window_data().upd.send(offer);
                 // we don't care if there's nobody to receive
                 LRESULT(0)
