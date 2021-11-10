@@ -4,11 +4,12 @@ use windows::{Win32::Foundation::*, Win32::System::DataExchange::*, Win32::Syste
 
 use tokio::{runtime::{Handle, Runtime}, sync::{mpsc, oneshot, watch}};
 
-use crate::{offer::ClipboardOffer, raw::{WindowsClipboard, WindowsClipboardOwned}, send::{ClipboardContents, ClipboardFormatContent, ClipboardFormatData}};
+use crate::send::DelayRenderedClipboardData;
+use crate::{offer::ClipboardOffer, raw::{WindowsClipboard, WindowsClipboardOwned}, send::{ClipboardContents, ClipboardFormatContent}};
 
 struct WindowData {
     upd: watch::Sender<Option<ClipboardOffer>>,
-    delay_renderers: Arc<Mutex<HashMap<u32, oneshot::Sender<oneshot::Sender<ClipboardFormatData>>>>>,
+    delay_renderers: Arc<Mutex<HashMap<u32, DelayRenderedClipboardData>>>,
     runtime: Runtime,
 }
 
@@ -60,14 +61,15 @@ pub fn run(
                 let mut clipboard = clipboard.clear()?;
                 let mut delay_renderers = delay_renderers.lock().unwrap();
                 delay_renderers.clear();
-                for (format, content) in x.0 {
+                for content in x.0 {
                     match content {
                         ClipboardFormatContent::DelayRendered(renderer) => {
+                            let format = renderer.format();
                             delay_renderers.insert(format.0, renderer);
                             clipboard.send_delay_rendered(format)?;
                         }
                         ClipboardFormatContent::Immediate(val) => {
-                            val.render(&mut clipboard, format)?;
+                            val.render(&mut clipboard)?;
                         }
                     }
                 }
@@ -116,10 +118,9 @@ extern "system" fn wndproc(window: HWND, message: u32, wparam: WPARAM, lparam: L
                 let data = window_data();
                 let mut delay_renderers = data.delay_renderers.lock().unwrap();
                 let fmt = CLIPBOARD_FORMATS(wparam.0 as u32);
-                let (tx, rx) = oneshot::channel();
-                if let Some(()) = delay_renderers.remove(&fmt.0).and_then(|c| c.send(tx).ok()) {
-                    if let Ok(cfd) = data.runtime.block_on(rx) {
-                        let _ = cfd.render(&mut WindowsClipboardOwned::assert(), fmt);
+                if let Some(dr) = delay_renderers.remove(&fmt.0) {
+                    if let Some(cfd) = data.runtime.block_on(dr.delay_render()) {
+                        let _ = cfd.render(&mut WindowsClipboardOwned::assert());
                         // if windows refuses to render this there is nothing we can do
                     }
                     // else: if our delay renderer us not responding there is nothing we can do
@@ -137,20 +138,13 @@ extern "system" fn wndproc(window: HWND, message: u32, wparam: WPARAM, lparam: L
                 let clipboard_open = WindowsClipboard::open(window);
                 let mut clipboard = WindowsClipboardOwned::assert(); // must not clear existing data here
                 if GetClipboardOwner() == window { // someone else could have the clipboard by now
-                    let joined = futures_util::future::join_all(delay_renderers.drain().map(|(format, renderer)| async move {
-                        let (tx, rx) = oneshot::channel();
-                        if let Ok(()) = renderer.send(tx) {
-                            if let Ok(cfd) = rx.await {
-                                return Some((format, cfd));
-                            }
-                        }
-                        // ignore all formats where the delay renderer is gone or did not work
-                        None
+                    let joined = futures_util::future::join_all(delay_renderers.drain().map(|(_, renderer)| async move {
+                        renderer.delay_render().await
                     }));
                     let joined = data.runtime.block_on(joined);
 
-                    for (format, cfd) in joined.into_iter().flatten() {
-                        let _ = cfd.render(&mut clipboard, CLIPBOARD_FORMATS(format));
+                    for cfd in joined.into_iter().flatten() {
+                        let _ = cfd.render(&mut clipboard);
                         // if windows refuses to render this there is nothing we can do
                     }
                 }

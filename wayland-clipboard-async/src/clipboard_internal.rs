@@ -1,7 +1,7 @@
-use std::cell::{Ref, RefCell};
+use std::cell::RefCell;
 use std::collections::HashSet;
-use std::fmt::Debug;
 use std::future::Future;
+use std::ops::Deref;
 use std::os::unix::prelude::{AsRawFd, FromRawFd};
 use std::rc::Rc;
 use std::sync::Arc;
@@ -140,6 +140,7 @@ impl WaylandClipboardInternal {
     }
 }
 
+/// You should offer all of these MIME types when offering UTF-8 text in order to ensure compatibility with other applications.
 pub const PLAINTEXT_MIME_TYPES: &[&str] = &[
     "text/plain",
     "text/plain;charset=utf-8",
@@ -148,23 +149,29 @@ pub const PLAINTEXT_MIME_TYPES: &[&str] = &[
     "TEXT",
 ];
 
+/// An application is requesting clipboard data from you.
+///
+/// Use `target` or `into_target` to deliver the response.
 pub struct ClipboardRequest {
     mime_type: String,
     target: PipeWrite,
 }
 impl ClipboardRequest {
+    /// The MIME type they asked for.
     pub fn mime_type(&self) -> &str {
         &self.mime_type
     }
+    /// A reference to write the data into.
     pub fn target(&mut self) -> &mut (impl AsyncWrite + AsRawFd) {
         &mut self.target
     }
+    /// A value to write the data into.
     pub fn into_target(self) -> impl AsyncWrite + AsRawFd {
         self.target
     }
 }
 
-
+/// An application is offering data on the clipboard.
 #[derive(Clone)]
 pub struct ClipboardOffer {
     offer: ZwlrDataControlOfferV1,
@@ -181,17 +188,22 @@ impl Drop for ClipboardOffer {
 }
 */
 impl ClipboardOffer {
-    pub fn mime_types(&self) -> MimeTypesGuard/*impl IntoIterator<Item=&str>*/ {
+    /// Set of MIME types they are offering.
+    pub fn mime_types(&self) -> impl Deref<Target=HashSet<String>> + '_ {
         let mime = self.offer.as_ref().user_data().get::<RefCell<HashSet<String>>>().unwrap();
-        MimeTypesGuard(mime.borrow())
+        mime.borrow()
     }
+    /// Receive clipboard contents as `String`.
+    ///
+    /// Convenience wrapper around `receive_bytes`.
     pub async fn receive_string(&self) -> anyhow::Result<String> {
         let v = self.receive_bytes("text/plain;charset=utf-8".to_owned()).await?;
         Ok(String::from_utf8(v)?)
     }
+    /// Receive clipboard contents of a given MIME type as a reader.
     pub async fn receive_reader(&self, mime: impl Into<String>) -> anyhow::Result<PipeRead> {
         let mime = mime.into();
-        if !self.mime_types().into_iter().any(|x| x == mime) {
+        if !self.mime_types().contains(&mime) {
             anyhow::bail!("The requested MIME type is not available");
         }
         let (r, w) = tokio_pipe::pipe()?;
@@ -203,36 +215,13 @@ impl ClipboardOffer {
         self.notify.notify_one();
         Ok(r)
     }
+    /// Receive clipboard contents of a given MIME type as `Vec<u8>`.
+    ///
+    /// Convenience wrapper around `receive_reader`.
     pub async fn receive_bytes(&self, mime: impl Into<String>) -> anyhow::Result<Vec<u8>> {
         let mut r = self.receive_reader(mime).await?;
         let mut v = Vec::new();
         r.read_to_end(&mut v).await?;
         Ok(v)
-    }
-}
-
-
-#[doc(hidden)]
-pub struct MimeTypesGuard<'a>(Ref<'a, HashSet<String>>);
-impl<'a> IntoIterator for &'a MimeTypesGuard<'a> {
-    type Item = &'a str;
-    type IntoIter = MimeTypesIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        MimeTypesIter((&*self.0).iter())
-    }
-}
-impl<'a> Debug for MimeTypesGuard<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_set().entries(self.into_iter()).finish()
-    }
-}
-#[doc(hidden)]
-pub struct MimeTypesIter<'a>(std::collections::hash_set::Iter<'a, String>);
-impl<'a> Iterator for MimeTypesIter<'a> {
-    type Item = &'a str;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(|x| x.as_str())
     }
 }

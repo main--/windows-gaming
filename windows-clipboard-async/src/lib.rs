@@ -37,7 +37,7 @@ pub mod raw;
 pub mod format;
 
 pub use offer::ClipboardOffer;
-pub use send::{ClipboardContents, ClipboardFormatContent, ClipboardFormatData};
+pub use send::{ClipboardContents, ClipboardFormatContent, ClipboardFormatData, DelayRenderedClipboardData};
 
 /// Result type from the `windows` crate.
 pub use windows::runtime::Result as WinapiResult;
@@ -47,7 +47,6 @@ struct WindowsEventLoop {
     rx_shutdown: Option<oneshot::Receiver<Result<WinapiResult<()>, Box<dyn Any + Send>>>>,
 }
 impl WindowsEventLoop {
-    ///
     async fn shutdown(mut self) -> WinapiResult<()> {
         let rx_shutdown = self.rx_shutdown.take().unwrap();
         drop(self);

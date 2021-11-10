@@ -12,11 +12,20 @@ enum Command {
     ClaimString(String),
 }
 
+/// Handle to the Wayland clipboard.
+///
+/// Dropping this handle causes all clipboard functionality (clipboard watching and providing data) to cease.
 pub struct WaylandClipboard {
     sender: mpsc::Sender<Command>,
 }
 
 impl WaylandClipboard {
+    /// Initialize the clipboard.
+    ///
+    /// Returns a `Future` as well as a `WaylandClipboard`.
+    /// The `Future` is the task that takes care of actually running the clipboard.
+    /// It will complete once you drop the `WaylandClipboard`.
+    /// `WaylandClipboard` does nothing unless you schedule this task.
     pub async fn init() -> anyhow::Result<(impl std::future::Future, Self)> {
         let (tx, mut rx) = tokio::sync::mpsc::channel::<Command>(1);
 
@@ -57,21 +66,25 @@ impl WaylandClipboard {
         Ok((job, WaylandClipboard { sender: tx }))
     }
 
+    /// Obtain the current contents of the clipboard.
     pub async fn get(&self) -> Option<ClipboardOffer> {
         let (ttx, rx) = oneshot::channel();
         self.sender.send(Command::Get(ttx)).await.ok().unwrap();
         rx.await.unwrap()
     }
+    /// Subscribe to clipboard changes.
     pub async fn subscribe(&self) -> watch::Receiver<Option<ClipboardOffer>> {
         let (ttx, rx) = oneshot::channel();
         self.sender.send(Command::Subscribe(ttx)).await.ok().unwrap();
         rx.await.unwrap()
     }
+    /// Claim the clipboard and offer the given MIME types.
     pub async fn claim(&self, mime_types: impl Iterator<Item=String>) -> mpsc::UnboundedReceiver<ClipboardRequest> {
         let (ttx, rx) = oneshot::channel();
         self.sender.send(Command::Claim { mime_types: mime_types.collect(), sender: ttx }).await.ok().unwrap();
         rx.await.unwrap()
     }
+    /// Claim the clipboard and offer a fixed `String`.
     pub async fn claim_string(&self, text: String) {
         self.sender.send(Command::ClaimString(text)).await.ok().unwrap();
     }
