@@ -1,4 +1,3 @@
-#[macro_use] extern crate prost_derive;
 
 include!(concat!(env!("OUT_DIR"), "/clientpipe_protocol.rs"));
 
