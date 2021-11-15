@@ -1,0 +1,16 @@
+[package]
+name = "windows-keybinds"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+windows-eventloop = { path = "../windows-eventloop" }
+tokio = { version = "1.13.0", features = ["rt", "sync"] }
+windows = { version = "0.26.0", features = ["std", "Win32_Foundation", "Win32_UI_Input_KeyboardAndMouse", "Win32_System_DataExchange"] }
+log = "0.4.14"
+
+[dev-dependencies]
+env_logger = "0.9.0"
+tokio = { version = "1.13.0", features = ["rt", "sync", "macros"] }

@@ -24,12 +24,14 @@
 //! }
 //! ```
 
-use std::{any::Any, panic::AssertUnwindSafe, thread};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
-use tokio::{runtime::Handle, sync::{mpsc, oneshot, watch}};
+use async_trait::async_trait;
+use tokio::sync::watch;
+use windows::Win32::System::DataExchange::{AddClipboardFormatListener, GetClipboardOwner, RemoveClipboardFormatListener};
+use windows::Win32::System::SystemServices::CLIPBOARD_FORMATS;
 use windows::{Win32::Foundation::*, Win32::UI::WindowsAndMessaging::*};
-
-mod clipboard_thread;
 
 pub mod offer;
 pub mod send;
@@ -41,85 +43,117 @@ pub use send::{ClipboardContents, ClipboardFormatContent, ClipboardFormatData, D
 
 /// Result type from the `windows` crate.
 pub use windows::runtime::Result as WinapiResult;
+use windows_eventloop::{RemoveMeError, WindowMessageListener, WindowsEventLoop};
 
-struct WindowsEventLoop {
-    handle: HWND,
-    rx_shutdown: Option<oneshot::Receiver<Result<WinapiResult<()>, Box<dyn Any + Send>>>>,
-}
-impl WindowsEventLoop {
-    async fn shutdown(mut self) -> WinapiResult<()> {
-        let rx_shutdown = self.rx_shutdown.take().unwrap();
-        drop(self);
-        match rx_shutdown.await {
-            Ok(Ok(r)) => r,
-            Ok(Err(e)) => std::panic::resume_unwind(e),
-            Err(_) => unreachable!(),
-        }
-    }
-}
-impl Drop for WindowsEventLoop {
-    fn drop(&mut self) {
-        unsafe { PostMessageA(self.handle, WM_USER, None, None) }.ok().unwrap();
-    }
-}
+use self::raw::WindowsClipboardOwned;
 
-/// Represents a thread running this crate's clipboard functionality.
+/// Represents this crate's clipboard functionality, running on a `WindowsEventLoop`.
+/// It has the following responsibilities:
 ///
 /// - when not holding the clipboard: watch for clipboard updates
 /// - when holding the clipboard: respond to requests for data
+///
+/// # Shutdown
+///
+/// If you drop this struct (and all `watch::Receiver` instances obtained through `watch()`), we will
+/// stop listening to clipboard updates as soon as all delay-rendered content has been taken care of.
+///
+/// Alternatively, you can simply shut down the underlying `WindowsEventLoop`.
+/// This causes Windows to query for all delay-rendered contents immediately.
+/// Hence, you should make sure that your delay-renderers remain working and responsive until `WindowsEventLoop::shutdown` has returned.
 pub struct WindowsClipboard {
-    eventloop: WindowsEventLoop,
+    hwnd: HWND,
     rx_offers: watch::Receiver<Option<offer::ClipboardOffer>>,
-    tx_contents: mpsc::Sender<ClipboardContents>,
+    delay_renderers: Arc<Mutex<HashMap<u32, DelayRenderedClipboardData>>>,
 }
 
+struct ClipboardHandler {
+    upd: watch::Sender<Option<ClipboardOffer>>,
+    delay_renderers: Arc<Mutex<HashMap<u32, DelayRenderedClipboardData>>>,
+}
+#[async_trait(?Send)]
+impl WindowMessageListener for ClipboardHandler {
+    async fn handle(&mut self, window: HWND, message: u32, wparam: WPARAM, _lparam: LPARAM) -> Result<Option<LRESULT>, RemoveMeError> {
+        unsafe {
+            match message {
+                WM_CLIPBOARDUPDATE => {
+                    let offer = super::read_clipboard(window).unwrap_or(None);
+                    match self.upd.send(offer) {
+                        // if there is nobody to receive, the WindowsClipboard has been dropped
+                        // let's unregister if (and only if) we have no outstanding delay renderers
+                        Err(_) if self.delay_renderers.lock().unwrap().is_empty() => {
+                            RemoveClipboardFormatListener(window);
+                            return Err(RemoveMeError);
+                        }
+                        _ => (),
+                    }
+                }
+                WM_DESTROYCLIPBOARD => {
+                    // if someone else takes over the clipboard, destroy our delay renderers
+                    if GetClipboardOwner() != window {
+                        self.delay_renderers.lock().unwrap().clear();
+                    }
+                }
+                WM_RENDERFORMAT => {
+                    let mut delay_renderers = self.delay_renderers.lock().unwrap();
+                    let fmt = CLIPBOARD_FORMATS(wparam.0 as u32);
+                    if let Some(dr) = delay_renderers.remove(&fmt.0) {
+                        if let Some(cfd) = dr.delay_render().await {
+                            let _ = cfd.render(&mut WindowsClipboardOwned::assert());
+                            // if windows refuses to render this there is nothing we can do
+                        }
+                        // else: if our delay renderer us not responding there is nothing we can do
+                    }
+                    // else: if our delay renderer is already gone there is - you guessed it - nothing we can do
+
+                    // TODO: maybe add debug logging for all of these cases
+                }
+                WM_RENDERALLFORMATS => {
+                    let mut delay_renderers = self.delay_renderers.lock().unwrap();
+
+                    let clipboard_open = raw::WindowsClipboard::open(window);
+                    let mut clipboard = WindowsClipboardOwned::assert(); // must not clear existing data here
+                    if GetClipboardOwner() == window { // someone else could have the clipboard by now
+                        let joined = futures_util::future::join_all(delay_renderers.drain().map(|(_, renderer)| async move {
+                            renderer.delay_render().await
+                        })).await;
+
+                        for cfd in joined.into_iter().flatten() {
+                            let _ = cfd.render(&mut clipboard);
+                            // if windows refuses to render this there is nothing we can do
+                        }
+                    }
+                    drop(clipboard_open);
+                }
+                _ => return Ok(None),
+            }
+
+            Ok(Some(LRESULT(0)))
+        }
+    }
+}
 
 impl WindowsClipboard {
     /// Initialize this crate's clipboard functionality.
-    pub async fn init() -> windows::runtime::Result<WindowsClipboard> {
-        let (tx, rx) = oneshot::channel();
+    ///
+    /// # Concurrent instances
+    ///
+    /// Initializing a second `WindowsClipboard` instance for the same `WindowsEventLoop`
+    /// while the first instance is still active is not allowed and causes an error.
+    pub async fn init(wel: &WindowsEventLoop) -> windows::runtime::Result<WindowsClipboard> {
         let (tx_offers, rx_offers) = watch::channel(read_clipboard(HWND(0))?);
-        let (tx_contents, rx_contents) = mpsc::channel(1);
-        let handle = Handle::current();
 
-        let (tx_shutdown, rx_shutdown) = oneshot::channel();
-        thread::spawn(move || {
-            let res = std::panic::catch_unwind(AssertUnwindSafe(move || clipboard_thread::run(handle, tx_offers, rx_contents, tx)));
-            match tx_shutdown.send(res) {
-                Ok(()) => (), // they received it
-                Err(Ok(Ok(()))) => (), // no receiver it but it's no crash
-                Err(Ok(Err(_))) => {
-                    // no receiver but we failed.
-                    // it's not a panic either however, so can't be that serious i guess?
-                    // maybe let's not kill the program in this case
-                }
-                Err(Err(e)) => {
-                    // no receiver and we had a crash
-                    // no choice but to rethrow and bring down the application
-                    std::panic::resume_unwind(e);
-                }
+        let hwnd = wel.window_handle();
+        let delay_renderers: Arc<Mutex<HashMap<u32, DelayRenderedClipboardData>>> = Default::default();
+        let dr2 = delay_renderers.clone();
+        wel.send_callback(Box::new(move |wd| {
+            unsafe {
+                assert!(AddClipboardFormatListener(hwnd).as_bool());
             }
-        });
+            wd.register_listener(Box::new(ClipboardHandler { upd: tx_offers, delay_renderers }))
+        })).await.unwrap();
 
-
-        let handle = match rx.await {
-            Ok(h) => h,
-            Err(_) => {
-                // the only way this can happen is if they crashed; let's propagate the error or panic
-                match rx_shutdown.await.unwrap() {
-                    Ok(Ok(())) => unreachable!(),
-                    Ok(Err(e)) => return Err(e),
-                    Err(e) => std::panic::resume_unwind(e),
-                }
-            }
-        };
-
-        let eventloop = WindowsEventLoop { handle, rx_shutdown: Some(rx_shutdown) };
-        Ok(WindowsClipboard {
-            eventloop,
-            rx_offers,
-            tx_contents,
-        })
+        Ok(WindowsClipboard { hwnd, rx_offers, delay_renderers: dr2 })
     }
 
 
@@ -137,23 +171,24 @@ impl WindowsClipboard {
     }
 
     /// Send new contents to the clipboard.
-    ///
-    /// Note that this sends through a channel internally, so the fact that this future returns does not mean that
-    /// your data is already visible on the clipboard.
-    /// You would have to wait and check with `watch` for that.
-    pub async fn send(&self, contents: ClipboardContents) -> Result<(), mpsc::error::SendError<ClipboardContents>> {
-        self.tx_contents.send(contents).await
-    }
-
-    /// Shut down the clipboard thread.
-    ///
-    /// This causes Windows to query for all delay-rendered contents immediately.
-    /// Hence, you should make sure that your delay-renderers remain working and responsive until this function has returned.
-    ///
-    /// For completeness' sake, note that this call will re-surface any errors or panics that happened on the clipboard thread.
-    /// However, the clipboard thread is not expected to panic in general.
-    pub async fn shutdown(self) -> WinapiResult<()> {
-        self.eventloop.shutdown().await
+    pub fn send(&self, contents: ClipboardContents) -> WinapiResult<()> {
+        let mut clipboard = raw::WindowsClipboard::open(self.hwnd);
+        let mut clipboard = clipboard.clear()?;
+        let mut delay_renderers = self.delay_renderers.lock().unwrap();
+        delay_renderers.clear();
+        for content in contents.0 {
+            match content {
+                ClipboardFormatContent::DelayRendered(renderer) => {
+                    let format = renderer.format();
+                    delay_renderers.insert(format.0, renderer);
+                    clipboard.send_delay_rendered(format)?;
+                }
+                ClipboardFormatContent::Immediate(val) => {
+                    val.render(&mut clipboard)?;
+                }
+            }
+        }
+        Ok(())
     }
 }
 

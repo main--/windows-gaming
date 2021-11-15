@@ -1,0 +1,13 @@
+[package]
+name = "windows-eventloop"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-trait = "0.1.51"
+tokio = { version = "1.13.0", features = ["rt", "sync"] }
+windows = { version = "0.26.0", features = ["std", "Win32_Foundation", "Win32_Graphics_Gdi", "Win32_System_LibraryLoader", "Win32_UI_WindowsAndMessaging"] }
+futures-util = { version = "0.3.17", default-features = false, features = ["alloc"] }
+log = "0.4.14"
