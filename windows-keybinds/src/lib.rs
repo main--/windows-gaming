@@ -59,7 +59,7 @@ impl<T: AsRef<WindowsEventLoop>> HotKeyManager<T> {
     /// Note: There is a footgun where if you register the same modifier+vk combination multiple times
     /// the docs state that only the first call should succeed. Subsequent registrations will fail silently
     /// under the current implementation. Turn on logging to debug this.
-    pub async fn register_hotkey(&mut self, modifiers: HOT_KEY_MODIFIERS, vk: u32) -> mpsc::UnboundedReceiver<()> {
+    pub async fn register_hotkey(&self, modifiers: HOT_KEY_MODIFIERS, vk: u32) -> mpsc::UnboundedReceiver<()> {
         let (tx, rx) = mpsc::unbounded_channel();
         let hwnd = self.wel.as_ref().window_handle();
         let sname = OsString::from(format!("rust-windows-keybinds#{}", HK_COUNTER.fetch_add(1, Ordering::Relaxed)));

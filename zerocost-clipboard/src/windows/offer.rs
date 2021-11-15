@@ -30,6 +30,7 @@ use super::{format::{self, DebugFormats}, raw};
 #[derive(Clone)]
 pub struct ClipboardOffer {
     sequence: u32,
+    owner: HWND,
     formats: Vec<CLIPBOARD_FORMATS>,
 }
 impl Debug for ClipboardOffer {
@@ -63,13 +64,18 @@ pub enum Error {
 type Result<T> = std::result::Result<T, Error>;
 
 impl ClipboardOffer {
-    pub(crate) fn new(sequence: u32, formats: Vec<CLIPBOARD_FORMATS>) -> Self {
-        ClipboardOffer { sequence, formats }
+    pub(crate) fn new(sequence: u32, owner: HWND, formats: Vec<CLIPBOARD_FORMATS>) -> Self {
+        ClipboardOffer { sequence, owner, formats }
     }
 
     /// Iterates over the formats currently available on the clipboard
     pub fn formats(&self) -> impl Iterator<Item=CLIPBOARD_FORMATS> + '_ {
         self.formats.iter().copied()
+    }
+
+    /// Gets the clipboard owner
+    pub fn owner(&self) -> HWND {
+        self.owner
     }
 
     /// Receive any clipboard format as a `HANDLE`.

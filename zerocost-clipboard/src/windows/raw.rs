@@ -76,6 +76,11 @@ impl WindowsClipboard {
     pub fn sequence_number(&self) -> u32 {
         unsafe { GetClipboardSequenceNumber() }
     }
+
+    /// Query the clipboard owner.
+    pub fn owner(&self) -> HWND {
+        unsafe { GetClipboardOwner() }
+    }
 }
 impl Drop for WindowsClipboard {
     fn drop(&mut self) {

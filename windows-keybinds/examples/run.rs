@@ -7,7 +7,7 @@ async fn main() {
     env_logger::init();
 
     let wel = WindowsEventLoop::init().await.unwrap();
-    let mut kb = HotKeyManager::new(Box::new(wel)).await;
+    let kb = HotKeyManager::new(Box::new(wel)).await;
     let mut reg = kb.register_hotkey(MOD_CONTROL | MOD_WIN, VK_DELETE.0.into()).await;
     for _ in 0..3 {
         reg.recv().await.unwrap();

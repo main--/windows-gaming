@@ -200,7 +200,8 @@ pub fn read_clipboard(window: HWND) -> windows::runtime::Result<Option<Clipboard
         None
     } else {
         let sequence = clipboard.sequence_number();
-        Some(ClipboardOffer::new(sequence, formats))
+        let owner = clipboard.owner();
+        Some(ClipboardOffer::new(sequence, owner, formats))
     };
     Ok(offer)
 }

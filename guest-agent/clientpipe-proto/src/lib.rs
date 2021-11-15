@@ -6,6 +6,11 @@ impl From<clipboard_message::Message> for ga_cmd_out::Message {
         ga_cmd_out::Message::Clipboard(ClipboardMessage { message: Some(msg) })
     }
 }
+impl From<clipboard_message::Message> for ga_cmd_in::Message {
+    fn from(msg: clipboard_message::Message) -> Self {
+        ga_cmd_in::Message::Clipboard(ClipboardMessage { message: Some(msg) })
+    }
+}
 
 impl From<RegisterHotKey> for ga_cmd_out::Message {
     fn from(msg: RegisterHotKey) -> Self {
