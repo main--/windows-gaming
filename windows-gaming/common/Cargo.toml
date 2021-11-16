@@ -1,0 +1,11 @@
+[package]
+name = "common"
+version = "0.1.0"
+authors = ["main() <main@ehvag.de>"]
+
+[dependencies]
+toml = "0.4"
+serde = "1.0"
+serde_derive = "1.0"
+serde_yaml = "0.7"
+libudev = "0.2.0"
