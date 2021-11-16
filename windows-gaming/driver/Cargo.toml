@@ -26,6 +26,6 @@ tokio-signal = "0.1"
 dbus = "0.5"
 input = "0.2.1"
 xcb = "0.8.1"
-prost = { git = "https://github.com/danburkert/prost.git" }
-clientpipe-proto = { path = "clientpipe-proto" }
+prost = "0.9"
+clientpipe-proto = { path = "../../guest-agent/clientpipe-proto" }
 common = { path = "../common" }

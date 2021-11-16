@@ -1,7 +1,7 @@
 extern crate clientpipe_proto as proto;
 
 use std::io;
-use bytes::{IntoBuf, Buf, BytesMut};
+use prost::bytes::{Buf, BytesMut};
 use tokio_io::codec::{Encoder, Decoder};
 use prost::{encoding, Message};
 
@@ -16,11 +16,11 @@ impl Decoder for Codec {
     type Item = GaCmdIn;
     type Error = io::Error;
 
-    fn decode(&mut self, buf: &mut BytesMut) -> io::Result<Option<GaCmdIn>> {
+    fn decode(&mut self, buf: &mut bytes::BytesMut) -> io::Result<Option<GaCmdIn>> {
         let mut res = Ok(None);
         let mut consumed = 0;
         {
-            let mut rbuf = (&*buf).into_buf();
+            let mut rbuf = (&*buf).as_ref();
             // prost's length delimiting functions are astonishingly useless because they return io::Error
             if let Ok(len) = encoding::decode_varint(&mut rbuf) {
                 if rbuf.remaining() as u64 >= len {
@@ -45,11 +45,16 @@ impl Encoder for Codec {
     type Item = GaCmdOut;
     type Error = io::Error;
 
-    fn encode(&mut self, cmd: GaCmdOut, buf: &mut BytesMut) -> io::Result<()> {
+    fn encode(&mut self, cmd: GaCmdOut, buf: &mut bytes::BytesMut) -> io::Result<()> {
         let cmd = proto::GaCmdOut { message: Some(cmd) };
 
         let len = cmd.encoded_len();
-        buf.reserve(len + encoding::encoded_len_varint(len as u64));
-        Ok(cmd.encode_length_delimited(buf)?)
+        let cap = len + encoding::encoded_len_varint(len as u64);
+
+        let mut tmp = prost::bytes::BytesMut::with_capacity(cap);
+        cmd.encode_length_delimited(&mut tmp)?;
+
+        buf.extend_from_slice(tmp.as_ref());
+        Ok(())
     }
 }
