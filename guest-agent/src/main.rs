@@ -25,7 +25,8 @@ mod clientpipe_codec;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
-    let _ = env_logger::try_init(); // This crashes when windows_subsystem is set (i.e., in release builds)
+    #[cfg(debug_assertions)]
+    env_logger::init();
 
     log::info!("requesting shutdown privileges ...");
     request_shutdown_privileges().unwrap();
