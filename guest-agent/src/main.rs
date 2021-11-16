@@ -1,5 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::ffi::OsStr;
+use std::os::windows::prelude::OsStrExt;
+use std::ptr;
 use std::sync::{Arc, Mutex};
 
 use futures_util::StreamExt;
@@ -7,6 +10,11 @@ use tokio::net::TcpStream;
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::codec::{FramedRead, FramedWrite};
+use windows::Win32::Foundation::{BOOLEAN, HANDLE, LUID, PWSTR};
+use windows::Win32::Security::{AdjustTokenPrivileges, LUID_AND_ATTRIBUTES, LookupPrivilegeValueW, SE_PRIVILEGE_ENABLED, TOKEN_ADJUST_PRIVILEGES, TOKEN_PRIVILEGES, TOKEN_QUERY};
+use windows::Win32::System::Power::SetSuspendState;
+use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+use windows::runtime::Handle;
 use windows_eventloop::WindowsEventLoop;
 use windows_keybinds::HotKeyManager;
 use zerocost_clipboard::{ClipboardContents, ClipboardFormatContent, DelayRenderedClipboardData, WindowsClipboard};
@@ -16,6 +24,10 @@ mod clientpipe_codec;
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
     let _ = env_logger::try_init(); // This crashes when windows_subsystem is set (i.e., in release builds)
+
+    log::info!("requesting shutdown privileges ...");
+    request_shutdown_privileges().unwrap();
+    log::info!("success");
 
     let (rx, tx) = TcpStream::connect(("10.0.2.1", 31337)).await?.into_split();
     let incoming = FramedRead::new(rx, clientpipe_codec::Codec);
@@ -67,7 +79,12 @@ async fn main() -> anyhow::Result<()> {
                     });
                 },
                 clientpipe_codec::GaCmdOut::ReleaseModifiers(()) => (),
-                clientpipe_codec::GaCmdOut::Suspend(()) => (), // unimplemented
+                clientpipe_codec::GaCmdOut::Suspend(()) => {
+                    let res = unsafe { SetSuspendState(BOOLEAN(0), BOOLEAN(0), BOOLEAN(0)) }.ok();
+                    if let Err(e) = res {
+                        log::error!("Failed to suspend: {:?}", e);
+                    }
+                }
                 clientpipe_codec::GaCmdOut::Clipboard(c) => {
                     log::trace!("handling clipboard {:?}", c);
                     match c.message {
@@ -108,5 +125,21 @@ async fn main() -> anyhow::Result<()> {
     });
     a.await;
 
+    Ok(())
+}
+
+fn request_shutdown_privileges() -> windows::runtime::Result<()> {
+    unsafe {
+        let mut token: HANDLE = HANDLE::default();
+        OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &mut token).ok()?;
+        let mut privname: Vec<_> = OsStr::new("SeShutdownPrivilege").encode_wide().chain([0]).collect();
+        let mut luid = LUID::default();
+        LookupPrivilegeValueW(None, PWSTR(privname.as_mut_ptr()), &mut luid).ok()?;
+        let privs = TOKEN_PRIVILEGES {
+            PrivilegeCount: 1,
+            Privileges: [LUID_AND_ATTRIBUTES { Luid: luid, Attributes: SE_PRIVILEGE_ENABLED }],
+        };
+        AdjustTokenPrivileges(token, false, &privs, 0, ptr::null_mut(), ptr::null_mut()).ok()?;
+    }
     Ok(())
 }
