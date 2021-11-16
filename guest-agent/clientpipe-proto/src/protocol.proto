@@ -42,6 +42,7 @@ message GaCmdOut {
     google.protobuf.Empty suspend = 17;
     RegisterHotKey register_hot_key = 18;
     Point set_mouse_position = 19;
+    google.protobuf.Empty shutdown = 20;
   }
 }
 

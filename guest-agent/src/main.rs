@@ -13,7 +13,9 @@ use tokio_util::codec::{FramedRead, FramedWrite};
 use windows::Win32::Foundation::{BOOLEAN, HANDLE, LUID, PWSTR};
 use windows::Win32::Security::{AdjustTokenPrivileges, LUID_AND_ATTRIBUTES, LookupPrivilegeValueW, SE_PRIVILEGE_ENABLED, TOKEN_ADJUST_PRIVILEGES, TOKEN_PRIVILEGES, TOKEN_QUERY};
 use windows::Win32::System::Power::SetSuspendState;
+use windows::Win32::System::Shutdown::{EWX_POWEROFF, EXIT_WINDOWS_FLAGS, ExitWindowsEx, SHTDN_REASON_FLAG_PLANNED};
 use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+use windows::Win32::UI::WindowsAndMessaging::EWX_FORCEIFHUNG;
 use windows::runtime::Handle;
 use windows_eventloop::WindowsEventLoop;
 use windows_keybinds::HotKeyManager;
@@ -83,6 +85,12 @@ async fn main() -> anyhow::Result<()> {
                     let res = unsafe { SetSuspendState(BOOLEAN(0), BOOLEAN(0), BOOLEAN(0)) }.ok();
                     if let Err(e) = res {
                         log::error!("Failed to suspend: {:?}", e);
+                    }
+                }
+                clientpipe_codec::GaCmdOut::Shutdown(()) => {
+                    let res = unsafe { ExitWindowsEx(EWX_POWEROFF | EXIT_WINDOWS_FLAGS(EWX_FORCEIFHUNG), SHTDN_REASON_FLAG_PLANNED.0) }.ok();
+                    if let Err(e) = res {
+                        log::error!("Failed to shut down: {:?}", e);
                     }
                 }
                 clientpipe_codec::GaCmdOut::Clipboard(c) => {
