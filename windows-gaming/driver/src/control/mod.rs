@@ -9,6 +9,7 @@ use std::cell::RefCell;
 
 use futures::{future, Stream, Future, Sink};
 use futures::unsync::mpsc;
+use futures03::compat::Future01CompatExt;
 use tokio_core::reactor::Handle;
 use tokio_io::AsyncRead;
 use tokio_uds::UnixListener as TokioUnixListener;
@@ -20,7 +21,6 @@ type Handler<'a> = Box<Future<Item=(), Error=Error> + 'a>;
 
 pub fn create<'a>(socket: StdUnixListener, handle: &'a Handle, controller: Rc<RefCell<Controller>>) -> Handler<'a> {
     let socket = TokioUnixListener::from_listener(socket, &handle).unwrap();
-    let handle_inner = handle.clone();
     let handler = socket.incoming().for_each(move |(socket, _)| {
         let (writer, reader) = socket.framed(Codec).split();
         let (sender, recv) = mpsc::unbounded();
@@ -28,7 +28,6 @@ pub fn create<'a>(socket: StdUnixListener, handle: &'a Handle, controller: Rc<Re
         let writer = writer.sink_map_err(|_| ()).send_all(recv).map_err(|_| ()).map(|_| ());
         let controller_rc = controller.clone();
         let mut temp_entry = false;
-        let handle_inner = handle_inner.clone();
         let reader = reader.map_err(|_| ()).for_each(move |req| {
             let mut controller = controller_rc.borrow_mut();
             info!("Control request: {:?}", req);
@@ -66,18 +65,18 @@ pub fn create<'a>(socket: StdUnixListener, handle: &'a Handle, controller: Rc<Re
                     let controller = controller_rc.clone();
                     let sender = sender.clone();
                     let sender2 = sender.clone();
-                    handle_inner.spawn(receiver.for_each(move |data| (&*sender.borrow()).send(data).map_err(|_| ()))
+                    tokio1::task::spawn_local(receiver.for_each(move |data| (&*sender.borrow()).send(data).map_err(|_| ()))
                         .then(move |_| {
                             controller.borrow_mut().temporary_exit();
                             let _ = (&*sender2.borrow()).send(ControlCmdOut::TemporaryLightDetached);
-                            Ok(())
-                        }));
+                            Ok::<(), ()>(())
+                        }).compat());
                 }
             }
             Box::new(future::ok(()))
         }).then(|_| Ok(()));
 
-        handle.spawn(writer.select(reader).then(|_| Ok(())));
+        tokio1::task::spawn_local(writer.select(reader).then(|_| Ok::<(), ()>(())).compat());
         Ok(())
     });
     Box::new(handler)

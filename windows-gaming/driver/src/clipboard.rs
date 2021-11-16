@@ -1,145 +1,183 @@
+use std::io::Cursor;
+use std::iter::once;
+use std::os::unix::prelude::FromRawFd;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::os::unix::io::AsRawFd;
 
 use futures::{Async, Stream, Future};
-use futures::unsync::mpsc::UnboundedReceiver;
+use futures::unsync::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use futures03::compat::Compat;
+use futures03::{FutureExt, TryFutureExt, TryStreamExt, StreamExt};
 use tokio_core::reactor::{Handle, PollEvented};
-use xcb::{self, Atom, Connection, ConnError, GenericEvent, GenericError, Window, Timestamp,
-          SelectionRequestEvent, SelectionNotifyEvent,
-          SELECTION_REQUEST, SELECTION_CLEAR, SELECTION_NOTIFY, PROPERTY_NOTIFY, PROP_MODE_REPLACE};
 
 use my_io::MyIo;
 use controller::Controller;
 use clientpipe::ClipboardType;
+use tokio_stream::wrappers::{UnboundedReceiverStream, WatchStream};
 
+extern crate zerocost_clipboard;
 
-struct XcbEvents<'a> {
-    connection: &'a Connection,
-    my_io: PollEvented<MyIo>,
-}
-
-impl<'a> XcbEvents<'a> {
-    fn new(connection: &'a Connection, handle: &Handle) -> XcbEvents<'a> {
-        XcbEvents {
-            connection,
-            my_io: PollEvented::new(MyIo { fd: connection.as_raw_fd() }, handle).unwrap(),
-        }
-    }
-}
-
-impl<'a> Stream for XcbEvents<'a> {
-    type Item = GenericEvent;
-    type Error = ConnError;
-
-    fn poll(&mut self) -> Result<Async<Option<GenericEvent>>, ConnError> {
-        if let Some(event) = self.connection.poll_for_queued_event() {
-            return Ok(Async::Ready(Some(event)));
-        }
-
-        match self.my_io.poll_read() {
-            Async::Ready(()) => match self.connection.poll_for_event() {
-                Some(event) => Ok(Async::Ready(Some(event))),
-                None => self.connection.has_error().map(|()| {
-                    self.my_io.need_read();
-                    Async::NotReady
-                }),
-            },
-            Async::NotReady => Ok(Async::NotReady),
-        }
-    }
-}
-
-fn get_atom(connection: &Connection, name: &str) -> Result<Atom, GenericError> {
-    xcb::intern_atom(connection, false, name).get_reply().map(|reply| reply.atom())
-}
-
-struct Atoms {
-    clipboard: Atom,
-    targets: Atom,
-    utf8_string: Atom,
-    property: Atom,
-    png: Atom,
-}
+static OUR_MIME_MARKER: &'static str = "application/from-windows";
 
 pub struct X11Clipboard {
+    /*
     connection: Connection,
     window: u32,
     atoms: Atoms,
+    */
+    clipboard: zerocost_clipboard::WaylandClipboard,
+    run: RefCell<Option<Box<dyn Future<Item=(), Error=anyhow::Error>>>>,
+
+    cmd_tx: UnboundedSender<Cmd>,
+    cmd_rx: RefCell<Option<UnboundedReceiver<Cmd>>>,
+}
+
+#[derive(Debug)]
+enum Cmd {
+    Grab,
+    Read(ClipboardType),
 }
 
 impl X11Clipboard {
-    pub fn open() -> Result<X11Clipboard, GenericError> {
-        let (connection, screen) = Connection::connect(None).unwrap();
+    pub fn open() -> Box<Future<Item=X11Clipboard, Error=anyhow::Error>> {
+        /*
+        let (tx, rx) = futures::sync::oneshot::channel();
+        std::thread::spawn(move || {
+            let rt = tokio1::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+            let (run, clipboard) = rt.block_on(zerocost_clipboard::WaylandClipboard::init()).unwrap();
+            let _ = tx.send(clipboard);
+            rt.block_on(run);
+        });
 
-        let window = connection.generate_id();
-
-        // borrowing a little from the x11-clipboard crate here
-        {
-            let screen = connection.get_setup().roots().nth(screen as usize)
-                .expect("Invalid X11 screen!");
-
-            xcb::create_window(
-                &connection,
-                xcb::COPY_FROM_PARENT as u8,
-                window, screen.root(),
-                0, 0, 1, 1,
-                0,
-                xcb::WINDOW_CLASS_INPUT_OUTPUT as u16,
-                screen.root_visual(),
-                &[(
-                    xcb::CW_EVENT_MASK,
-                    xcb::EVENT_MASK_STRUCTURE_NOTIFY | xcb::EVENT_MASK_PROPERTY_CHANGE
-                )]
-            );
-            connection.flush();
-        }
-
-        let atoms = Atoms {
-            clipboard: get_atom(&connection, "CLIPBOARD")?,
-            property: get_atom(&connection, "THIS_CLIPBOARD_OUT")?,
-            targets: get_atom(&connection, "TARGETS")?,
-            utf8_string: get_atom(&connection, "UTF8_STRING")?,
-            // incr: get_atom(&connection, "INCR")?, // not (yet?) implemented
-            png: get_atom(&connection, "image/png")?,
-        };
-
-        Ok(X11Clipboard { connection, window, atoms })
+        let task = rx.map(|cb| {
+            X11Clipboard { clipboard: cb }
+        }).map_err(|e| anyhow::Error::from(e));
+        task.boxed()
+        */
+        trace!("opening wayland clipboard");
+        let task = zerocost_clipboard::WaylandClipboard::init().boxed().compat();
+        task.map(|(run, clipboard)| {
+            //let c = run.boxed_local().compat();
+            let run = tokio_compat_02::FutureExt::compat(run);
+            let run: Box<dyn Future<Item=(), Error=anyhow::Error>> = Box::new(run.boxed_local().compat());
+            let run = RefCell::new(Some(run));
+            let (cmd_tx, cmd_rx) = mpsc::unbounded();
+            trace!("opened wayland clipboard");
+            X11Clipboard { run, clipboard, cmd_tx, cmd_rx: RefCell::new(Some(cmd_rx)) }
+        }).boxed()
     }
 
     pub fn grab_clipboard(&self) {
-        xcb::set_selection_owner(&self.connection, self.window, self.atoms.clipboard, xcb::CURRENT_TIME);
-        self.connection.flush();
+        self.cmd_tx.unbounded_send(Cmd::Grab).unwrap();
     }
 
     pub fn read_clipboard(&self, kind: ClipboardType) {
-        let target = self.cliptype_to_atom(kind).unwrap_or(self.atoms.targets);
-        xcb::convert_selection(&self.connection, self.window, self.atoms.clipboard,
-                               target, self.atoms.property, xcb::CURRENT_TIME);
-        self.connection.flush();
-    }
-
-    fn atom_to_cliptype(&self, atom: Atom) -> Option<ClipboardType> {
-        Some(match atom {
-            x if x == self.atoms.targets => ClipboardType::None,
-            x if x == self.atoms.utf8_string => ClipboardType::Text,
-            x if x == self.atoms.png => ClipboardType::Image,
-            _ => return None,
-        })
-    }
-
-    fn cliptype_to_atom(&self, kind: ClipboardType) -> Option<Atom> {
-        match kind {
-            ClipboardType::None => None,
-            ClipboardType::Text => Some(self.atoms.utf8_string),
-            ClipboardType::Image => Some(self.atoms.png),
-        }
+        self.cmd_tx.unbounded_send(Cmd::Read(kind)).unwrap();
     }
 
     pub fn run<'a>(&'a self,
                    controller: Rc<RefCell<Controller>>,
                    resp_recv: UnboundedReceiver<ClipboardRequestResponse>,
                    handle: &Handle) -> Box<Future<Item=(), Error=::std::io::Error> + 'a> {
+        trace!("running wayland clipboard");
+        let cmd_rx = self.cmd_rx.borrow_mut().take().unwrap();
+        //let clipboard = self.clipboard.clone();
+        let clipboard = &self.clipboard;
+        let run = self.run.borrow_mut().take().unwrap();
+        Box::new(run.map_err(|_| unreachable!()).join(
+        self.clipboard.subscribe().never_error().boxed().compat().and_then(move |clipboard_rx| {
+            let clipboard_sub = WatchStream::new(clipboard_rx);
+            let controller2 = controller.clone();
+            let clipboard_listener = clipboard_sub.map(Ok).compat().for_each(move |offer| {
+                debug!("got clipboard offer");
+                if let Some(offer) = offer {
+                    if !offer.mime_types().contains(OUR_MIME_MARKER) {
+                        debug!("it is foreign, so we grab the clipboard");
+                        // only react if it's not from us
+                        controller2.borrow_mut().grab_win_clipboard();
+                    }
+                }
+                Ok(())
+            });
+            let responder = resp_recv.for_each(move |mut response: ClipboardRequestResponse| {
+                match response.response {
+                    ClipboardResponse::Types(kinds) => {
+                        todo!();
+                    }
+                    ClipboardResponse::Data(buf) => {
+                        debug!("responding to wayland with clipboard data");
+                        let fd = response.event.req.target().as_raw_fd();
+                        let tkfs = tokio_fs::file::File::from_std(unsafe { std::fs::File::from_raw_fd(fd) });
+                        std::mem::forget(response.event.req.into_target());
+                        tokio_io::io::copy(Cursor::new(buf), tkfs).then(|_| Ok(()))
+                    }
+                }
+                // TODO: right now we default to requesting unknown formats as text
+                // this is potentially bad
+                // we should not set anything here for unsupported formats
+
+                /*
+                xcb::send_event(
+                    &self.connection, false, event.requestor, 0,
+                    &SelectionNotifyEvent::new(
+                        event.time,
+                        event.requestor,
+                        event.selection,
+                        event.target,
+                        event.property
+                    )
+                );
+                self.connection.flush();
+                */
+
+                //Ok(())
+            });
+            //let clipboard = self.clipboard.clone();
+            let (claim_tx, claim_rx) = mpsc::unbounded();
+            let controller2 = controller.clone();
+            let cmd_handler = cmd_rx.for_each(move |r| {
+                match r {
+                    Cmd::Grab => {
+                        debug!("windows is grabbing the clipboard");
+                        let claim_tx = claim_tx.clone();
+                        clipboard.claim(zerocost_clipboard::PLAINTEXT_MIME_TYPES.iter().chain(once(&OUR_MIME_MARKER)).map(|&s| s.to_owned()))
+                            .map(move |sender| claim_tx.send(sender).unwrap())
+                            .unit_error().boxed_local().compat()
+                    }
+                    Cmd::Read(_) => {
+                        debug!("windows is reading the clipboard (i.e. pasting)");
+                        let controller = controller2.clone();
+                        clipboard.get().then(move |c| c.unwrap().receive_string()).map(move |s| {
+                                let contents = s.unwrap().into_bytes();
+                                controller.borrow_mut().respond_win_clipboard(contents);
+                            })
+                            .unit_error().boxed_local().compat()
+                    }
+                }
+            });
+
+            let controller = controller.clone();
+            let claim_handler = claim_rx.for_each(move |claim| {
+                let controller = controller.clone();
+                UnboundedReceiverStream::new(claim).map(Ok).boxed().compat().for_each(move |req| {
+                    controller.borrow_mut().read_win_clipboard(ClipboardRequestEvent { req });
+                    Ok(())
+                })
+            });
+
+            clipboard_listener
+                .join(responder.map_err(|()| unreachable!()))
+                .join(cmd_handler.map_err(|()| unreachable!()))
+                .join(claim_handler.map_err(|()| unreachable!()))
+                .then(|_| Ok(()))
+        }).map_err(|_| std::io::Error::last_os_error())).map(|((), ())| ()))
+        /*
+        let clipboard_sub = WatchStream::new(self.clipboard.subscribe());
+        //let clipboard_listener = clipboard_sub.
+        todo!();
+        */
+        /*
         let xcb_listener = XcbEvents::new(&self.connection, handle).for_each(move |event| {
             trace!("XCB event {}", event.response_type());
             match event.response_type() & !0x80 {
@@ -225,16 +263,20 @@ impl X11Clipboard {
         });
 
         Box::new(xcb_listener.join(responder.map_err(|()| unreachable!())).then(|_| Ok(())))
+        */
     }
 }
 
 pub struct ClipboardRequestEvent {
+    /*
     time: Timestamp,
     requestor: Window,
     selection: Atom,
     target: Atom,
     property: Atom,
     desired_type: ClipboardType,
+    */
+    req: zerocost_clipboard::ClipboardRequest,
 }
 
 impl ClipboardRequestEvent {
@@ -253,7 +295,8 @@ impl ClipboardRequestEvent {
     }
 
     pub fn desired_type(&self) -> ClipboardType {
-        self.desired_type
+        ClipboardType::Text
+        //self.desired_type
     }
 }
 

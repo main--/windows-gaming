@@ -10,6 +10,7 @@ use std::time::Duration;
 
 use futures::unsync::mpsc::{self, UnboundedSender};
 use futures::{Stream, Sink, Future};
+use futures03::compat::Future01CompatExt;
 use tokio_core::reactor::Handle;
 use tokio_io::AsyncRead;
 use tokio_uds::UnixStream as TokioUnixStream;
@@ -69,7 +70,7 @@ impl Clientpipe {
                                 true => Ok(()),
                                 false => Err(()),
                             });
-                        handle.spawn(timer);
+                        tokio1::task::spawn_local(timer.compat());
                     }
                 }
                 GaCmdIn::Suspending(()) => {

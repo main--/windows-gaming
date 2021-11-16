@@ -196,7 +196,7 @@ impl ClipboardOffer {
     /// Receive clipboard contents as `String`.
     ///
     /// Convenience wrapper around `receive_bytes`.
-    pub async fn receive_string(&self) -> anyhow::Result<String> {
+    pub async fn receive_string(/*&*/self) -> anyhow::Result<String> {
         let v = self.receive_bytes("text/plain;charset=utf-8".to_owned()).await?;
         Ok(String::from_utf8(v)?)
     }

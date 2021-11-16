@@ -15,6 +15,7 @@ enum Command {
 /// Handle to the Wayland clipboard.
 ///
 /// Dropping this handle causes all clipboard functionality (clipboard watching and providing data) to cease.
+#[derive(Clone)]
 pub struct WaylandClipboard {
     sender: mpsc::Sender<Command>,
 }
@@ -26,14 +27,19 @@ impl WaylandClipboard {
     /// The `Future` is the task that takes care of actually running the clipboard.
     /// It will complete once you drop the `WaylandClipboard`.
     /// `WaylandClipboard` does nothing unless you schedule this task.
-    pub async fn init() -> anyhow::Result<(impl std::future::Future, Self)> {
+    pub async fn init() -> anyhow::Result<(impl std::future::Future<Output=anyhow::Result<()>>, Self)> {
         let (tx, mut rx) = tokio::sync::mpsc::channel::<Command>(1);
 
+        log::trace!("making job");
         let job = async move {
+            log::trace!("job booting");
             let mut queue = WaylandEventLoop::new()?;
+            log::trace!("have wel queue");
             let wc = WaylandClipboardInternal::init(&mut queue).await?;
+            log::trace!("have wl clipboard");
 
             let command_handler = async move {
+                log::trace!("entering commandhandler");
                 while let Some(cmd) = rx.recv().await {
                     // in general for oneshot senders, we don't care if they don't want their result
                     match cmd {

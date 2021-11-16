@@ -17,6 +17,8 @@ log = "0.3.8"
 mio = "0.6"
 bytes = "0.4"
 futures = "0.1"
+futures03 = { package = "futures", version = "0.3", features = ["compat"] }
+tokio1 = { package = "tokio", version = "1.14", features = ["rt"] }
 tokio-io = "0.1"
 tokio-core = "0.1"
 tokio-uds = "0.1"
@@ -25,8 +27,14 @@ tokio-process = "0.1"
 tokio-signal = "0.1"
 dbus = "0.5"
 input = "0.2.1"
-xcb = "0.8.1"
 prost = "0.9"
 clientpipe-proto = { path = "../../guest-agent/clientpipe-proto" }
 common = { path = "../common" }
 sd-notify = "0.3.0"
+zerocost-clipboard = { path = "../../zerocost-clipboard" }
+anyhow = "1.0.45"
+tokio-stream = { version = "0.1.8", features = ["sync"] }
+tokio-compat = "0.1.6"
+tokio-fs = "0.1.7"
+tokio-reactor = "0.1"
+tokio-compat-02 = "0.2.0"

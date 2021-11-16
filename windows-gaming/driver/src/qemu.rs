@@ -52,7 +52,8 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
     notify_systemd(false, "Starting qemu ...");
     trace!("starting qemu setup");
     let mut qemu = Command::new(QEMU);
-    qemu.args(&["-enable-kvm",
+    qemu.args(&[//"-S", // do not actually boot until we are ready :)
+                "-enable-kvm",
                 "-machine",
                 "pc-q35-6.1",
                 "-cpu",

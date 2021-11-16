@@ -1,3 +1,5 @@
+#![allow(bare_trait_objects, deprecated, unused_imports)]
+
 extern crate nix;
 extern crate users;
 extern crate libudev;
@@ -22,12 +24,20 @@ extern crate tokio_process;
 extern crate tokio_signal;
 extern crate dbus as libdbus;
 extern crate input;
-extern crate xcb;
 extern crate prost;
 extern crate common;
+extern crate anyhow;
+extern crate futures03;
+extern crate tokio1;
+extern crate tokio_stream;
+extern crate tokio_compat;
+extern crate tokio_fs;
+extern crate tokio_reactor;
 
 pub mod qemu;
 pub use control::ControlCmdIn;
+use futures03::compat::Future01CompatExt;
+use tokio1::task::LocalSet;
 
 mod control;
 mod monitor;
@@ -65,6 +75,12 @@ use libinput::Input;
 use clipboard::X11Clipboard;
 
 pub fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
+    /*
+    let rt = tokio_compat::runtime::current_thread::Runtime::new().unwrap();
+    rt.enter(|| run_inner(cfg, tmp, data, enable_gui));
+}
+pub fn run_inner(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
+    */
     let control_socket_file = tmp.join("control.sock");
     // first check for running sessions
     match UnixStream::connect(&control_socket_file) {
@@ -136,7 +152,9 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
 
     let controller = Rc::new(RefCell::new(ctrl));
 
-    let clipboard = X11Clipboard::open().expect("Failed to open X11 clipboard!");
+    let rt1 = tokio1::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    //core.enter
+    let clipboard = /*core.run*/rt1.block_on(X11Clipboard::open().compat()).expect("Failed to open X11 clipboard!");
     let clipboard_listener = clipboard.run(controller.clone(), resp_recv, &handle);
 
     let clipboard_grabber = clipgrab_recv.for_each(|()| {
@@ -184,7 +202,8 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
         Box::new(clipboard_reader),
     ]).map(|_| ());
 
-    core.run(qemu.select2(joined).then(|x| {
+    let ls = LocalSet::new();
+    ls.block_on(&rt1, qemu.select2(joined).then(|x| {
         match x {
             Ok(future::Either::A((_, _))) => info!("qemu down first, all ok"),
             Err(future::Either::A((e, _))) => return future::err(e).boxed(),
@@ -195,10 +214,10 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
             }
         }
         future::ok(()).boxed()
-    })).expect("Waiting for qemu errored");
+    }).compat()).expect("Waiting for qemu errored");
 
     info!("unbinding resettable vfio-things");
-    
+
     for dev in cfg.machine.pci_devices.iter().filter(|x| x.resettable) {
         let mut child = Command::new(data.join("vfio-ubind")).arg(&dev.slot).arg("-r").spawn().expect("failed to run vfio-ubind");
         match child.wait() {

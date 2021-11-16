@@ -8,8 +8,6 @@ extern crate common;
 extern crate driver;
 extern crate wizard;
 
-mod logger;
-
 use std::path::Path;
 use std::os::unix::net::UnixStream;
 use std::io::{self, Write};
@@ -27,7 +25,7 @@ enum RunMode {
 
 const DATA_FOLDER: &'static str = "/usr/lib/windows-gaming";
 fn main() {
-    logger::init().expect("Error initializing env_logger");
+    env_logger::init();
 
     let mut cli = App::new(crate_name!())
         .version(crate_version!())
