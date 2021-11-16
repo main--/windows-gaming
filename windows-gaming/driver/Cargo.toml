@@ -15,16 +15,11 @@ libudev = "0.2.0"
 itertools = "0.6"
 log = "0.3.8"
 mio = "0.6"
-bytes = "0.4"
+bytes = "1.1"
 futures = "0.1"
-futures03 = { package = "futures", version = "0.3", features = ["compat"] }
-tokio1 = { package = "tokio", version = "1.14", features = ["rt"] }
-tokio-io = "0.1"
-tokio-core = "0.1"
-tokio-uds = "0.1"
-tokio-timer = "0.1"
-tokio-process = "0.1"
-tokio-signal = "0.1"
+futures03 = { package = "futures", version = "0.3", features = ["compat", "io-compat"] }
+tokio1 = { package = "tokio", version = "1.14", features = ["full"] }
+tokio-util = { version = "0.6.9", features = ["codec", "compat"] }
 dbus = "0.5"
 input = "0.2.1"
 prost = "0.9"
@@ -33,8 +28,5 @@ common = { path = "../common" }
 sd-notify = "0.3.0"
 zerocost-clipboard = { path = "../../zerocost-clipboard" }
 anyhow = "1.0.45"
-tokio-stream = { version = "0.1.8", features = ["sync"] }
-tokio-compat = "0.1.6"
-tokio-fs = "0.1.7"
-tokio-reactor = "0.1"
-tokio-compat-02 = "0.2.0"
+tokio-stream = { version = "0.1.8", features = ["sync", "signal", "time", "net"] }
+tokio-io = "0.1.13"

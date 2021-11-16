@@ -5,7 +5,6 @@ use std::cell::RefCell;
 use std::borrow::Cow;
 use std::os::unix::io::RawFd;
 
-use tokio_core::reactor::{Handle, PollEvented};
 use futures::{Async, Poll, Future, Stream, Sink};
 use futures::unsync::mpsc::{UnboundedSender, UnboundedReceiver, self};
 use input::{Libinput, LibinputInterface, Device, AccelProfile};
@@ -15,11 +14,11 @@ use input::event::keyboard::{KeyState, KeyboardEventTrait};
 use libc::{self, c_char, c_int, c_ulong, c_void};
 use libudev::{Result as UdevResult, Context, Enumerator};
 
-use my_io::MyIo;
 use common::config::{UsbBinding, UsbPort, UsbId, MachineConfig};
 use controller::Controller;
 use common::hotkeys::{KeyboardState, KeyResolution, KeyBinding};
 use monitor::{QmpCommand, InputEvent, InputButton, KeyValue};
+use tokio1::io::unix::AsyncFd;
 
 const EVIOCGRAB: c_ulong = 1074021776;
 
@@ -51,12 +50,12 @@ pub struct Input {
     machine: MachineConfig,
     li: Libinput,
     device_handles: Vec<Device>,
-    io: PollEvented<MyIo>,
+    io: AsyncFd<RawFd>,
     sender: UnboundedSender<Event>,
 }
 
 impl Input {
-    pub fn new(handle: &Handle, machine: MachineConfig) -> (Input, UnboundedReceiver<Event>) {
+    pub fn new(machine: MachineConfig) -> (Input, UnboundedReceiver<Event>) {
         let li = Libinput::new_from_path(LibinputInterface {
             open_restricted: Some(do_open),
             close_restricted: Some(do_close),
@@ -64,7 +63,7 @@ impl Input {
         let (send, recv) = mpsc::unbounded();
         (Input {
             machine,
-            io: PollEvented::new(MyIo { fd: unsafe { li.fd() } }, handle).unwrap(),
+            io: AsyncFd::new(unsafe { li.fd() }).unwrap(),
             li,
             device_handles: Vec::new(),
             sender: send,
@@ -137,25 +136,29 @@ impl Input {
 
 pub struct InputListener<'a>(pub &'a RefCell<Input>);
 
-impl<'a> Future for InputListener<'a> {
-    type Item = ();
-    type Error = io::Error;
+impl<'a> futures03::Future for InputListener<'a> {
+    type Output = Result<(), io::Error>;
 
-    fn poll(&mut self) -> Poll<(), io::Error> {
-        if let Async::NotReady = self.0.borrow().io.poll_read() {
-            return Ok(Async::NotReady);
+    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
+        loop {
+            if let std::task::Poll::Pending = self.0.borrow().io.poll_read_ready(cx) {
+                return std::task::Poll::Pending;
+            }
+
+            let mut p = self.0.borrow_mut();
+            p.li.dispatch()?;
+
+            // lmao what a quality api
+            while let Some(e) = p.li.next() {
+                (&p.sender).send(e).unwrap();
+            }
         }
 
-        let mut p = self.0.borrow_mut();
-        p.li.dispatch()?;
-
-        // lmao what a quality api
-        while let Some(e) = p.li.next() {
-            (&p.sender).send(e).unwrap();
-        }
-
+        /*
+        p.io.
         p.io.need_read();
-        Ok(Async::NotReady)
+        std::task::Poll::Pending
+        */
     }
 }
 

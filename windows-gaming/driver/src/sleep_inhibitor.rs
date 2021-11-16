@@ -3,10 +3,10 @@ use std::cell::RefCell;
 use std::io::Error;
 
 use libdbus::{Connection, ConnectionItem, BusType, Message, OwnedFd};
-use tokio_core::reactor::Handle;
 use futures::{Stream, Future, IntoFuture};
 
 use dbus::DBusItems;
+use futures03::TryStreamExt;
 
 pub fn system_dbus() -> Connection {
     Connection::get_private(BusType::System).unwrap()
@@ -28,11 +28,11 @@ fn inhibit(dbus: &Connection) -> OwnedFd {
     resp.get1().unwrap()
 }
 
-pub fn sleep_inhibitor<'a, R, F>(bus: &'a Connection, mut callback: F, handle: &'a Handle)
+pub fn sleep_inhibitor<'a, R, F>(bus: &'a Connection, mut callback: F)
                                  -> Box<Future<Item = (), Error = Error> + 'a>
     where F : FnMut() -> R + 'a, R : IntoFuture<Item = (), Error = ()> + 'a
 {
-    let items = DBusItems::new(&bus, &handle);
+    let items = DBusItems::new(&bus).compat();
 
     bus.add_match("interface='org.freedesktop.login1.Manager',member='PrepareForSleep'").unwrap();
 

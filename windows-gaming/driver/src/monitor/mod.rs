@@ -23,11 +23,11 @@ use std::cell::RefCell;
 
 use futures::unsync::mpsc::{self, UnboundedSender};
 use futures::{Stream, Sink, Future};
-use tokio_core::reactor::Handle;
-use tokio_io::AsyncRead;
-use tokio_uds::UnixStream as TokioUnixStream;
 
 use controller::Controller;
+use futures03::{StreamExt, SinkExt, TryStreamExt};
+use tokio1::net::UnixStream;
+use tokio_util::codec::Decoder;
 use self::codec::Codec;
 
 type Send = UnboundedSender<QmpCommand>;
@@ -42,17 +42,18 @@ pub struct Monitor {
 }
 
 impl Monitor {
-    pub fn new(stream: StdUnixStream, handle: &Handle) -> Monitor {
-        let stream = TokioUnixStream::from_stream(stream, handle).unwrap();
-        let (write, read) = stream.framed(Codec).split();
+    pub fn new(stream: StdUnixStream) -> Monitor {
+        stream.set_nonblocking(true).unwrap();
+        let stream = UnixStream::from_std(stream).unwrap();
+        let (write, read) = Codec.framed(stream).split();
         let (send, recv) = mpsc::unbounded();
         let recv = recv.map_err(|()| Error::new(ErrorKind::Other, "Failed to write to monitor"));
-        let sender = write.send_all(recv).map(|_| ());
+        let sender = recv.forward(write.compat()).map(|_| ());
 
         Monitor {
             send: Some(send),
             sender: Some(Box::new(sender)),
-            read: Some(Box::new(read)),
+            read: Some(Box::new(read.compat())),
         }
     }
 

@@ -16,12 +16,6 @@ extern crate log;
 extern crate mio;
 extern crate bytes;
 extern crate futures;
-extern crate tokio_core;
-extern crate tokio_io;
-extern crate tokio_uds;
-extern crate tokio_timer;
-extern crate tokio_process;
-extern crate tokio_signal;
 extern crate dbus as libdbus;
 extern crate input;
 extern crate prost;
@@ -30,20 +24,20 @@ extern crate anyhow;
 extern crate futures03;
 extern crate tokio1;
 extern crate tokio_stream;
-extern crate tokio_compat;
-extern crate tokio_fs;
-extern crate tokio_reactor;
+extern crate tokio_util;
 
 pub mod qemu;
 pub use control::ControlCmdIn;
+use futures03::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use futures03::compat::Future01CompatExt;
+use tokio1::signal::unix::{Signal, SignalKind, signal};
 use tokio1::task::LocalSet;
+use tokio_stream::wrappers::SignalStream;
 
 mod control;
 mod monitor;
 mod clientpipe;
 mod controller;
-mod my_io;
 mod sd_notify;
 mod samba;
 mod dbus;
@@ -61,8 +55,6 @@ use std::path::Path;
 use std::process::Command;
 use std::io::ErrorKind;
 
-use tokio_core::reactor::Core;
-use tokio_signal::unix::{Signal, SIGINT, SIGTERM};
 use futures::{Future, Stream, future};
 use futures::unsync::mpsc;
 
@@ -75,12 +67,11 @@ use libinput::Input;
 use clipboard::X11Clipboard;
 
 pub fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
-    /*
-    let rt = tokio_compat::runtime::current_thread::Runtime::new().unwrap();
-    rt.enter(|| run_inner(cfg, tmp, data, enable_gui));
+    let rt1 = tokio1::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    let _g = rt1.enter();
+    run_inner(cfg, tmp, data, enable_gui, &rt1);
 }
-pub fn run_inner(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
-    */
+pub fn run_inner(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool, rt1: &tokio1::runtime::Runtime) {
     let control_socket_file = tmp.join("control.sock");
     // first check for running sessions
     match UnixStream::connect(&control_socket_file) {
@@ -116,13 +107,10 @@ pub fn run_inner(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
         .expect("Failed to set permissions on control socket");
     debug!("Started Control socket");
 
-    let mut core = Core::new().unwrap();
-    let handle = core.handle();
-
-    let qemu = qemu::run(cfg, tmp, data, &clientpipe_socket_file, &monitor_socket_file, &handle, enable_gui)
-        .map(|code| {
-            if !code.success() {
-                warn!("QEMU returned with an error code: {}", code);
+    let qemu_child = qemu::run(cfg, tmp, data, &clientpipe_socket_file, &monitor_socket_file, enable_gui);
+    let qemu = qemu_child.wait_with_output().boxed().compat().map(|code| {
+            if !code.status.success() {
+                warn!("QEMU returned with an error code: {}", code.status);
             }
         });
 
@@ -135,10 +123,10 @@ pub fn run_inner(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
     sd_notify::notify_systemd(false, "Booting ...");
     debug!("Windows is starting");
 
-    let mut monitor = Monitor::new(monitor_stream, &handle);
-    let mut clientpipe = Clientpipe::new(clientpipe_stream, &handle);
+    let mut monitor = Monitor::new(monitor_stream);
+    let mut clientpipe = Clientpipe::new(clientpipe_stream);
 
-    let (mut input, input_events) = Input::new(&handle, cfg.machine.clone());
+    let (mut input, input_events) = Input::new(cfg.machine.clone());
     input.suspend();
     let input = Rc::new(RefCell::new(input));
 
@@ -152,10 +140,9 @@ pub fn run_inner(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
 
     let controller = Rc::new(RefCell::new(ctrl));
 
-    let rt1 = tokio1::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-    //core.enter
+
     let clipboard = /*core.run*/rt1.block_on(X11Clipboard::open().compat()).expect("Failed to open X11 clipboard!");
-    let clipboard_listener = clipboard.run(controller.clone(), resp_recv, &handle);
+    let clipboard_listener = clipboard.run(controller.clone(), resp_recv);
 
     let clipboard_grabber = clipgrab_recv.for_each(|()| {
         clipboard.grab_clipboard();
@@ -169,7 +156,7 @@ pub fn run_inner(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
 
     let sysbus = sleep_inhibitor::system_dbus();
     let ctrl = controller.clone();
-    let inhibitor = sleep_inhibitor::sleep_inhibitor(&sysbus, move || ctrl.borrow_mut().suspend(), &handle);
+    let inhibitor = sleep_inhibitor::sleep_inhibitor(&sysbus, move || ctrl.borrow_mut().suspend());
 
     let ref input_ref = *input;
     let input_listener = libinput::InputListener(input_ref);
@@ -177,25 +164,25 @@ pub fn run_inner(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
     let input_handler = libinput::create_handler(input_events, &hotkey_bindings, controller.clone(),
                                                  monitor_sender);
 
-    let control_handler = control::create(control_socket, &handle, controller.clone());
+    let control_handler = control::create(control_socket, controller.clone());
 
-    let sigint = Signal::new(SIGINT, &handle).flatten_stream();
-    let sigterm = Signal::new(SIGTERM, &handle).flatten_stream();
-    let signals = sigint.merge(sigterm);
+    let sigint = SignalStream::new(signal(SignalKind::interrupt()).unwrap());
+    let sigterm = SignalStream::new(signal(SignalKind::terminate()).unwrap());
+    let signals = tokio_stream::StreamExt::merge(sigint, sigterm).map(Ok).compat();
     let catch_sigterm = signals.for_each(|_| {
         controller.borrow_mut().shutdown();
-        Ok(())
+        Ok::<(), ()>(())
     }).then(|_| Ok(()));
 
     let joined = future::join_all(vec![
         inhibitor,
-        clientpipe.take_handler(controller.clone(), &handle),
+        clientpipe.take_handler(controller.clone()),
         clientpipe.take_sender(),
         control_handler,
         monitor.take_handler(controller.clone()),
         monitor.take_sender(),
         Box::new(catch_sigterm),
-        Box::new(input_listener),
+        Box::new(input_listener.compat()),
         input_handler,
         clipboard_listener,
         Box::new(clipboard_grabber),

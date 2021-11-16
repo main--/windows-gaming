@@ -1,4 +1,4 @@
-use std::process::{Command, Stdio};
+use std::process::{Stdio};
 use std::path::{Path};
 use std::iter::Iterator;
 use std::fs;
@@ -6,8 +6,6 @@ use std::io;
 use std::os::unix::process::CommandExt as UnixCommandExt;
 
 use itertools::Itertools;
-use tokio_core::reactor::Handle;
-use tokio_process::{CommandExt, Child};
 use libc;
 
 use common::config::{Config, SoundBackend, AlsaUnit, UsbBus};
@@ -15,11 +13,12 @@ use controller;
 use sd_notify::notify_systemd;
 use samba;
 use common::util;
+use tokio1::process::{Child, Command};
 
 const QEMU: &str = "/usr/bin/qemu-system-x86_64";
 
 fn supports_display(kind: &str) -> bool {
-    Command::new(QEMU).args(&["-display", kind, "-version"])
+    std::process::Command::new(QEMU).args(&["-display", kind, "-version"])
         .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null())
         .status().unwrap().success()
 }
@@ -29,7 +28,7 @@ pub fn has_gtk_support() -> bool {
 }
 
 pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monitor_path: &Path,
-           handle: &Handle, enable_gui: bool) -> Child {
+           enable_gui: bool) -> Child {
     trace!("qemu::run");
     let machine = &cfg.machine;
 
@@ -125,7 +124,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
     // TODO: Check if the configured device is in the configured slot
     for device in cfg.machine.pci_devices.iter() {
         if device.resettable {
-            let mut child = Command::new(data.join("vfio-ubind")).arg(&device.slot).spawn().expect("failed to run vfio-ubind");
+            let mut child = std::process::Command::new(data.join("vfio-ubind")).arg(&device.slot).spawn().expect("failed to run vfio-ubind");
             match child.wait() {
                 Ok(status) if !status.success() =>
                     panic!("vfio-ubind failed with {}! The device might not be bound to the \
@@ -289,15 +288,17 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
     debug!("qemu: {:?}", qemu);
 
     // try to detach qemu from process group to enable better Ctrl+C support
-    qemu.before_exec(|| unsafe {
-        if libc::setpgid(0, 0) < 0 {
-            warn!("Can't setpgid: {}", io::Error::last_os_error());
-        } else {
-            debug!("Detached qemu process");
-        }
-        Ok(())
-    });
-    let qemu = qemu.spawn_async(handle).expect("Failed to start qemu");
+    unsafe {
+        qemu.pre_exec(|| {
+            if libc::setpgid(0, 0) < 0 {
+                warn!("Can't setpgid: {}", io::Error::last_os_error());
+            } else {
+                debug!("Detached qemu process");
+            }
+            Ok(())
+        });
+    }
+    let qemu = qemu.spawn().expect("Failed to start qemu");
     trace!("qemu spawned");
     return qemu;
 }

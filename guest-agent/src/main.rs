@@ -109,13 +109,13 @@ async fn main() -> anyhow::Result<()> {
                         }
                         Some(clientpipe_codec::ClipboardMessage::RequestClipboardContents(types)) => {
                             if types == clientpipe_codec::ClipboardType::None.into() {
+                                tx.send(clientpipe_codec::ClipboardMessage::ContentTypes(clientpipe_codec::ClipboardTypes { types: vec![clientpipe_codec::ClipboardType::Text.into()] }).into()).await.unwrap();
+                            } else {
                                 let s = match clipboard.current() {
                                     Some(offer) if offer.has_string() => offer.receive_string().unwrap(),
                                     _ => "failed".to_owned(),
                                 };
                                 tx.send(clientpipe_codec::ClipboardMessage::ClipboardContents(s.into_bytes()).into()).await.unwrap();
-                            } else {
-                                tx.send(clientpipe_codec::ClipboardMessage::ContentTypes(clientpipe_codec::ClipboardTypes { types: vec![clientpipe_codec::ClipboardType::Text.into()] }).into()).await.unwrap();
                             }
                         }
                         Some(clientpipe_codec::ClipboardMessage::ContentTypes(_types)) => (), // ignored, we assume string only

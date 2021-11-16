@@ -9,26 +9,28 @@ use std::cell::RefCell;
 
 use futures::{future, Stream, Future, Sink};
 use futures::unsync::mpsc;
+use futures03::{SinkExt, StreamExt, TryStreamExt};
 use futures03::compat::Future01CompatExt;
-use tokio_core::reactor::Handle;
-use tokio_io::AsyncRead;
-use tokio_uds::UnixListener as TokioUnixListener;
 
 use controller::Controller;
+use tokio1::net::UnixListener;
+use tokio_stream::wrappers::UnixListenerStream;
+use tokio_util::codec::Decoder;
 use self::codec::Codec;
 
 type Handler<'a> = Box<Future<Item=(), Error=Error> + 'a>;
 
-pub fn create<'a>(socket: StdUnixListener, handle: &'a Handle, controller: Rc<RefCell<Controller>>) -> Handler<'a> {
-    let socket = TokioUnixListener::from_listener(socket, &handle).unwrap();
-    let handler = socket.incoming().for_each(move |(socket, _)| {
-        let (writer, reader) = socket.framed(Codec).split();
+pub fn create<'a>(socket: StdUnixListener, controller: Rc<RefCell<Controller>>) -> Handler<'a> {
+    socket.set_nonblocking(true).unwrap();
+    let socket = UnixListener::from_std(socket).unwrap();
+    let handler = UnixListenerStream::new(socket).compat().for_each(move |socket| {
+        let (writer, reader) = Codec.framed(socket).split();
         let (sender, recv) = mpsc::unbounded();
         let sender = Rc::new(RefCell::new(sender));
-        let writer = writer.sink_map_err(|_| ()).send_all(recv).map_err(|_| ()).map(|_| ());
+        let writer = writer.compat().sink_map_err(|_| ()).send_all(recv).map_err(|_| ()).map(|_| ());
         let controller_rc = controller.clone();
         let mut temp_entry = false;
-        let reader = reader.map_err(|_| ()).for_each(move |req| {
+        let reader = reader.compat().map_err(|_| ()).for_each(move |req| {
             let mut controller = controller_rc.borrow_mut();
             info!("Control request: {:?}", req);
             if temp_entry {

@@ -1,32 +1,32 @@
 use std::collections::VecDeque;
+use std::ops::DerefMut;
+use std::os::unix::prelude::RawFd;
 
+use futures03::Stream;
 use libdbus::{Connection, ConnectionItem, Watch, WatchEvent};
-use tokio_core::reactor::{Handle, PollEvented};
 use mio::Ready;
 use mio::unix::UnixReady;
-use futures::{Async, Poll, Stream};
+use futures::{Async, Poll};
 
-use my_io::MyIo;
+use tokio1::io::unix::AsyncFd;
 
-pub struct DBusItems<'a, 'b> {
+pub struct DBusItems<'a> {
     conn: &'a Connection,
-    handle: &'b Handle,
     fds: Vec<Fd>,
     pending_items: VecDeque<ConnectionItem>,
 }
 
 struct Fd {
-    io: PollEvented<MyIo>,
+    io: AsyncFd<RawFd>,
     interest: Ready,
 }
 
-impl<'a, 'b> DBusItems<'a, 'b> {
-    pub fn new(bus: &'a Connection, handle: &'b Handle) -> DBusItems<'a, 'b> {
+impl<'a> DBusItems<'a> {
+    pub fn new(bus: &'a Connection) -> DBusItems<'a> {
         DBusItems {
-            handle: handle,
             fds: bus.watch_fds().iter().map(|x| {
                 Fd {
-                    io: PollEvented::new(MyIo { fd: x.fd() }, &handle).unwrap(),
+                    io: AsyncFd::new(x.fd()).unwrap(),
                     interest: to_ready(&x),
                 }
             }).collect(),
@@ -36,34 +36,55 @@ impl<'a, 'b> DBusItems<'a, 'b> {
     }
 }
 
-impl<'a, 'b> Stream for DBusItems<'a, 'b> {
-    type Item = ConnectionItem;
-    type Error = ();
+impl Fd {
+    fn poll(&self, cx: &mut std::task::Context<'_>) -> Async<Ready> {
+        let mut ready = Ready::empty();
+        if self.interest.contains(Ready::readable()) {
+            if self.io.poll_read_ready(cx).is_ready() {
+                ready |= Ready::readable();
+            }
+        }
+        if self.interest.contains(Ready::writable()) {
+            if self.io.poll_write_ready(cx).is_ready() {
+                ready |= Ready::writable();
+            }
+        }
 
-    fn poll(&mut self) -> Poll<Option<ConnectionItem>, ()> {
+        if ready.is_empty() {
+            Async::NotReady
+        } else {
+            Async::Ready(ready)
+        }
+    }
+}
+
+impl<'a> Stream for DBusItems<'a> {
+    type Item = Result<ConnectionItem, ()>;
+
+    fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
         // if we still got data, don't touch the fds
         if let Some(x) = self.pending_items.pop_front() {
-            return Ok(Async::Ready(Some(x)));
+            return std::task::Poll::Ready(Some(Ok(x)));
         }
 
         // query fds
-        let results: Vec<_> = self.fds.iter().flat_map(|fd| match fd.io.poll_ready(fd.interest) {
-            Async::Ready(x) => Some((fd.io.get_ref().fd, x)),
+        let results: Vec<_> = self.fds.iter().flat_map(|fd| match fd.poll(cx) {
+            Async::Ready(x) => Some((*fd.io.get_ref(), x)),
             Async::NotReady => None,
         }).collect();
 
         // borrow things to keep borrowck happy
-        let fds = &mut self.fds;
-        let conn = &self.conn;
-        let handle = &self.handle;
+        let myself = self.deref_mut();
+        let fds = &mut myself.fds;
+        let conn = &myself.conn;
         // make dbus process fds and collect the results
-        self.pending_items.extend(
+        myself.pending_items.extend(
             results.into_iter().flat_map(|(fd, r)| conn.watch_handle(fd, from_ready(r)))
                 .flat_map(|ci| match ci {
                     // eat WatchFd events
                     ConnectionItem::WatchFd(w) => {
                         let ready = to_ready(&w);
-                        let pos = fds.iter().position(|x| x.io.get_ref().fd == w.fd());
+                        let pos = fds.iter().position(|x| *x.io.get_ref() == w.fd());
                         if ready.is_empty() {
                             // removed
                             if let Some(i) = pos {
@@ -75,7 +96,7 @@ impl<'a, 'b> Stream for DBusItems<'a, 'b> {
                                 fds[i].interest = ready;
                             } else {
                                 fds.push(Fd {
-                                    io: PollEvented::new(MyIo { fd: w.fd() }, handle).unwrap(),
+                                    io: AsyncFd::new(w.fd()).unwrap(),
                                     interest: ready,
                                 });
                             }
@@ -87,9 +108,9 @@ impl<'a, 'b> Stream for DBusItems<'a, 'b> {
 
         // finally, return results (if any)
         if let Some(x) = self.pending_items.pop_front() {
-            Ok(Async::Ready(Some(x)))
+            std::task::Poll::Ready(Some(Ok(x)))
         } else {
-            Ok(Async::NotReady)
+            std::task::Poll::Pending
         }
     }
 }

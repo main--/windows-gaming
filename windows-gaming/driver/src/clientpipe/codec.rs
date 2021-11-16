@@ -2,7 +2,7 @@ extern crate clientpipe_proto as proto;
 
 use std::io;
 use prost::bytes::{Buf, BytesMut};
-use tokio_io::codec::{Encoder, Decoder};
+use tokio_util::codec::{Encoder, Decoder};
 use prost::{encoding, Message};
 
 pub use self::proto::{RegisterHotKey, ClipboardType, ClipboardTypes, Point};
@@ -41,8 +41,7 @@ impl Decoder for Codec {
     }
 }
 
-impl Encoder for Codec {
-    type Item = GaCmdOut;
+impl Encoder<GaCmdOut> for Codec {
     type Error = io::Error;
 
     fn encode(&mut self, cmd: GaCmdOut, buf: &mut bytes::BytesMut) -> io::Result<()> {

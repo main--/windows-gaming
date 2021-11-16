@@ -10,13 +10,16 @@ use std::time::Duration;
 
 use futures::unsync::mpsc::{self, UnboundedSender};
 use futures::{Stream, Sink, Future};
+use futures03::StreamExt;
+use futures03::SinkExt;
+use futures03::TryStreamExt;
 use futures03::compat::Future01CompatExt;
-use tokio_core::reactor::Handle;
-use tokio_io::AsyncRead;
-use tokio_uds::UnixStream as TokioUnixStream;
-use tokio_timer::Timer;
 
 use controller::Controller;
+use tokio1::net::UnixStream;
+use tokio1::time;
+use tokio_stream::wrappers::IntervalStream;
+use tokio_util::codec::Decoder;
 use self::codec::{Codec, GaCmdIn};
 
 type Send = UnboundedSender<GaCmdOut>;
@@ -31,17 +34,18 @@ pub struct Clientpipe {
 }
 
 impl Clientpipe {
-    pub fn new(stream: StdUnixStream, handle: &Handle) -> Clientpipe {
-        let stream = TokioUnixStream::from_stream(stream, &handle).unwrap();
-        let (write, read) = stream.framed(Codec).split();
+    pub fn new(stream: StdUnixStream) -> Clientpipe {
+        stream.set_nonblocking(true).unwrap();
+        let stream = UnixStream::from_std(stream).unwrap();
+        let (write, read) = Codec.framed(stream).split();
         let (send, recv) = mpsc::unbounded();
         let recv = recv.map_err(|()| Error::new(ErrorKind::Other, "Failed to write to clientpipe"));
-        let sender = write.send_all(recv).map(|_| ());
+        let sender = recv.forward(write.compat()).map(|_| ());
 
         Clientpipe {
             send: Some(send),
             sender: Some(Box::new(sender)),
-            read: Some(Box::new(read)),
+            read: Some(Box::new(read.compat())),
         }
     }
 
@@ -53,7 +57,7 @@ impl Clientpipe {
         self.sender.take().unwrap()
     }
 
-    pub fn take_handler<'a>(&mut self, controller_rc: Rc<RefCell<Controller>>, handle: &'a Handle) -> Handler<'a> {
+    pub fn take_handler<'a>(&mut self, controller_rc: Rc<RefCell<Controller>>) -> Handler<'a> {
         let handler = self.read.take().unwrap().for_each(move |cmd| {
             trace!("GA sent message: {:?}", cmd);
             let mut controller = controller_rc.borrow_mut();
@@ -64,9 +68,9 @@ impl Clientpipe {
 
                     if controller.ga_hello() {
                         let controller = controller_rc.clone();
-                        let timer = Timer::default().interval(Duration::new(5, 0))
-                            .map_err(|_| ())
-                            .for_each(move |()| match controller.borrow_mut().ga_ping() {
+                        let timer = IntervalStream::new(time::interval(Duration::new(5, 0)))
+                            .map(|a| Ok::<_, ()>(a)).compat()
+                            .for_each(move |_| match controller.borrow_mut().ga_ping() {
                                 true => Ok(()),
                                 false => Err(()),
                             });

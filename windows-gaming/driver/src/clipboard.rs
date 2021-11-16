@@ -9,9 +9,7 @@ use futures::{Async, Stream, Future};
 use futures::unsync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures03::compat::Compat;
 use futures03::{FutureExt, TryFutureExt, TryStreamExt, StreamExt};
-use tokio_core::reactor::{Handle, PollEvented};
 
-use my_io::MyIo;
 use controller::Controller;
 use clientpipe::ClipboardType;
 use tokio_stream::wrappers::{UnboundedReceiverStream, WatchStream};
@@ -41,25 +39,9 @@ enum Cmd {
 
 impl X11Clipboard {
     pub fn open() -> Box<Future<Item=X11Clipboard, Error=anyhow::Error>> {
-        /*
-        let (tx, rx) = futures::sync::oneshot::channel();
-        std::thread::spawn(move || {
-            let rt = tokio1::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-            let (run, clipboard) = rt.block_on(zerocost_clipboard::WaylandClipboard::init()).unwrap();
-            let _ = tx.send(clipboard);
-            rt.block_on(run);
-        });
-
-        let task = rx.map(|cb| {
-            X11Clipboard { clipboard: cb }
-        }).map_err(|e| anyhow::Error::from(e));
-        task.boxed()
-        */
         trace!("opening wayland clipboard");
         let task = zerocost_clipboard::WaylandClipboard::init().boxed().compat();
         task.map(|(run, clipboard)| {
-            //let c = run.boxed_local().compat();
-            let run = tokio_compat_02::FutureExt::compat(run);
             let run: Box<dyn Future<Item=(), Error=anyhow::Error>> = Box::new(run.boxed_local().compat());
             let run = RefCell::new(Some(run));
             let (cmd_tx, cmd_rx) = mpsc::unbounded();
@@ -79,10 +61,10 @@ impl X11Clipboard {
     pub fn run<'a>(&'a self,
                    controller: Rc<RefCell<Controller>>,
                    resp_recv: UnboundedReceiver<ClipboardRequestResponse>,
-                   handle: &Handle) -> Box<Future<Item=(), Error=::std::io::Error> + 'a> {
+                   ) -> Box<Future<Item=(), Error=::std::io::Error> + 'a> {
         trace!("running wayland clipboard");
         let cmd_rx = self.cmd_rx.borrow_mut().take().unwrap();
-        //let clipboard = self.clipboard.clone();
+
         let clipboard = &self.clipboard;
         let run = self.run.borrow_mut().take().unwrap();
         Box::new(run.map_err(|_| unreachable!()).join(
@@ -96,6 +78,8 @@ impl X11Clipboard {
                         debug!("it is foreign, so we grab the clipboard");
                         // only react if it's not from us
                         controller2.borrow_mut().grab_win_clipboard();
+                    } else {
+                        debug!("but we reject it because it's ours");
                     }
                 }
                 Ok(())
@@ -107,33 +91,14 @@ impl X11Clipboard {
                     }
                     ClipboardResponse::Data(buf) => {
                         debug!("responding to wayland with clipboard data");
-                        let fd = response.event.req.target().as_raw_fd();
-                        let tkfs = tokio_fs::file::File::from_std(unsafe { std::fs::File::from_raw_fd(fd) });
-                        std::mem::forget(response.event.req.into_target());
-                        tokio_io::io::copy(Cursor::new(buf), tkfs).then(|_| Ok(()))
+                        let target = response.event.req.into_target();
+                        let target = tokio_util::compat::TokioAsyncWriteCompatExt::compat_write(target);
+                        let target = futures03::io::AsyncWriteExt::compat_write(target);
+                        tokio_io::io::copy(Cursor::new(buf), target).then(|_| Ok(()))
                     }
                 }
-                // TODO: right now we default to requesting unknown formats as text
-                // this is potentially bad
-                // we should not set anything here for unsupported formats
-
-                /*
-                xcb::send_event(
-                    &self.connection, false, event.requestor, 0,
-                    &SelectionNotifyEvent::new(
-                        event.time,
-                        event.requestor,
-                        event.selection,
-                        event.target,
-                        event.property
-                    )
-                );
-                self.connection.flush();
-                */
-
-                //Ok(())
             });
-            //let clipboard = self.clipboard.clone();
+
             let (claim_tx, claim_rx) = mpsc::unbounded();
             let controller2 = controller.clone();
             let cmd_handler = cmd_rx.for_each(move |r| {

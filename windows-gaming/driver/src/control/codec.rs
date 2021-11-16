@@ -1,7 +1,7 @@
 use std::io;
 use std::str;
-use bytes::{BytesMut, BufMut, LittleEndian, IntoBuf, Buf};
-use tokio_io::codec::{Encoder, Decoder};
+use bytes::{BytesMut, BufMut, Buf};
+use tokio_util::codec::{Encoder, Decoder};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ControlCmdOut {
@@ -46,10 +46,10 @@ impl Decoder for Codec {
             Some(7) => ControlCmdIn::LightEntry,
             Some(8) if buf.len() < 9 => return Ok(None),
             Some(8) => {
-                let mut bbuf = (&*buf).into_buf();
+                let mut bbuf = buf.as_ref();
                 bbuf.advance(1); // skip cmd
-                let x = bbuf.get_i32::<LittleEndian>();
-                let y = bbuf.get_i32::<LittleEndian>();
+                let x = bbuf.get_i32_le();
+                let y = bbuf.get_i32_le();
                 size += 8;
                 ControlCmdIn::TemporaryLightEntry { x, y }
             }
@@ -66,8 +66,7 @@ impl Decoder for Codec {
     }
 }
 
-impl Encoder for Codec {
-    type Item = ControlCmdOut;
+impl Encoder<ControlCmdOut> for Codec {
     type Error = io::Error;
 
     fn encode(&mut self, cmd: ControlCmdOut, buf: &mut BytesMut) -> io::Result<()> {
@@ -76,8 +75,8 @@ impl Encoder for Codec {
             ControlCmdOut::MouseEdged { x, y } => {
                 buf.put_u8(1);
                 buf.reserve(8);
-                buf.put_i32::<LittleEndian>(x);
-                buf.put_i32::<LittleEndian>(y);
+                buf.put_i32_le(x);
+                buf.put_i32_le(y);
             }
             ControlCmdOut::TemporaryLightAttached => buf.put_u8(2),
             ControlCmdOut::TemporaryLightDetached => buf.put_u8(3),

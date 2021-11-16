@@ -2,7 +2,7 @@ use std::io;
 use std::str;
 use std::borrow::Cow;
 use bytes::BytesMut;
-use tokio_io::codec::{Encoder, Decoder};
+use tokio_util::codec::{Encoder, Decoder};
 use serde_json;
 
 #[derive(Serialize)]
@@ -168,8 +168,7 @@ impl Decoder for Codec {
     }
 }
 
-impl Encoder for Codec {
-    type Item = QmpCommand;
+impl Encoder<QmpCommand> for Codec {
     type Error = io::Error;
 
     fn encode(&mut self, cmd: QmpCommand, buf: &mut BytesMut) -> io::Result<()> {
