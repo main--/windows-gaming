@@ -54,7 +54,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
     let mut qemu = Command::new(QEMU);
     qemu.args(&["-enable-kvm",
                 "-machine",
-                "q35",
+                "pc-q35-6.1",
                 "-cpu",
                 "host,kvm=off,hv_time,hv_relaxed,hv_vapic,hv_spinlocks=0x1fff,\
                  hv_vendor_id=NvidiaFuckU",
@@ -71,10 +71,12 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
                          data.join("ovmf-code.fd").display()),
                 "-drive",
                 &format!("if=pflash,format=raw,file={}", efivars_file.display()),
-                "-device", "virtio-scsi-pci,id=scsi",
+                "-object", "iothread,id=ioth0",
+                "-device", "virtio-scsi-pci,id=scsi,iothread=ioth0",
                 "-drive", &format!("if=none,id=iso,media=cdrom,file={}", ga_iso.display()),
                 "-device", "scsi-cd,id=cdrom,drive=iso",
     ]);
+    // TODO: make root ports in the VM for PCIe devices to ensure it's all natural to the guest OS and drivers
 
     if enable_gui {
         qemu.args(&["-display", "gtk", "-vga", "qxl"]);
@@ -131,7 +133,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
                 _ => (),
             }
         }
-        
+
         qemu.args(&["-device", &format!("vfio-pci,host={},multifunction=on", device.slot)]);
         debug!("Passed through {}", device.slot);
     }
