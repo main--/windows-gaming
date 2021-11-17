@@ -4,8 +4,6 @@ extern crate serde_derive;
 extern crate log;
 extern crate dbus as libdbus;
 
-use tokio::runtime::{Builder, Runtime};
-
 pub mod qemu;
 pub use crate::control::ControlCmdIn;
 use futures03::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
@@ -46,12 +44,8 @@ use crate::clientpipe::Clientpipe;
 use crate::libinput::Input;
 use crate::clipboard::X11Clipboard;
 
-pub fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
-    let rt1 = Builder::new_current_thread().enable_all().build().unwrap();
-    let _g = rt1.enter();
-    run_inner(cfg, tmp, data, enable_gui, &rt1);
-}
-pub fn run_inner(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool, rt1: &Runtime) {
+#[tokio::main]
+pub async fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
     let control_socket_file = tmp.join("control.sock");
     // first check for running sessions
     match UnixStream::connect(&control_socket_file) {
@@ -121,7 +115,7 @@ pub fn run_inner(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool, rt1: &
     let controller = Rc::new(RefCell::new(ctrl));
 
 
-    let clipboard = /*core.run*/rt1.block_on(X11Clipboard::open().compat()).expect("Failed to open X11 clipboard!");
+    let clipboard = X11Clipboard::open().compat().await.expect("Failed to open X11 clipboard!");
     let clipboard_listener = clipboard.run(controller.clone(), resp_recv);
 
     let clipboard_grabber = clipgrab_recv.for_each(|()| {
@@ -170,7 +164,7 @@ pub fn run_inner(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool, rt1: &
     ]).map(|_| ());
 
     let ls = LocalSet::new();
-    ls.block_on(&rt1, qemu.select2(joined).then(|x| -> Box<dyn Future<Item=(), Error=std::io::Error>> {
+    ls.run_until(qemu.select2(joined).then(|x| -> Box<dyn Future<Item=(), Error=std::io::Error>> {
         match x {
             Ok(future::Either::A((_, _))) => info!("qemu down first, all ok"),
             Err(future::Either::A((e, _))) => return Box::new(future::err(e)),
@@ -181,7 +175,7 @@ pub fn run_inner(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool, rt1: &
             }
         }
         Box::new(future::ok(()))
-    }).compat()).expect("Waiting for qemu errored");
+    }).compat()).await.expect("Waiting for qemu errored");
 
     info!("unbinding resettable vfio-things");
 
