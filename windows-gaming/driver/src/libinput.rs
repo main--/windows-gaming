@@ -13,7 +13,7 @@ use input::{Libinput, LibinputInterface, Device, AccelProfile};
 use input::event::{Event, KeyboardEvent, PointerEvent};
 use input::event::pointer::{Axis, ButtonState, PointerScrollEvent};
 use input::event::keyboard::{KeyState, KeyboardEventTrait};
-use libc::{self, c_char, c_int, c_ulong};
+use libc::{self, c_char, c_int, c_ulong, pollfd};
 use libudev::{Result as UdevResult, Context, Enumerator};
 
 use common::config::{UsbBinding, UsbPort, UsbId, MachineConfig};
@@ -157,21 +157,36 @@ impl Input {
 
 pub struct InputListener<'a>(pub &'a RefCell<Input>);
 
+// while we could just have a stream here, libinput gets mad if we process their events too slowly
+// hence, we buffer through an UnboundedSender and have this future which, whenever the fd is ready,
+// lets libinput do its thing and sends the events to our channel for deferred processing
+// it will (basically) never complete
 impl<'a> futures03::Future for InputListener<'a> {
     type Output = Result<(), io::Error>;
 
     fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
+        let mut p = self.0.borrow_mut();
+        let p = &mut *p;
         loop {
-            if let std::task::Poll::Pending = self.0.borrow().io.poll_read_ready(cx) {
-                return std::task::Poll::Pending;
-            }
+            match p.io.poll_read_ready(cx) {
+                std::task::Poll::Pending => return std::task::Poll::Pending,
+                std::task::Poll::Ready(guard) => {
+                    let mut guard = guard?;
 
-            let mut p = self.0.borrow_mut();
-            p.li.dispatch()?;
+                    p.li.dispatch()?;
 
-            // lmao what a quality api
-            while let Some(e) = p.li.next() {
-                (&p.sender).unbounded_send(e).unwrap();
+                    // recheck to figure out whether libinput lied to us
+                    let mut fd = pollfd { fd: p.li.as_raw_fd(), events: libc::POLLIN, revents: 0  };
+                    let is_really_finished = unsafe { libc::poll(&mut fd, 1, 0) } == 0;
+                    if is_really_finished {
+                        guard.clear_ready();
+                    }
+
+                    // lmao what a quality api
+                    while let Some(e) = p.li.next() {
+                        (&p.sender).unbounded_send(e).unwrap();
+                    }
+                }
             }
         }
     }
