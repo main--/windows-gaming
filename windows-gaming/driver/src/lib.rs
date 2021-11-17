@@ -4,15 +4,14 @@ extern crate serde_derive;
 extern crate log;
 extern crate dbus as libdbus;
 
-use tokio1;
-use tokio_stream;
+use tokio::runtime::{Builder, Runtime};
 
 pub mod qemu;
 pub use crate::control::ControlCmdIn;
 use futures03::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use futures03::compat::Future01CompatExt;
-use tokio1::signal::unix::{SignalKind, signal};
-use tokio1::task::LocalSet;
+use tokio::signal::unix::{SignalKind, signal};
+use tokio::task::LocalSet;
 use tokio_stream::wrappers::SignalStream;
 
 mod control;
@@ -48,11 +47,11 @@ use crate::libinput::Input;
 use crate::clipboard::X11Clipboard;
 
 pub fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
-    let rt1 = tokio1::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    let rt1 = Builder::new_current_thread().enable_all().build().unwrap();
     let _g = rt1.enter();
     run_inner(cfg, tmp, data, enable_gui, &rt1);
 }
-pub fn run_inner(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool, rt1: &tokio1::runtime::Runtime) {
+pub fn run_inner(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool, rt1: &Runtime) {
     let control_socket_file = tmp.join("control.sock");
     // first check for running sessions
     match UnixStream::connect(&control_socket_file) {

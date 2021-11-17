@@ -16,7 +16,7 @@ mio = "0.6"
 bytes = "1.1"
 futures = "0.1"
 futures03 = { package = "futures", version = "0.3", features = ["compat", "io-compat"] }
-tokio1 = { package = "tokio", version = "1.14", features = ["full"] }
+tokio = { version = "1.14", features = ["full"] }
 tokio-util = { version = "0.6.9", features = ["codec", "compat"] }
 dbus = "0.5"
 input = "0.2.1"

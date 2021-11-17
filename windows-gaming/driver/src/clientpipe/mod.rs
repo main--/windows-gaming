@@ -16,8 +16,8 @@ use futures03::TryStreamExt;
 use futures03::compat::Future01CompatExt;
 
 use crate::controller::Controller;
-use tokio1::net::UnixStream;
-use tokio1::time;
+use tokio::net::UnixStream;
+use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::codec::Decoder;
 use self::codec::{Codec, GaCmdIn};
@@ -74,7 +74,7 @@ impl Clientpipe {
                                 true => Ok(()),
                                 false => Err(()),
                             });
-                        tokio1::task::spawn_local(timer.compat());
+                        tokio::task::spawn_local(timer.compat());
                     }
                 }
                 GaCmdIn::Suspending(()) => {

@@ -8,7 +8,7 @@ use mio::Ready;
 use mio::unix::UnixReady;
 use futures::{Async};
 
-use tokio1::io::unix::AsyncFd;
+use tokio::io::unix::AsyncFd;
 
 pub struct DBusItems<'a> {
     conn: &'a Connection,

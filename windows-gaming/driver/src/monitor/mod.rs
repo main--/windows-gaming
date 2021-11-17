@@ -26,7 +26,7 @@ use futures::{Stream, Future};
 
 use crate::controller::Controller;
 use futures03::{StreamExt, SinkExt, TryStreamExt};
-use tokio1::net::UnixStream;
+use tokio::net::UnixStream;
 use tokio_util::codec::Decoder;
 use self::codec::Codec;
 

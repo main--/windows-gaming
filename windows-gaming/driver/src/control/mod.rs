@@ -13,7 +13,7 @@ use futures03::{SinkExt, StreamExt, TryStreamExt};
 use futures03::compat::Future01CompatExt;
 
 use crate::controller::Controller;
-use tokio1::net::UnixListener;
+use tokio::net::UnixListener;
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::Decoder;
 use self::codec::Codec;
@@ -67,7 +67,7 @@ pub fn create<'a>(socket: StdUnixListener, controller: Rc<RefCell<Controller>>) 
                     let controller = controller_rc.clone();
                     let sender = sender.clone();
                     let sender2 = sender.clone();
-                    tokio1::task::spawn_local(receiver.for_each(move |data| (&*sender.borrow()).unbounded_send(data).map_err(|_| ()))
+                    tokio::task::spawn_local(receiver.for_each(move |data| (&*sender.borrow()).unbounded_send(data).map_err(|_| ()))
                         .then(move |_| {
                             controller.borrow_mut().temporary_exit();
                             let _ = (&*sender2.borrow()).unbounded_send(ControlCmdOut::TemporaryLightDetached);
@@ -78,7 +78,7 @@ pub fn create<'a>(socket: StdUnixListener, controller: Rc<RefCell<Controller>>) 
             Box::new(future::ok(()))
         }).then(|_| Ok(()));
 
-        tokio1::task::spawn_local(writer.select(reader).then(|_| Ok::<(), ()>(())).compat());
+        tokio::task::spawn_local(writer.select(reader).then(|_| Ok::<(), ()>(())).compat());
         Ok(())
     });
     Box::new(handler)

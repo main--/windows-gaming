@@ -12,7 +12,7 @@ use crate::controller;
 use crate::sd_notify::notify_systemd;
 use crate::samba;
 use common::util;
-use tokio1::process::{Child, Command};
+use tokio::process::{Child, Command};
 
 const QEMU: &str = "/usr/bin/qemu-system-x86_64";
 

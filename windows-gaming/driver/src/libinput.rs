@@ -18,7 +18,7 @@ use common::config::{UsbBinding, UsbPort, UsbId, MachineConfig};
 use crate::controller::Controller;
 use common::hotkeys::{KeyboardState, KeyResolution, KeyBinding};
 use crate::monitor::{QmpCommand, InputEvent, InputButton, KeyValue};
-use tokio1::io::unix::AsyncFd;
+use tokio::io::unix::AsyncFd;
 
 const EVIOCGRAB: c_ulong = 1074021776;
 
