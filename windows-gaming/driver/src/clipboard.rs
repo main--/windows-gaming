@@ -14,7 +14,7 @@ use crate::controller::Controller;
 use crate::clientpipe::ClipboardType;
 use tokio_stream::wrappers::{UnboundedReceiverStream, WatchStream};
 
-extern crate zerocost_clipboard;
+use zerocost_clipboard;
 
 static OUR_MIME_MARKER: &'static str = "application/from-windows";
 

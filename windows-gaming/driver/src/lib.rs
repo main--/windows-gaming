@@ -1,26 +1,11 @@
-extern crate nix;
-extern crate users;
-extern crate libudev;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_json;
-extern crate libc;
-extern crate itertools;
 #[macro_use]
 extern crate log;
-extern crate mio;
-extern crate bytes;
-extern crate futures;
 extern crate dbus as libdbus;
-extern crate input;
-extern crate prost;
-extern crate common;
-extern crate anyhow;
-extern crate futures03;
-extern crate tokio1;
-extern crate tokio_stream;
-extern crate tokio_util;
+
+use tokio1;
+use tokio_stream;
 
 pub mod qemu;
 pub use crate::control::ControlCmdIn;
