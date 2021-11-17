@@ -91,12 +91,16 @@ impl X11Clipboard {
                     }
                     ClipboardResponse::Data(buf) => {
                         debug!("responding to wayland with clipboard data");
-                        let target = response.event.req.into_target();
-                        let target = tokio_util::compat::TokioAsyncWriteCompatExt::compat_write(target);
-                        let target = futures03::io::AsyncWriteExt::compat_write(target);
-                        tokio_io::io::copy(Cursor::new(buf), target).then(|_| Ok(()))
+                        let mut target = response.event.req.into_target();
+                        tokio::spawn(async move {
+                            let res = tokio::io::copy_buf(&mut Cursor::new(buf), &mut target).await;
+                            if let Err(e) = res {
+                                error!("Error responding to wayland clipboard: {:?}", e);
+                            }
+                        });
                     }
                 }
+                Ok(())
             });
 
             let (claim_tx, claim_rx) = mpsc::unbounded();
