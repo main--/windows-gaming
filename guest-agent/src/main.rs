@@ -14,7 +14,7 @@ use windows::Win32::Foundation::{BOOLEAN, HANDLE, LUID, PWSTR};
 use windows::Win32::System::Power::SetSuspendState;
 use windows::Win32::System::Shutdown::{EWX_POWEROFF, EXIT_WINDOWS_FLAGS, ExitWindowsEx, SHTDN_REASON_FLAG_PLANNED};
 use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
-use windows::Win32::UI::WindowsAndMessaging::{EWX_FORCEIFHUNG, GetMessageExtraInfo};
+use windows::Win32::UI::WindowsAndMessaging::{EWX_FORCE, GetMessageExtraInfo};
 use windows::runtime::Handle;
 use windows_eventloop::WindowsEventLoop;
 use windows_keybinds::HotKeyManager;
@@ -90,7 +90,7 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
                 clientpipe_codec::GaCmdOut::Shutdown(()) => {
-                    let res = unsafe { ExitWindowsEx(EWX_POWEROFF | EXIT_WINDOWS_FLAGS(EWX_FORCEIFHUNG), SHTDN_REASON_FLAG_PLANNED.0) }.ok();
+                    let res = unsafe { ExitWindowsEx(EWX_POWEROFF | EXIT_WINDOWS_FLAGS(EWX_FORCE), SHTDN_REASON_FLAG_PLANNED.0) }.ok();
                     if let Err(e) = res {
                         log::error!("Failed to shut down: {:?}", e);
                     }
