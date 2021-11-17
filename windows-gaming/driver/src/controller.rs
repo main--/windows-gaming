@@ -83,9 +83,6 @@ impl Controller {
                x11_clipboard: UnboundedSender<ClipboardRequestResponse>,
                x11_clipboard_grabber: UnboundedSender<()>,
                x11_clipboard_reader: UnboundedSender<ClipboardType>) -> Controller {
-        if let Ok(rl) = std::env::var("RUST_LOG") {
-            clientpipe.unbounded_send(GaCmdOut::EnableDebugConsole(rl)).unwrap();
-        }
         Controller {
             machine_config,
             hooks_config,
@@ -136,6 +133,10 @@ impl Controller {
 
     pub fn ga_hello(&mut self) -> bool {
         sd_notify::notify_systemd(true, "Ready");
+
+        if let Ok(rl) = std::env::var("RUST_LOG") {
+            self.write_ga(GaCmdOut::EnableDebugConsole(rl));
+        }
 
         // send GA all hotkeys we want to register
         for (i, hotkey) in self.machine_config.hotkeys.clone().into_iter().enumerate() {
@@ -315,6 +316,7 @@ impl Controller {
 
     /// Suspends Windows
     pub fn suspend(&mut self) -> Box<dyn Future<Item=(), Error=()>> {
+        info!("Suspending windows");
         if self.ga == State::Suspended {
             // we are already suspended, return a resolved future
             return Box::new(future::ok(()));
@@ -358,6 +360,7 @@ impl Controller {
     }
 
     pub fn shutdown(&mut self) {
+        info!("Initiating windows shutdown");
         // if GA is up, use that to shut down instead of sending the ACPI message through qemu
         match self.ga {
             State::Up | State::Pinging => self.write_ga(GaCmdOut::Shutdown(())),
