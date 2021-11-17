@@ -109,7 +109,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
                          machine.cores,
                          machine.threads.unwrap_or(1))]);
     trace!("use hda sound hardware");
-    qemu.args(&["-soundhw", "hda"]);
+    qemu.args(&["-device", "intel-hda", "-device", "hda-duplex"]);
 
     for (idx, bridge) in machine.network.iter().flat_map(|x| x.bridges.iter()).enumerate() {
         trace!("setup bridge {}", bridge);
