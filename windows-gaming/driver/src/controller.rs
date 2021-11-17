@@ -350,7 +350,11 @@ impl Controller {
     }
 
     pub fn shutdown(&mut self) {
-        self.write_ga(GaCmdOut::Shutdown(()));
+        // if GA is up, use that to shut down instead of sending the ACPI message through qemu
+        match self.ga {
+            State::Up | State::Pinging => self.write_ga(GaCmdOut::Shutdown(())),
+            _ => (&self.monitor).unbounded_send(QmpCommand::SystemPowerdown).unwrap(),
+        }
     }
 
     /// Windows told us to grab the keyboard
