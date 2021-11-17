@@ -15,9 +15,9 @@ use libc::{self, c_char, c_int, c_ulong, c_void};
 use libudev::{Result as UdevResult, Context, Enumerator};
 
 use common::config::{UsbBinding, UsbPort, UsbId, MachineConfig};
-use controller::Controller;
+use crate::controller::Controller;
 use common::hotkeys::{KeyboardState, KeyResolution, KeyBinding};
-use monitor::{QmpCommand, InputEvent, InputButton, KeyValue};
+use crate::monitor::{QmpCommand, InputEvent, InputButton, KeyValue};
 use tokio1::io::unix::AsyncFd;
 
 const EVIOCGRAB: c_ulong = 1074021776;

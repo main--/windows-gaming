@@ -24,7 +24,7 @@ use std::cell::RefCell;
 use futures::unsync::mpsc::{self, UnboundedSender};
 use futures::{Stream, Future};
 
-use controller::Controller;
+use crate::controller::Controller;
 use futures03::{StreamExt, SinkExt, TryStreamExt};
 use tokio1::net::UnixStream;
 use tokio_util::codec::Decoder;

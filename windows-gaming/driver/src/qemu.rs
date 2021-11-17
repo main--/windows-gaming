@@ -8,9 +8,9 @@ use itertools::Itertools;
 use libc;
 
 use common::config::{Config, SoundBackend, AlsaUnit, UsbBus};
-use controller;
-use sd_notify::notify_systemd;
-use samba;
+use crate::controller;
+use crate::sd_notify::notify_systemd;
+use crate::samba;
 use common::util;
 use tokio1::process::{Child, Command};
 

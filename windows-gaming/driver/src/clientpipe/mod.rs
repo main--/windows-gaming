@@ -15,7 +15,7 @@ use futures03::SinkExt;
 use futures03::TryStreamExt;
 use futures03::compat::Future01CompatExt;
 
-use controller::Controller;
+use crate::controller::Controller;
 use tokio1::net::UnixStream;
 use tokio1::time;
 use tokio_stream::wrappers::IntervalStream;

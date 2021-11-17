@@ -23,7 +23,7 @@ extern crate tokio_stream;
 extern crate tokio_util;
 
 pub mod qemu;
-pub use control::ControlCmdIn;
+pub use crate::control::ControlCmdIn;
 use futures03::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use futures03::compat::Future01CompatExt;
 use tokio1::signal::unix::{SignalKind, signal};
@@ -56,11 +56,11 @@ use futures::unsync::mpsc;
 
 use common::config::Config;
 
-use controller::Controller;
-use monitor::Monitor;
-use clientpipe::Clientpipe;
-use libinput::Input;
-use clipboard::X11Clipboard;
+use crate::controller::Controller;
+use crate::monitor::Monitor;
+use crate::clientpipe::Clientpipe;
+use crate::libinput::Input;
+use crate::clipboard::X11Clipboard;
 
 pub fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
     let rt1 = tokio1::runtime::Builder::new_current_thread().enable_all().build().unwrap();

@@ -12,7 +12,7 @@ use futures::unsync::mpsc;
 use futures03::{SinkExt, StreamExt, TryStreamExt};
 use futures03::compat::Future01CompatExt;
 
-use controller::Controller;
+use crate::controller::Controller;
 use tokio1::net::UnixListener;
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::Decoder;

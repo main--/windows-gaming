@@ -10,8 +10,8 @@ use futures::unsync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 use futures03::{FutureExt, TryFutureExt, TryStreamExt, StreamExt};
 
-use controller::Controller;
-use clientpipe::ClipboardType;
+use crate::controller::Controller;
+use crate::clientpipe::ClipboardType;
 use tokio_stream::wrappers::{UnboundedReceiverStream, WatchStream};
 
 extern crate zerocost_clipboard;

@@ -1,4 +1,4 @@
-use monitor::{InputEvent, KeyValue};
+use crate::monitor::{InputEvent, KeyValue};
 
 // $ awk '{ print "    InputEvent::Key { down: false, key: KeyValue::Qcode(" $3 ") },"; }' qcode.rs
 

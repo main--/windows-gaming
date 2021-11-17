@@ -2,10 +2,10 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::io::Error;
 
-use libdbus::{Connection, ConnectionItem, BusType, Message, OwnedFd};
+use crate::libdbus::{Connection, ConnectionItem, BusType, Message, OwnedFd};
 use futures::{Stream, Future, IntoFuture};
 
-use dbus::DBusItems;
+use crate::dbus::DBusItems;
 use futures03::TryStreamExt;
 
 pub fn system_dbus() -> Connection {

@@ -3,7 +3,7 @@ use std::ops::DerefMut;
 use std::os::unix::prelude::RawFd;
 
 use futures03::Stream;
-use libdbus::{Connection, ConnectionItem, Watch, WatchEvent};
+use crate::libdbus::{Connection, ConnectionItem, Watch, WatchEvent};
 use mio::Ready;
 use mio::unix::UnixReady;
 use futures::{Async};

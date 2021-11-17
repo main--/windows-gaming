@@ -14,13 +14,13 @@ use futures::future;
 
 use common::config::{UsbId, UsbPort, UsbBinding, MachineConfig, HotKeyAction, Action};
 use common::util;
-use clientpipe::{GaCmdOut, ClipboardMessage, ClipboardType, RegisterHotKey, Point};
-use control::ControlCmdOut;
-use monitor::QmpCommand;
-use sd_notify;
-use libinput::Input;
-use clipboard::{ClipboardRequestEvent, ClipboardRequestResponse};
-use release_all_keys::EVENTS as RELEASE_ALL_KEYS;
+use crate::clientpipe::{GaCmdOut, ClipboardMessage, ClipboardType, RegisterHotKey, Point};
+use crate::control::ControlCmdOut;
+use crate::monitor::QmpCommand;
+use crate::sd_notify;
+use crate::libinput::Input;
+use crate::clipboard::{ClipboardRequestEvent, ClipboardRequestResponse};
+use crate::release_all_keys::EVENTS as RELEASE_ALL_KEYS;
 
 
 #[derive(PartialEq, Eq, Clone, Copy)]
