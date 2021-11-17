@@ -67,7 +67,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
                 "-qmp",
                 &format!("unix:{}", monitor_path.display()),
                 "-drive",
-                &format!("if=pflash,format=raw,readonly,file={}",
+                &format!("if=pflash,format=raw,readonly=on,file={}",
                          data.join("ovmf-code.fd").display()),
                 "-drive",
                 &format!("if=pflash,format=raw,file={}", efivars_file.display()),
