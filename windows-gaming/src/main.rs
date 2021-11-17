@@ -6,7 +6,6 @@ extern crate time;
 #[macro_use] extern crate clap;
 extern crate common;
 extern crate driver;
-extern crate wizard;
 
 use std::path::Path;
 use std::os::unix::net::UnixStream;
@@ -134,7 +133,7 @@ fn main() {
 
     match matches.subcommand() {
         ("run", cmd) => driver::run(cfg.as_ref().unwrap(), &workdir_path, &data_folder, cmd.unwrap().is_present("virtual-gpu")),
-        ("wizard", _) => wizard::run(cfg, &config_path, &workdir_path, &data_folder),
+        ("wizard", _) => unimplemented!("wizard"),
         ("control", cmd) => {
             match cmd.unwrap().subcommand() {
                 ("attach", cmd) => {
@@ -157,7 +156,7 @@ fn main() {
         }
         _ => match cfg {
             Some(ref cfg) if cfg.setup.is_none() => driver::run(cfg, &workdir_path, &data_folder, false),
-            cfg => wizard::run(cfg, &config_path, &workdir_path, &data_folder),
+            _cfg => unimplemented!("wizard"),
         }
     }
 }
