@@ -109,7 +109,7 @@ pub async fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
     let (clipread_send, clipread_recv) = mpsc::unbounded();
     let (resp_send, resp_recv) = mpsc::unbounded();
 
-    let ctrl = Controller::new(cfg.machine.clone(), monitor_sender.clone(), clientpipe.take_send(), input.clone(),
+    let ctrl = Controller::new(cfg.machine.clone(), cfg.hooks.clone(), monitor_sender.clone(), clientpipe.take_send(), input.clone(),
                                resp_send, clipgrab_send, clipread_send);
 
     let controller = Rc::new(RefCell::new(ctrl));

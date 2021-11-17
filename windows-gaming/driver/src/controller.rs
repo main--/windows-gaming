@@ -2,7 +2,6 @@ use std::mem;
 use std::rc::Rc;
 use std::ffi::OsStr;
 use std::cell::RefCell;
-use std::process::Command;
 use std::borrow::Cow;
 
 use itertools::Itertools;
@@ -12,8 +11,9 @@ use futures::unsync::oneshot::{self, Sender};
 use futures::Future;
 use futures::future;
 
-use common::config::{UsbId, UsbPort, UsbBinding, MachineConfig, HotKeyAction, Action};
+use common::config::{Action, HooksConfig, HotKeyAction, MachineConfig, UsbBinding, UsbId, UsbPort};
 use common::util;
+use tokio::process::Command;
 use crate::clientpipe::{GaCmdOut, ClipboardMessage, ClipboardType, RegisterHotKey, Point};
 use crate::control::ControlCmdOut;
 use crate::monitor::QmpCommand;
@@ -51,6 +51,7 @@ enum IoState {
 
 pub struct Controller {
     machine_config: MachineConfig,
+    hooks_config: HooksConfig,
 
     ga: State,
     io_state: IoState,
@@ -75,6 +76,7 @@ impl Controller {
     }
 
     pub fn new(machine_config: MachineConfig,
+               hooks_config: HooksConfig,
                monitor: UnboundedSender<QmpCommand>,
                clientpipe: UnboundedSender<GaCmdOut>,
                input: Rc<RefCell<Input>>,
@@ -84,6 +86,7 @@ impl Controller {
         (&monitor).unbounded_send(QmpCommand::QmpCapabilities).unwrap();
         Controller {
             machine_config,
+            hooks_config,
 
             ga: State::Down,
             io_state: IoState::Detached,
@@ -304,6 +307,8 @@ impl Controller {
     pub fn prepare_entry(&mut self) {
         // release modifiers
         self.write_ga(GaCmdOut::ReleaseModifiers(()));
+        // launch entry hook
+        run_hook(&self.hooks_config.attach);
     }
 
     /// Suspends Windows
@@ -347,6 +352,7 @@ impl Controller {
         }
 
         self.io_state = IoState::Detached;
+        run_hook(&self.hooks_config.detach);
     }
 
     pub fn shutdown(&mut self) {
@@ -469,4 +475,19 @@ pub fn udev_resolve_binding(udev: &Context, binding: &UsbBinding)
 pub fn resolve_binding(binding: &UsbBinding) -> UdevResult<Option<(String, String)>> {
     let udev = Context::new().expect("Failed to create udev context");
     udev_resolve_binding(&udev, binding)
+}
+
+fn run_hook(hook: &Option<String>) {
+    if let Some(hook) = hook.as_ref() {
+        match Command::new("/bin/sh").arg("-c").arg(&hook).spawn() {
+            Ok(mut child) => {
+                tokio::spawn(async move {
+                    if let Err(e) = child.wait().await {
+                        warn!("Error waiting for hook to return: {:?}", e);
+                    }
+                });
+            }
+            Err(e) => warn!("Error spawning hook: {:?}", e),
+        }
+    }
 }

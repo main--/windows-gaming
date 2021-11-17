@@ -102,6 +102,17 @@ pub struct Config {
     pub additional_qemu_cmdline: Option<String>,
     pub runtime_directory_override: Option<String>,
     pub data_directory_override: Option<String>,
+    pub hooks: HooksConfig,
+}
+
+// TODO: maybe using run-parts would be a more flexible solution here?
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[serde(default)]
+pub struct HooksConfig {
+    pub ready: Option<String>,
+    pub attach: Option<String>,
+    pub detach: Option<String>,
+    pub down: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
