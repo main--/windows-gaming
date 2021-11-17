@@ -104,8 +104,8 @@ pub struct Config {
     pub data_directory_override: Option<String>,
 }
 
-#[serde(default)]
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(default)]
 pub struct SoundConfig {
     pub timer_period: usize,
     pub input: SoundSettings,
@@ -124,8 +124,8 @@ impl Default for SoundConfig {
     }
 }
 
-#[serde(default)]
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(default)]
 pub struct SoundSettings {
     pub voices: usize,
     pub use_polling: bool,
@@ -172,8 +172,8 @@ impl Default for SoundBackend {
     }
 }
 
-#[serde(default)]
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(default)]
 pub struct AlsaSettings {
     pub name: String,
 
