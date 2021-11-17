@@ -85,6 +85,7 @@ impl Encoder<ControlCmdOut> for Codec {
     }
 }
 
+/*
 #[cfg(test)]
 mod test {
     use super::*;
@@ -116,3 +117,4 @@ mod test {
         assert_eq!(bytes.len(), 0);
     }
 }
+*/
