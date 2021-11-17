@@ -16,44 +16,42 @@ pub use self::codec::{
     InputButton,
 };
 
-use std::os::unix::net::{UnixStream as StdUnixStream};
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 use std::rc::Rc;
 use std::cell::RefCell;
 
 use futures::unsync::mpsc::{self, UnboundedSender};
-use futures::{Stream, Future};
+use futures::Future;
+use futures03::compat::Stream01CompatExt;
+use qapi::futures::{QapiStream, QmpStreamTokio};
+use qapi::qmp;
+use tokio::io::{ReadHalf, WriteHalf};
 
 use crate::controller::Controller;
-use futures03::{StreamExt, SinkExt, TryStreamExt};
+use futures03::{FutureExt, StreamExt, TryFutureExt};
 use tokio::net::UnixStream;
-use tokio_util::codec::Decoder;
-use self::codec::Codec;
 
 type Send = UnboundedSender<QmpCommand>;
-type Sender = Box<dyn Future<Item=(), Error=Error>>;
-type Read = Box<dyn Stream<Item=Message, Error=Error>>;
 type Handler = Box<dyn Future<Item=(), Error=Error>>;
 
 pub struct Monitor {
     send: Option<Send>,
-    sender: Option<Sender>,
-    read: Option<Read>,
+    recv: Option<mpsc::UnboundedReceiver<QmpCommand>>,
+    qapi: Option<QapiStream<QmpStreamTokio<ReadHalf<UnixStream>>, QmpStreamTokio<WriteHalf<UnixStream>>>>,
 }
 
 impl Monitor {
-    pub fn new(stream: StdUnixStream) -> Monitor {
-        stream.set_nonblocking(true).unwrap();
-        let stream = UnixStream::from_std(stream).unwrap();
-        let (write, read) = Codec.framed(stream).split();
+    pub async fn new(stream: UnixStream) -> Monitor {
+        let (r, w) = tokio::io::split(stream);
+        let nego = QmpStreamTokio::open_split(r, w).await.unwrap();
+        let qapi = nego.negotiate().await.unwrap();
+
         let (send, recv) = mpsc::unbounded();
-        let recv = recv.map_err(|()| Error::new(ErrorKind::Other, "Failed to write to monitor"));
-        let sender = recv.forward(write.compat()).map(|_| ());
 
         Monitor {
             send: Some(send),
-            sender: Some(Box::new(sender)),
-            read: Some(Box::new(read.compat())),
+            recv: Some(recv),
+            qapi: Some(qapi),
         }
     }
 
@@ -61,23 +59,57 @@ impl Monitor {
         self.send.take().unwrap()
     }
 
-    pub fn take_sender(&mut self) -> Sender {
-        self.sender.take().unwrap()
-    }
-
     pub fn take_handler(&mut self, controller: Rc<RefCell<Controller>>) -> Handler {
-        let handler = self.read.take().unwrap().for_each(move |msg| {
-            if let Message::Return { .. } = msg {
-                // do not print these, they are useless and spammy
-            } else {
-                info!("{:?}", msg);
-            }
+        let (qapi, mut events) = self.qapi.take().unwrap().into_parts();
+        let event_handler = async move {
+            while let Some(a) = events.next().await {
+                let event = match a {
+                    Err(e) => {
+                        warn!("Error reading from QAPI: {:?}", e);
+                        return;
+                    }
+                    Ok(e) => e,
+                };
 
-            if let Message::Event(Event::Suspend { .. }) = msg {
-                controller.borrow_mut().qemu_suspended();
+                info!("QAPI event: {:?}", event);
+                match event {
+                    qapi::qmp::Event::SUSPEND { .. } => {
+                        controller.borrow_mut().qemu_suspended();
+                    }
+                    _ => (),
+                }
             }
+        };
+        let mut commands = self.recv.take().unwrap().compat();
+        let command_handler = async move {
+            while let Some(Ok(cmd)) = commands.next().await {
+                let res = match cmd {
+                    QmpCommand::DeviceAdd { driver, id, bus, port, hostbus, hostaddr } =>
+                        qapi.execute(&qmp::device_add { id: Some(id), bus: Some(bus), driver: driver.to_owned(), arguments: vec![
+                            ("port".to_owned(), port.into()),
+                            ("hostbus".to_owned(), hostbus.into()),
+                            ("hostaddr".to_owned(), hostaddr.into()),
+                        ].into_iter().collect() }).await,
+                    QmpCommand::DeviceDel { id } => qapi.execute(&qmp::device_del { id }).await,
+                    QmpCommand::SystemPowerdown => qapi.execute(&qmp::system_powerdown {}).await,
+                    QmpCommand::SystemWakeup => qapi.execute(&qmp::system_wakeup {}).await,
+                    QmpCommand::InputSendEvent { events } =>
+                        qapi.execute(&qmp::input_send_event { device: None, head: None, events: events.into_iter().map(|i| i.clone().into()).collect() }).await,
+                };
+
+                if let Err(e) = res {
+                    warn!("Error executing QMP command: {:?}", e);
+                    if let qapi::ExecuteError::Io(_) = e {
+                        // don't loop infinitely trying to read from a broken socket
+                        break;
+                    }
+                }
+            }
+        };
+        let handler = async move {
+            tokio::join!(event_handler, command_handler);
             Ok(())
-        });
-        Box::new(handler)
+        };
+        Box::new(handler.boxed_local().compat())
     }
 }

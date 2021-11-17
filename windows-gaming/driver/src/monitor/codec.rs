@@ -2,13 +2,13 @@ use std::io;
 use std::str;
 use std::borrow::Cow;
 use bytes::{Buf, BytesMut};
+use qapi::{Enum, qmp};
 use tokio_util::codec::{Encoder, Decoder};
 use serde_json;
 
 #[derive(Serialize)]
 #[serde(tag = "execute", content = "arguments", rename_all = "snake_case")]
 pub enum QmpCommand {
-    QmpCapabilities,
     DeviceAdd {
         driver: &'static str,
         id: String,
@@ -42,6 +42,17 @@ pub enum InputEvent {
         down: bool,
     },
 }
+impl Into<qmp::InputEvent> for InputEvent {
+    fn into(self) -> qmp::InputEvent {
+        match self {
+            InputEvent::Rel { axis, value } => qmp::InputEvent::rel { data: qmp::InputMoveEvent { value: value as isize, axis: qmp::InputAxis::from_name(axis).unwrap() }  },
+            InputEvent::Btn { button, down } => qmp::InputEvent::btn { data: qmp::InputBtnEvent { down, button: button.into() } },
+            InputEvent::Key { key, down } => qmp::InputEvent::key { data: qmp::InputKeyEvent { down, key: match key {
+                KeyValue::Qcode(s) => qmp::KeyValue::qcode { data: qmp::QKeyCode::from_name(s).unwrap() },
+            } }},
+        }
+    }
+}
 
 #[derive(Serialize, Clone, Copy)]
 #[serde(tag = "type", content = "data", rename_all = "snake_case")]
@@ -60,6 +71,19 @@ pub enum InputButton {
     WheelDown,
     Side,
     Extra,
+}
+impl Into<qmp::InputButton> for InputButton {
+    fn into(self) -> qmp::InputButton {
+        match self {
+            InputButton::Left => qmp::InputButton::left,
+            InputButton::Middle => qmp::InputButton::middle,
+            InputButton::Right => qmp::InputButton::right,
+            InputButton::WheelUp => qmp::InputButton::wheel_up,
+            InputButton::WheelDown => qmp::InputButton::wheel_down,
+            InputButton::Side => qmp::InputButton::side,
+            InputButton::Extra => qmp::InputButton::extra,
+        }
+    }
 }
 
 #[derive(Deserialize, Debug, PartialEq, Eq)]

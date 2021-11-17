@@ -8,6 +8,7 @@ pub mod qemu;
 pub use crate::control::ControlCmdIn;
 use futures03::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use futures03::compat::Future01CompatExt;
+use tokio::net::UnixListener;
 use tokio::signal::unix::{SignalKind, signal};
 use tokio::task::LocalSet;
 use tokio_stream::wrappers::SignalStream;
@@ -66,7 +67,7 @@ pub async fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
     trace!("created tmp dir");
 
     let monitor_socket_file = tmp.join("monitor.sock");
-    let monitor_socket = StdUnixListener::bind(&monitor_socket_file)
+    let monitor_socket = UnixListener::bind(&monitor_socket_file)
         .expect("Failed to create monitor socket");
     debug!("Started Monitor");
 
@@ -88,7 +89,7 @@ pub async fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
             }
         });
 
-    let (monitor_stream, _) = monitor_socket.accept().expect("Failed to get monitor");
+    let (monitor_stream, _) = monitor_socket.accept().await.expect("Failed to get monitor");
     drop(monitor_socket);
 
     let (clientpipe_stream, _) = clientpipe_socket.accept().expect("Failed to get clientpipe");
@@ -97,7 +98,7 @@ pub async fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
     sd_notify::notify_systemd(false, "Booting ...");
     debug!("Windows is starting");
 
-    let mut monitor = Monitor::new(monitor_stream);
+    let mut monitor = Monitor::new(monitor_stream).await;
     let mut clientpipe = Clientpipe::new(clientpipe_stream);
 
     let (mut input, input_events) = Input::new(cfg.machine.clone());
@@ -154,7 +155,6 @@ pub async fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
         clientpipe.take_sender(),
         control_handler,
         monitor.take_handler(controller.clone()),
-        monitor.take_sender(),
         Box::new(catch_sigterm),
         Box::new(input_listener.compat()),
         input_handler,

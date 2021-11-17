@@ -83,7 +83,6 @@ impl Controller {
                x11_clipboard: UnboundedSender<ClipboardRequestResponse>,
                x11_clipboard_grabber: UnboundedSender<()>,
                x11_clipboard_reader: UnboundedSender<ClipboardType>) -> Controller {
-        (&monitor).unbounded_send(QmpCommand::QmpCapabilities).unwrap();
         Controller {
             machine_config,
             hooks_config,
