@@ -45,7 +45,7 @@ use crate::clientpipe::Clientpipe;
 use crate::libinput::Input;
 use crate::clipboard::X11Clipboard;
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 pub async fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
     let control_socket_file = tmp.join("control.sock");
     // first check for running sessions
