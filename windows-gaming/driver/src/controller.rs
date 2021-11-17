@@ -135,6 +135,7 @@ impl Controller {
     pub fn ga_hello(&mut self) -> bool {
         sd_notify::notify_systemd(true, "Ready");
 
+        #[cfg(debug_assertions)]
         if let Ok(rl) = std::env::var("RUST_LOG") {
             self.write_ga(GaCmdOut::EnableDebugConsole(rl));
         }
