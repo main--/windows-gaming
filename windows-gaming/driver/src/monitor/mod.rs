@@ -22,7 +22,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 
 use futures::unsync::mpsc::{self, UnboundedSender};
-use futures::{Stream, Sink, Future};
+use futures::{Stream, Future};
 
 use controller::Controller;
 use futures03::{StreamExt, SinkExt, TryStreamExt};

@@ -61,7 +61,7 @@ impl Decoder for Codec {
             }
             None => return Ok(None),
         };
-        buf.split_to(size);
+        buf.advance(size);
         Ok(Some(ret))
     }
 }

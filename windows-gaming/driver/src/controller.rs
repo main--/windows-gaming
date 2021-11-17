@@ -14,7 +14,7 @@ use futures::future;
 
 use common::config::{UsbId, UsbPort, UsbBinding, MachineConfig, HotKeyAction, Action};
 use common::util;
-use clientpipe::{GaCmdOut, ClipboardMessage, ClipboardType, ClipboardTypes, RegisterHotKey, Point};
+use clientpipe::{GaCmdOut, ClipboardMessage, ClipboardType, RegisterHotKey, Point};
 use control::ControlCmdOut;
 use monitor::QmpCommand;
 use sd_notify;
@@ -71,7 +71,7 @@ pub struct Controller {
 
 impl Controller {
     fn write_ga<C: Into<GaCmdOut>>(&mut self, cmd: C) {
-        (&self.clientpipe).send(cmd.into()).unwrap();
+        (&self.clientpipe).unbounded_send(cmd.into()).unwrap();
     }
 
     pub fn new(machine_config: MachineConfig,
@@ -81,7 +81,7 @@ impl Controller {
                x11_clipboard: UnboundedSender<ClipboardRequestResponse>,
                x11_clipboard_grabber: UnboundedSender<()>,
                x11_clipboard_reader: UnboundedSender<ClipboardType>) -> Controller {
-        (&monitor).send(QmpCommand::QmpCapabilities).unwrap();
+        (&monitor).unbounded_send(QmpCommand::QmpCapabilities).unwrap();
         Controller {
             machine_config,
 
@@ -204,7 +204,7 @@ impl Controller {
             State::Resuming | State::Suspending => (),
             State::Suspended => {
                 // make them wake up
-                (&self.monitor).send(QmpCommand::SystemWakeup).unwrap();
+                (&self.monitor).unbounded_send(QmpCommand::SystemWakeup).unwrap();
                 // can't enter now - gotta wait for GA to get ready
                 self.ga = State::Resuming;
             },
@@ -269,7 +269,7 @@ impl Controller {
             IoState::AwaitingUpgrade | IoState::LightEntry => self.input.borrow_mut().suspend(),
             IoState::TemporaryLightEntry(ref mut sender) => {
                 self.input.borrow_mut().suspend();
-                sender.send(ControlCmdOut::TemporaryLightDetached).unwrap();
+                sender.unbounded_send(ControlCmdOut::TemporaryLightDetached).unwrap();
             }
             IoState::FullEntry => return,
         }
@@ -287,7 +287,7 @@ impl Controller {
                     .expect("Failed to resolve usb binding") {
                 let bus = dev.bus;
                 let usable_ports = util::usable_ports(bus);
-                (&self.monitor).send(QmpCommand::DeviceAdd {
+                (&self.monitor).unbounded_send(QmpCommand::DeviceAdd {
                     driver: "usb-host",
                     bus: format!("{}{}.0", bus, port / usable_ports),
                     port: (port % usable_ports) + 1,
@@ -333,7 +333,7 @@ impl Controller {
             IoState::AwaitingUpgrade | IoState::LightEntry | IoState::TemporaryLightEntry(_) => {
                 debug!("detaching light entry");
                 self.input.borrow_mut().suspend();
-                (&self.monitor).send(QmpCommand::InputSendEvent {
+                (&self.monitor).unbounded_send(QmpCommand::InputSendEvent {
                     events: Cow::from(RELEASE_ALL_KEYS),
                 }).unwrap();
             },
@@ -341,7 +341,7 @@ impl Controller {
                 debug!("detaching full entry");
                 for i in self.machine_config.usb_devices.iter().enumerate()
                         .filter(|&(_, dev)| !dev.permanent).map(|(i, _)| i) {
-                    (&self.monitor).send(QmpCommand::DeviceDel { id: format!("usb{}", i) }).unwrap();
+                    (&self.monitor).unbounded_send(QmpCommand::DeviceDel { id: format!("usb{}", i) }).unwrap();
                 }
             }
         }
@@ -359,25 +359,25 @@ impl Controller {
 
     /// Windows told us to grab the keyboard
     pub fn grab_x11_clipboard(&mut self) {
-        (&self.x11_clipboard_grabber).send(()).unwrap();
+        (&self.x11_clipboard_grabber).unbounded_send(()).unwrap();
     }
 
     /// Paste on Windows, so we have to request contents
     pub fn read_x11_clipboard(&mut self, kind: ClipboardType) {
-        (&self.x11_clipboard_reader).send(kind).unwrap();
+        (&self.x11_clipboard_reader).unbounded_send(kind).unwrap();
     }
 
     /// Windows asked what kind of data our clipboard has, X11 responded
     pub fn respond_x11_types(&mut self, types: Vec<ClipboardType>) {
         if let Some(event) = self.win_clipboard_request.take() {
-            (&self.x11_clipboard).send(event.reply_types(types)).unwrap();
+            (&self.x11_clipboard).unbounded_send(event.reply_types(types)).unwrap();
         }
     }
 
     /// Pasting on Linux, Windows responded with contents
     pub fn respond_x11_clipboard(&mut self, buf: Vec<u8>) {
         if let Some(event) = self.win_clipboard_request.take() {
-            (&self.x11_clipboard).send(event.reply_data(buf)).unwrap();
+            (&self.x11_clipboard).unbounded_send(event.reply_data(buf)).unwrap();
         }
     }
 
@@ -392,11 +392,15 @@ impl Controller {
         self.win_clipboard_request = Some(event);
     }
 
+    /*
+    Unused right now, clipboard protocol will change to avoid the two-step dance.
+
     // Linux asked what kind of data our clipboard has, Windows responded
     pub fn respond_win_types(&mut self, types: Vec<ClipboardType>) {
         let types = types.into_iter().map(Into::into).collect();
         self.write_ga(ClipboardMessage::ContentTypes(ClipboardTypes { types }));
     }
+    */
 
     /// Pasting on Windows, X11 responded with contents
     pub fn respond_win_clipboard(&mut self, buf: Vec<u8>) {
@@ -405,7 +409,7 @@ impl Controller {
 
     pub fn mouse_edged(&mut self, x: i32, y: i32) {
         if let IoState::TemporaryLightEntry(ref mut sender) = self.io_state {
-            sender.send(ControlCmdOut::MouseEdged { x, y }).unwrap();
+            sender.unbounded_send(ControlCmdOut::MouseEdged { x, y }).unwrap();
         }
     }
 }

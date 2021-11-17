@@ -150,7 +150,7 @@ impl<'a> futures03::Future for InputListener<'a> {
 
             // lmao what a quality api
             while let Some(e) = p.li.next() {
-                (&p.sender).send(e).unwrap();
+                (&p.sender).unbounded_send(e).unwrap();
             }
         }
 

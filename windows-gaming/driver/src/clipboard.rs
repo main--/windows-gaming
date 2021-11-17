@@ -41,13 +41,13 @@ impl X11Clipboard {
     pub fn open() -> Box<dyn Future<Item=X11Clipboard, Error=anyhow::Error>> {
         trace!("opening wayland clipboard");
         let task = zerocost_clipboard::WaylandClipboard::init().boxed().compat();
-        task.map(|(run, clipboard)| {
+        Box::new(task.map(|(run, clipboard)| {
             let run: Box<dyn Future<Item=(), Error=anyhow::Error>> = Box::new(run.boxed_local().compat());
             let run = RefCell::new(Some(run));
             let (cmd_tx, cmd_rx) = mpsc::unbounded();
             trace!("opened wayland clipboard");
             X11Clipboard { run, clipboard, cmd_tx, cmd_rx: RefCell::new(Some(cmd_rx)) }
-        }).boxed()
+        }))
     }
 
     pub fn grab_clipboard(&self) {
@@ -107,7 +107,7 @@ impl X11Clipboard {
                         debug!("windows is grabbing the clipboard");
                         let claim_tx = claim_tx.clone();
                         clipboard.claim(zerocost_clipboard::PLAINTEXT_MIME_TYPES.iter().chain(once(&OUR_MIME_MARKER)).map(|&s| s.to_owned()))
-                            .map(move |sender| claim_tx.send(sender).unwrap())
+                            .map(move |sender| claim_tx.unbounded_send(sender).unwrap())
                             .unit_error().boxed_local().compat()
                     }
                     Cmd::Read(_) => {

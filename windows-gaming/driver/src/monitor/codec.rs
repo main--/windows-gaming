@@ -1,7 +1,7 @@
 use std::io;
 use std::str;
 use std::borrow::Cow;
-use bytes::BytesMut;
+use bytes::{Buf, BytesMut};
 use tokio_util::codec::{Encoder, Decoder};
 use serde_json;
 
@@ -146,7 +146,7 @@ impl Decoder for Codec {
             let line = buf.split_to(i);
 
             // Also remove the '\n'
-            buf.split_to(1);
+            buf.advance(1);
 
             // Turn this data into a UTF string and return it in a Frame.
             match str::from_utf8(&line) {

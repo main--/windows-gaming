@@ -6,8 +6,6 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 extern crate libc;
-#[macro_use]
-extern crate lazy_static;
 extern crate itertools;
 #[macro_use]
 extern crate log;
@@ -188,17 +186,17 @@ pub fn run_inner(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool, rt1: &
     ]).map(|_| ());
 
     let ls = LocalSet::new();
-    ls.block_on(&rt1, qemu.select2(joined).then(|x| {
+    ls.block_on(&rt1, qemu.select2(joined).then(|x| -> Box<dyn Future<Item=(), Error=std::io::Error>> {
         match x {
             Ok(future::Either::A((_, _))) => info!("qemu down first, all ok"),
-            Err(future::Either::A((e, _))) => return future::err(e).boxed(),
+            Err(future::Either::A((e, _))) => return Box::new(future::err(e)),
             Ok(future::Either::B((_, _))) => unreachable!(), // we never return cleanly
             Err(future::Either::B((e, a))) => {
                 error!("We errored: {}", e);
-                return a.boxed(); // we errored first, wait for qemu to exit
+                return Box::new(a); // we errored first, wait for qemu to exit
             }
         }
-        future::ok(()).boxed()
+        Box::new(future::ok(()))
     }).compat()).expect("Waiting for qemu errored");
 
     info!("unbinding resettable vfio-things");

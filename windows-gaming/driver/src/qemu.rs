@@ -3,7 +3,6 @@ use std::path::{Path};
 use std::iter::Iterator;
 use std::fs;
 use std::io;
-use std::os::unix::process::CommandExt as UnixCommandExt;
 
 use itertools::Itertools;
 use libc;

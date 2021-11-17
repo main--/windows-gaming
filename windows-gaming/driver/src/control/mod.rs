@@ -61,16 +61,16 @@ pub fn create<'a>(socket: StdUnixListener, controller: Rc<RefCell<Controller>>) 
                         warn!("Temporary entry failed, closing connection");
                         return Box::new(future::err(()));
                     }
-                    (&*sender.borrow()).send(ControlCmdOut::TemporaryLightAttached).unwrap();
+                    (&*sender.borrow()).unbounded_send(ControlCmdOut::TemporaryLightAttached).unwrap();
                     temp_entry = true;
                     let receiver = receiver.map_err(|_| ());
                     let controller = controller_rc.clone();
                     let sender = sender.clone();
                     let sender2 = sender.clone();
-                    tokio1::task::spawn_local(receiver.for_each(move |data| (&*sender.borrow()).send(data).map_err(|_| ()))
+                    tokio1::task::spawn_local(receiver.for_each(move |data| (&*sender.borrow()).unbounded_send(data).map_err(|_| ()))
                         .then(move |_| {
                             controller.borrow_mut().temporary_exit();
-                            let _ = (&*sender2.borrow()).send(ControlCmdOut::TemporaryLightDetached);
+                            let _ = (&*sender2.borrow()).unbounded_send(ControlCmdOut::TemporaryLightDetached);
                             Ok::<(), ()>(())
                         }).compat());
                 }

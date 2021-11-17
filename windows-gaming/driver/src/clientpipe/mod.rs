@@ -9,7 +9,7 @@ use std::cell::RefCell;
 use std::time::Duration;
 
 use futures::unsync::mpsc::{self, UnboundedSender};
-use futures::{Stream, Sink, Future};
+use futures::{Stream, Future};
 use futures03::StreamExt;
 use futures03::SinkExt;
 use futures03::TryStreamExt;
