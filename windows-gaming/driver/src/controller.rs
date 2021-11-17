@@ -350,7 +350,7 @@ impl Controller {
     }
 
     pub fn shutdown(&mut self) {
-        (&self.monitor).send(QmpCommand::SystemPowerdown).unwrap();
+        self.write_ga(GaCmdOut::Shutdown(()));
     }
 
     /// Windows told us to grab the keyboard
