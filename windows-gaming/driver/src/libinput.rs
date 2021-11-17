@@ -11,7 +11,7 @@ use futures::{Future, Stream, Sink};
 use futures::unsync::mpsc::{UnboundedSender, UnboundedReceiver, self};
 use input::{Libinput, LibinputInterface, Device, AccelProfile};
 use input::event::{Event, KeyboardEvent, PointerEvent};
-use input::event::pointer::{Axis, ButtonState};
+use input::event::pointer::{Axis, ButtonState, PointerScrollEvent};
 use input::event::keyboard::{KeyState, KeyboardEventTrait};
 use libc::{self, c_char, c_int, c_ulong};
 use libudev::{Result as UdevResult, Context, Enumerator};
@@ -207,8 +207,8 @@ pub fn create_handler<'a>(input_events: UnboundedReceiver<Event>, hotkey_binding
                         }
                     }])
                 },
-            Event::Pointer(PointerEvent::Axis(ref a)) if a.has_axis(Axis::Vertical) => {
-                let steps = a.axis_value_discrete(Axis::Vertical).map(|x| x as i32).unwrap_or(0);
+            Event::Pointer(PointerEvent::ScrollWheel(ref e)) if e.has_axis(Axis::Vertical) => {
+                let steps = (e.scroll_value_v120(Axis::Vertical) / 120.) as i32;
                 if steps == 0 {
                     // stop event, ignore
                     return None;
@@ -227,6 +227,8 @@ pub fn create_handler<'a>(input_events: UnboundedReceiver<Event>, hotkey_binding
 
                 QmpCommand::InputSendEvent { events: Cow::from(events) }
             },
+            #[allow(deprecated)] // we're specifically ignoring this because it's deprecated
+            Event::Pointer(PointerEvent::Axis(_)) => return None,
             Event::Keyboard(KeyboardEvent::Key(k)) => {
                 let down = k.key_state() == KeyState::Pressed;
                 let KeyResolution { hotkeys, qcode } = match keyboard_state.input_linux(k.key(), down) {
