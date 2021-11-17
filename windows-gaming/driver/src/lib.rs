@@ -1,5 +1,3 @@
-#![allow(bare_trait_objects, deprecated, unused_imports)]
-
 extern crate nix;
 extern crate users;
 extern crate libudev;
