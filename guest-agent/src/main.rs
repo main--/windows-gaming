@@ -2,7 +2,7 @@
 
 use std::ffi::OsStr;
 use std::os::windows::prelude::OsStrExt;
-use std::ptr;
+use std::{mem, ptr};
 use std::sync::{Arc, Mutex};
 
 use futures_util::StreamExt;
@@ -11,11 +11,10 @@ use tokio::sync::{mpsc, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::codec::{FramedRead, FramedWrite};
 use windows::Win32::Foundation::{BOOLEAN, HANDLE, LUID, PWSTR};
-use windows::Win32::Security::{AdjustTokenPrivileges, LUID_AND_ATTRIBUTES, LookupPrivilegeValueW, SE_PRIVILEGE_ENABLED, TOKEN_ADJUST_PRIVILEGES, TOKEN_PRIVILEGES, TOKEN_QUERY};
 use windows::Win32::System::Power::SetSuspendState;
 use windows::Win32::System::Shutdown::{EWX_POWEROFF, EXIT_WINDOWS_FLAGS, ExitWindowsEx, SHTDN_REASON_FLAG_PLANNED};
 use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
-use windows::Win32::UI::WindowsAndMessaging::EWX_FORCEIFHUNG;
+use windows::Win32::UI::WindowsAndMessaging::{EWX_FORCEIFHUNG, GetMessageExtraInfo};
 use windows::runtime::Handle;
 use windows_eventloop::WindowsEventLoop;
 use windows_keybinds::HotKeyManager;
@@ -81,7 +80,9 @@ async fn main() -> anyhow::Result<()> {
                         }
                     });
                 },
-                clientpipe_codec::GaCmdOut::ReleaseModifiers(()) => (),
+                clientpipe_codec::GaCmdOut::ReleaseModifiers(()) => {
+                    release_modifiers();
+                }
                 clientpipe_codec::GaCmdOut::Suspend(()) => {
                     let res = unsafe { SetSuspendState(BOOLEAN(0), BOOLEAN(0), BOOLEAN(0)) }.ok();
                     if let Err(e) = res {
@@ -138,6 +139,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn request_shutdown_privileges() -> windows::runtime::Result<()> {
+    use windows::Win32::Security::*;
     unsafe {
         let mut token: HANDLE = HANDLE::default();
         OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &mut token).ok()?;
@@ -151,4 +153,20 @@ fn request_shutdown_privileges() -> windows::runtime::Result<()> {
         AdjustTokenPrivileges(token, false, &privs, 0, ptr::null_mut(), ptr::null_mut()).ok()?;
     }
     Ok(())
+}
+
+fn release_modifiers() {
+    use windows::Win32::UI::Input::KeyboardAndMouse::*;
+    unsafe {
+        unsafe fn i(vk: VIRTUAL_KEY) -> INPUT {
+            INPUT { r#type: INPUT_KEYBOARD, Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: vk, wScan: 0, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: GetMessageExtraInfo().0 as usize } } }
+        }
+        let inputs = [
+            i(VK_SHIFT), i(VK_LSHIFT), i(VK_RSHIFT),
+            i(VK_CONTROL), i(VK_LCONTROL), i(VK_RCONTROL),
+            i(VK_MENU), i(VK_LMENU), i(VK_RMENU),
+            i(VK_LWIN), i(VK_RWIN),
+        ];
+        SendInput(inputs.len() as u32, inputs.as_ptr(), mem::size_of_val(&inputs[0]) as i32);
+    }
 }
