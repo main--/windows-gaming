@@ -158,13 +158,13 @@ pub async fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
         Box::new(catch_sigterm),
         Box::new(input_listener.compat()),
         input_handler,
-        clipboard_listener,
+        Box::new(clipboard_listener.map(Ok).boxed_local().compat()),
         Box::new(clipboard_grabber),
         Box::new(clipboard_reader),
     ]).map(|_| ());
 
     let ls = LocalSet::new();
-    ls.run_until(qemu.select2(joined).then(|x| -> Box<dyn Future<Item=(), Error=std::io::Error>> {
+    let main_loop_legacy = qemu.select2(joined).then(|x| -> Box<dyn Future<Item=(), Error=std::io::Error>> {
         match x {
             Ok(future::Either::A((_, _))) => info!("qemu down first, all ok"),
             Err(future::Either::A((e, _))) => return Box::new(future::err(e)),
@@ -175,7 +175,12 @@ pub async fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
             }
         }
         Box::new(future::ok(()))
-    }).compat()).await.expect("Waiting for qemu errored");
+    });
+
+    let main_loop_modern = async move {
+        main_loop_legacy.compat().await
+    };
+    ls.run_until(main_loop_modern).await.expect("Waiting for qemu errored");
 
     info!("unbinding resettable vfio-things");
 
