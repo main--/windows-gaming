@@ -43,6 +43,7 @@ message GaCmdOut {
     RegisterHotKey register_hot_key = 18;
     Point set_mouse_position = 19;
     google.protobuf.Empty shutdown = 20;
+    string enable_debug_console = 21;
   }
 }
 

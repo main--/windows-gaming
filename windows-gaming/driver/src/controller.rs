@@ -83,6 +83,9 @@ impl Controller {
                x11_clipboard: UnboundedSender<ClipboardRequestResponse>,
                x11_clipboard_grabber: UnboundedSender<()>,
                x11_clipboard_reader: UnboundedSender<ClipboardType>) -> Controller {
+        if let Ok(rl) = std::env::var("RUST_LOG") {
+            clientpipe.unbounded_send(GaCmdOut::EnableDebugConsole(rl)).unwrap();
+        }
         Controller {
             machine_config,
             hooks_config,

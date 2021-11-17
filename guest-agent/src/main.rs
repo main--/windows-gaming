@@ -2,6 +2,7 @@
 
 use std::ffi::OsStr;
 use std::os::windows::prelude::OsStrExt;
+use std::os::windows::io::AsRawHandle;
 use std::{mem, ptr};
 use std::sync::{Arc, Mutex};
 
@@ -11,6 +12,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_util::codec::{FramedRead, FramedWrite};
 use windows::Win32::Foundation::{BOOLEAN, HANDLE, LUID, PWSTR};
+use windows::Win32::System::Console::AllocConsole;
 use windows::Win32::System::Power::SetSuspendState;
 use windows::Win32::System::Shutdown::{EWX_POWEROFF, EXIT_WINDOWS_FLAGS, ExitWindowsEx, SHTDN_REASON_FLAG_PLANNED};
 use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
@@ -130,12 +132,25 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
                 clientpipe_codec::GaCmdOut::SetMousePosition(_point) => (), // unimplemented
+                clientpipe_codec::GaCmdOut::EnableDebugConsole(rust_log) => {
+                    if !has_output() {
+                        unsafe {
+                            AllocConsole().ok().unwrap();
+                            assert!(has_output()); // technically redundant, since otherwise the env_logger initialization just panics
+                            env_logger::init_from_env(env_logger::Env::new().default_filter_or(rust_log));
+                        }
+                    } // else ignore, console is already open
+                }
             }
         }
     });
     a.await;
 
     Ok(())
+}
+
+fn has_output() -> bool {
+    !std::io::stdout().as_raw_handle().is_null()
 }
 
 fn request_shutdown_privileges() -> windows::runtime::Result<()> {
