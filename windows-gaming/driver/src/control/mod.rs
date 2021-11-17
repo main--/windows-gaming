@@ -18,7 +18,7 @@ use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::Decoder;
 use self::codec::Codec;
 
-type Handler<'a> = Box<Future<Item=(), Error=Error> + 'a>;
+type Handler<'a> = Box<dyn Future<Item=(), Error=Error> + 'a>;
 
 pub fn create<'a>(socket: StdUnixListener, controller: Rc<RefCell<Controller>>) -> Handler<'a> {
     socket.set_nonblocking(true).unwrap();
@@ -41,7 +41,7 @@ pub fn create<'a>(socket: StdUnixListener, controller: Rc<RefCell<Controller>>) 
                     }
                     _ => {
                         controller.temporary_exit();
-                        return Box::new(future::err(())) as Box<Future<Item=_, Error=_>>;
+                        return Box::new(future::err(())) as Box<dyn Future<Item=_, Error=_>>;
                     }
                 }
                 return Box::new(future::ok(()));

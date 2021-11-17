@@ -1,7 +1,7 @@
 extern crate clientpipe_proto as proto;
 
 use std::io;
-use prost::bytes::{Buf, BytesMut};
+use prost::bytes::{Buf};
 use tokio_util::codec::{Encoder, Decoder};
 use prost::{encoding, Message};
 

@@ -1,13 +1,13 @@
 use std::io::Cursor;
 use std::iter::once;
-use std::os::unix::prelude::FromRawFd;
+
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::os::unix::io::AsRawFd;
 
-use futures::{Async, Stream, Future};
+
+use futures::{Stream, Future};
 use futures::unsync::mpsc::{self, UnboundedReceiver, UnboundedSender};
-use futures03::compat::Compat;
+
 use futures03::{FutureExt, TryFutureExt, TryStreamExt, StreamExt};
 
 use controller::Controller;
@@ -38,7 +38,7 @@ enum Cmd {
 }
 
 impl X11Clipboard {
-    pub fn open() -> Box<Future<Item=X11Clipboard, Error=anyhow::Error>> {
+    pub fn open() -> Box<dyn Future<Item=X11Clipboard, Error=anyhow::Error>> {
         trace!("opening wayland clipboard");
         let task = zerocost_clipboard::WaylandClipboard::init().boxed().compat();
         task.map(|(run, clipboard)| {
@@ -61,7 +61,7 @@ impl X11Clipboard {
     pub fn run<'a>(&'a self,
                    controller: Rc<RefCell<Controller>>,
                    resp_recv: UnboundedReceiver<ClipboardRequestResponse>,
-                   ) -> Box<Future<Item=(), Error=::std::io::Error> + 'a> {
+                   ) -> Box<dyn Future<Item=(), Error=::std::io::Error> + 'a> {
         trace!("running wayland clipboard");
         let cmd_rx = self.cmd_rx.borrow_mut().take().unwrap();
 
@@ -84,9 +84,9 @@ impl X11Clipboard {
                 }
                 Ok(())
             });
-            let responder = resp_recv.for_each(move |mut response: ClipboardRequestResponse| {
+            let responder = resp_recv.for_each(move |response: ClipboardRequestResponse| {
                 match response.response {
-                    ClipboardResponse::Types(kinds) => {
+                    ClipboardResponse::Types(_kinds) => {
                         todo!();
                     }
                     ClipboardResponse::Data(buf) => {

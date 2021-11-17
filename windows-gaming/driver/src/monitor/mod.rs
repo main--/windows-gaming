@@ -31,9 +31,9 @@ use tokio_util::codec::Decoder;
 use self::codec::Codec;
 
 type Send = UnboundedSender<QmpCommand>;
-type Sender = Box<Future<Item=(), Error=Error>>;
-type Read = Box<Stream<Item=Message, Error=Error>>;
-type Handler = Box<Future<Item=(), Error=Error>>;
+type Sender = Box<dyn Future<Item=(), Error=Error>>;
+type Read = Box<dyn Stream<Item=Message, Error=Error>>;
+type Handler = Box<dyn Future<Item=(), Error=Error>>;
 
 pub struct Monitor {
     send: Option<Send>,

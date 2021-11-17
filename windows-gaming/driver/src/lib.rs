@@ -28,7 +28,7 @@ pub mod qemu;
 pub use control::ControlCmdIn;
 use futures03::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use futures03::compat::Future01CompatExt;
-use tokio1::signal::unix::{Signal, SignalKind, signal};
+use tokio1::signal::unix::{SignalKind, signal};
 use tokio1::task::LocalSet;
 use tokio_stream::wrappers::SignalStream;
 

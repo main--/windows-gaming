@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::borrow::Cow;
 use std::os::unix::io::RawFd;
 
-use futures::{Async, Poll, Future, Stream, Sink};
+use futures::{Future, Stream, Sink};
 use futures::unsync::mpsc::{UnboundedSender, UnboundedReceiver, self};
 use input::{Libinput, LibinputInterface, Device, AccelProfile};
 use input::event::{Event, KeyboardEvent, PointerEvent};
@@ -164,7 +164,7 @@ impl<'a> futures03::Future for InputListener<'a> {
 
 pub fn create_handler<'a>(input_events: UnboundedReceiver<Event>, hotkey_bindings: &'a [KeyBinding],
                           controller: Rc<RefCell<Controller>>, monitor_sender: UnboundedSender<QmpCommand>)
-            -> Box<Future<Item = (), Error = io::Error> + 'a> {
+            -> Box<dyn Future<Item = (), Error = io::Error> + 'a> {
     let mut keyboard_state = KeyboardState::new(hotkey_bindings);
     let input_handler = input_events.filter_map(move |event| {
         Some(match event {

@@ -23,9 +23,9 @@ use tokio_util::codec::Decoder;
 use self::codec::{Codec, GaCmdIn};
 
 type Send = UnboundedSender<GaCmdOut>;
-type Sender = Box<Future<Item=(), Error=Error>>;
-type Read = Box<Stream<Item=GaCmdIn, Error=Error>>;
-type Handler<'a> = Box<Future<Item=(), Error=Error> + 'a>;
+type Sender = Box<dyn Future<Item=(), Error=Error>>;
+type Read = Box<dyn Stream<Item=GaCmdIn, Error=Error>>;
+type Handler<'a> = Box<dyn Future<Item=(), Error=Error> + 'a>;
 
 pub struct Clientpipe {
     pub send: Option<Send>,

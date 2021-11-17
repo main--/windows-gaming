@@ -1,5 +1,5 @@
 use std::io;
-use std::str;
+
 use bytes::{BytesMut, BufMut, Buf};
 use tokio_util::codec::{Encoder, Decoder};
 

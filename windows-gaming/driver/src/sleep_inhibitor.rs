@@ -29,7 +29,7 @@ fn inhibit(dbus: &Connection) -> OwnedFd {
 }
 
 pub fn sleep_inhibitor<'a, R, F>(bus: &'a Connection, mut callback: F)
-                                 -> Box<Future<Item = (), Error = Error> + 'a>
+                                 -> Box<dyn Future<Item = (), Error = Error> + 'a>
     where F : FnMut() -> R + 'a, R : IntoFuture<Item = (), Error = ()> + 'a
 {
     let items = DBusItems::new(&bus).compat();
@@ -47,7 +47,7 @@ pub fn sleep_inhibitor<'a, R, F>(bus: &'a Connection, mut callback: F)
                 if starting {
                     // run callback, then drop
                     let myfd = fd.clone();
-                    let b: Box<Future<Item=(), Error=()>> = Box::new(callback().into_future().map(move |()| {
+                    let b: Box<dyn Future<Item=(), Error=()>> = Box::new(callback().into_future().map(move |()| {
                         *myfd.borrow_mut() = None;
                     }));
                     return b;

@@ -307,7 +307,7 @@ impl Controller {
     }
 
     /// Suspends Windows
-    pub fn suspend(&mut self) -> Box<Future<Item=(), Error=()>> {
+    pub fn suspend(&mut self) -> Box<dyn Future<Item=(), Error=()>> {
         if self.ga == State::Suspended {
             // we are already suspended, return a resolved future
             return Box::new(future::ok(()));

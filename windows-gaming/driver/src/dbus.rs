@@ -6,7 +6,7 @@ use futures03::Stream;
 use libdbus::{Connection, ConnectionItem, Watch, WatchEvent};
 use mio::Ready;
 use mio::unix::UnixReady;
-use futures::{Async, Poll};
+use futures::{Async};
 
 use tokio1::io::unix::AsyncFd;
 
