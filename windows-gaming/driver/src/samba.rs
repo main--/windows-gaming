@@ -3,9 +3,6 @@ use std::path::Path;
 use std::io::Write;
 use std::fmt::Write as FmtWrite;
 
-use users::get_user_by_name;
-use nix::unistd::chown;
-
 use common::config::SambaConfig;
 
 pub fn is_installed() -> bool {
@@ -14,8 +11,6 @@ pub fn is_installed() -> bool {
 
 pub fn setup(tmp: &Path, samba: &SambaConfig, usernet: &mut String) {
     assert!(is_installed(), "Optional samba dependency not installed!");
-
-    let user = get_user_by_name(&samba.user).unwrap();
 
     let samba_cfg = tmp.join("smbd.conf");
     let mut smbd_conf = File::create(&samba_cfg).expect("Failed to create smbd conf");
@@ -52,10 +47,13 @@ force user={2}
         .expect("Failed to write smbd conf");
 
     create_dir(&samba_folder).expect("Failed to create samba folder");
+    /*
+    TODO: running samba as a different user only made sense in root mode. Plus we need to rework all of this anyway.
     chown(&samba_folder,
           Some(user.uid()),
           Some(user.primary_group_id()))
         .expect("Failed to chown samba folder");
+    */
     write!(usernet,
            ",guestfwd=tcp:10.0.2.1:445-cmd:sudo -u {} -- smbd --configfile {}",
            samba.user,
