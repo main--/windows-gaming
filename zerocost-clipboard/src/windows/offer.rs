@@ -114,6 +114,7 @@ impl ClipboardOffer {
     }
 
     /// Checks whether this clipboard offer contains image data.
+    #[cfg(feature = "image")]
     pub fn has_image(&self) -> bool {
         self.formats().any(|x| x == format::CF_DIBV5)
     }
@@ -123,9 +124,8 @@ impl ClipboardOffer {
     #[cfg(feature = "image")]
     pub fn receive_image(&self) -> Result<image::DynamicImage> {
         use std::mem;
-
         use image::ImageFormat;
-        use windows::Win32::Graphics::Gdi::BITMAPV5HEADER;
+        use windows::Win32::Graphics::Gdi::{BITMAPFILEHEADER, BITMAPV5HEADER, RGBQUAD, BI_BITFIELDS};
 
         let mem = self.receive_bytes(format::CF_DIBV5)?;
         // mem now contains essentially a .bmp file, but without the first part of the header
@@ -135,9 +135,36 @@ impl ClipboardOffer {
 
         // so instead, we quickly synthesize a bitmap header to make things work
 
+        let mut hdr = BITMAPFILEHEADER::default();
+        let file_header_size = mem::size_of_val(&hdr);
+        let (pixels_offset, pixels_len) = unsafe {
+            let ptr = mem.as_ptr() as *const BITMAPV5HEADER;
+            let header_size = (*ptr).bV5Size as usize;
+            let mut colors_used = (*ptr).bV5ClrUsed as usize;
+            let size_image = (*ptr).bV5SizeImage as usize;
+            if (*ptr).bV5Compression == BI_BITFIELDS as u32 {
+                // The evidence here is unclear. The general consensus seems to be that in this case
+                // 12 bytes (i.e. 3x the size of RGBQUAD) follow, but nobody knows whether you're supposed
+                // to just add these or assign.
+                // In my testing, colors_used always seems to be zero so it makes no difference.
+                log::debug!("BI_BITFIELDS: assigning 3 to colors_used which was {}", colors_used);
+                colors_used = 3;
+            }
+            (file_header_size + header_size + colors_used * mem::size_of::<RGBQUAD>(), size_image)
+        };
+        let total_size = pixels_offset + pixels_len;
+
+        hdr.bfType = u16::from_ne_bytes(*b"BM");
+        hdr.bfSize = total_size as u32; // image crate ignores this right now, but it's basically free for us to calculate
+        hdr.bfOffBits = pixels_offset as u32;
+        let hdr_bytes = unsafe { std::slice::from_raw_parts(&hdr as *const _ as *const u8, file_header_size) };
+
         // std::io::Chain would solve this perfectly, if only it would implement Seek :((
         let multi = MultiCursor {
-            bufs: &[b"BM", &[0; 8], &(mem::size_of::<BITMAPV5HEADER>() as u32).to_le_bytes(), &mem],
+            bufs: &[hdr_bytes, &mem],
+            // Like this it would be slightly less unsafe, but also more error-prone:
+            // bufs: &[b"BM", &[0; 8], &(pixels_offset as u32).to_le_bytes(), &mem],
+
             position: 0,
         };
 

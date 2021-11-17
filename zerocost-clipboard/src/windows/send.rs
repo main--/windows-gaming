@@ -47,7 +47,7 @@ impl DelayRenderedClipboardData {
         match self {
             DelayRenderedClipboardData::Text(_) => format::CF_UNICODETEXT,
             #[cfg(feature = "image")]
-            DelayRenderedClipboardData::Image(_) => format::CF_DIBV5,
+            DelayRenderedClipboardData::Image(_) => format::CF_DIB,
             &DelayRenderedClipboardData::CustomBytes(f, _)
             | &DelayRenderedClipboardData::CustomHandle(f, _) => f,
         }
@@ -84,11 +84,6 @@ impl Drop for DestructibleHandle {
         (self.destructor)(self.handle);
     }
 }
-impl DestructibleHandle {
-    fn zero() -> Self {
-        Self { handle: Default::default(), destructor: |_| {} }
-    }
-}
 
 /// Data to be put onto the clipboard.
 #[non_exhaustive]
@@ -109,29 +104,23 @@ impl From<(CLIPBOARD_FORMATS, DestructibleHandle)> for ClipboardFormatData { fn 
 
 impl ClipboardFormatData {
     /// Render this data to a clipboard.
-    pub fn render(mut self, clipboard: &mut WindowsClipboardOwned<'_>) -> windows::runtime::Result<()> {
-        let mut buf = Vec::new();
-
-        let (format, handle) = match &mut self {
-            ClipboardFormatData::CustomHandle(format, handle) => (*format, mem::replace(handle, DestructibleHandle::zero())),
-            x => {
-                let (format, buf) = match x {
-                    ClipboardFormatData::Text(s) => {
-                        buf.extend(OsStr::new(&s).encode_wide().chain([0u16]).flat_map(|c| c.to_le_bytes()));
-                        (format::CF_UNICODETEXT, buf.as_slice())
-                    }
-                    #[cfg(feature = "image")]
-                    ClipboardFormatData::Image(i) => {
-                        i.write_to(&mut buf, image::ImageOutputFormat::Bmp)
-                        .expect("writing image data to a memory buffer failed (should not be possible)");
-                        (format::CF_DIBV5, &buf[14..])
-                    }
-                    ClipboardFormatData::CustomBytes(format, b) => (*format, b.as_slice()),
-                    ClipboardFormatData::CustomHandle(..) => unreachable!(),
-                };
-                let handle = alloc_hglobal(buf);
-                (format, handle)
+    pub fn render(self, clipboard: &mut WindowsClipboardOwned<'_>) -> windows::runtime::Result<()> {
+        let (format, handle) = match self {
+            ClipboardFormatData::Text(s) => {
+                let buf: Vec<_> = OsStr::new(&s).encode_wide().chain([0u16]).flat_map(|c| c.to_le_bytes()).collect();
+                (format::CF_UNICODETEXT, alloc_hglobal(&buf))
             }
+            #[cfg(feature = "image")]
+            ClipboardFormatData::Image(i) => {
+                let mut buf = Vec::new();
+                // we rely on the fact that image's bmp encoder always creates a DIB (BITMAPINFOHEADER) for Rgb8
+                let i = image::DynamicImage::ImageRgb8(i.into_rgb8());
+                i.write_to(&mut buf, image::ImageOutputFormat::Bmp)
+                    .expect("writing image data to a memory buffer failed (should not be possible)");
+                (format::CF_DIB, alloc_hglobal(&buf[14..]))
+            }
+            ClipboardFormatData::CustomBytes(format, b) => (format, alloc_hglobal(&b)),
+            ClipboardFormatData::CustomHandle(format, handle) => (format, handle),
         };
 
         clipboard.send(format, handle.handle)?;
