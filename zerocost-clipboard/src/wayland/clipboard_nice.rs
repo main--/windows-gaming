@@ -85,9 +85,9 @@ impl WaylandClipboard {
         rx.await.unwrap()
     }
     /// Claim the clipboard and offer the given MIME types.
-    pub async fn claim(&self, mime_types: impl Iterator<Item=String>) -> mpsc::UnboundedReceiver<ClipboardRequest> {
+    pub async fn claim(&self, mime_types: impl IntoIterator<Item=String>) -> mpsc::UnboundedReceiver<ClipboardRequest> {
         let (ttx, rx) = oneshot::channel();
-        self.sender.send(Command::Claim { mime_types: mime_types.collect(), sender: ttx }).await.ok().unwrap();
+        self.sender.send(Command::Claim { mime_types: mime_types.into_iter().collect(), sender: ttx }).await.ok().unwrap();
         rx.await.unwrap()
     }
     /// Claim the clipboard and offer a fixed `String`.
