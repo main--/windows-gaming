@@ -1,5 +1,7 @@
+use std::ffi::CString;
 use std::io;
 use std::iter;
+use std::os::unix::prelude::{AsRawFd, OsStrExt};
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::borrow::Cow;
@@ -11,7 +13,7 @@ use input::{Libinput, LibinputInterface, Device, AccelProfile};
 use input::event::{Event, KeyboardEvent, PointerEvent};
 use input::event::pointer::{Axis, ButtonState};
 use input::event::keyboard::{KeyState, KeyboardEventTrait};
-use libc::{self, c_char, c_int, c_ulong, c_void};
+use libc::{self, c_char, c_int, c_ulong};
 use libudev::{Result as UdevResult, Context, Enumerator};
 
 use common::config::{UsbBinding, UsbPort, UsbId, MachineConfig};
@@ -22,13 +24,13 @@ use tokio::io::unix::AsyncFd;
 
 const EVIOCGRAB: c_ulong = 1074021776;
 
-unsafe extern "C" fn do_open(path: *const c_char, mode: c_int, _: *mut c_void) -> c_int {
+unsafe extern "C" fn do_open(path: *const c_char, mode: c_int) -> c_int {
     let fd = libc::open(path, mode);
     grab_fd(fd, true);
     fd
 }
 
-unsafe extern "C" fn do_close(fd: c_int, _: *mut c_void) {
+unsafe extern "C" fn do_close(fd: c_int) {
     grab_fd(fd, false);
     libc::close(fd);
 }
@@ -54,16 +56,35 @@ pub struct Input {
     sender: UnboundedSender<Event>,
 }
 
+// could do advanced things here to avoid the need for udev rules that give us permissions to
+// the respective input devices
+// however, you need udev rules for full entry anyway, sooo...
+struct DumbLibinputInterface;
+impl LibinputInterface for DumbLibinputInterface {
+    fn open_restricted(&mut self, path: &std::path::Path, flags: i32) -> Result<RawFd, i32> {
+        let path = CString::new(path.as_os_str().as_bytes()).unwrap();
+        unsafe {
+            let fd = do_open(path.as_ptr(), flags);
+            if fd < 0 {
+                Err(*libc::__errno_location())
+            } else {
+                Ok(fd)
+            }
+        }
+    }
+
+    fn close_restricted(&mut self, fd: RawFd) {
+        unsafe { do_close(fd) }
+    }
+}
+
 impl Input {
     pub fn new(machine: MachineConfig) -> (Input, UnboundedReceiver<Event>) {
-        let li = Libinput::new_from_path(LibinputInterface {
-            open_restricted: Some(do_open),
-            close_restricted: Some(do_close),
-        }, Some(()));
+        let li = Libinput::new_from_path(DumbLibinputInterface);
         let (send, recv) = mpsc::unbounded();
         (Input {
             machine,
-            io: AsyncFd::new(unsafe { li.fd() }).unwrap(),
+            io: AsyncFd::new(li.as_raw_fd()).unwrap(),
             li,
             device_handles: Vec::new(),
             sender: send,
@@ -153,12 +174,6 @@ impl<'a> futures03::Future for InputListener<'a> {
                 (&p.sender).unbounded_send(e).unwrap();
             }
         }
-
-        /*
-        p.io.
-        p.io.need_read();
-        std::task::Poll::Pending
-        */
     }
 }
 
@@ -171,8 +186,8 @@ pub fn create_handler<'a>(input_events: UnboundedReceiver<Event>, hotkey_binding
             Event::Pointer(PointerEvent::Motion(m)) =>
                 QmpCommand::InputSendEvent {
                     events: Cow::from(vec![
-                        InputEvent::Rel { axis: "x", value: m.dx() as u32 },
-                        InputEvent::Rel { axis: "y", value: m.dy() as u32 },
+                        InputEvent::Rel { axis: "x", value: m.dx() as i64 },
+                        InputEvent::Rel { axis: "y", value: m.dy() as i64 },
                     ])
                 },
             Event::Pointer(PointerEvent::Button(b)) =>

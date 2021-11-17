@@ -31,7 +31,7 @@ pub enum QmpCommand {
 pub enum InputEvent {
     Rel {
         axis: &'static str,
-        value: u32,
+        value: i64,
     },
     Btn {
         button: InputButton,

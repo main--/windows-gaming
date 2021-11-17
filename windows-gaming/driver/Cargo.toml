@@ -19,7 +19,7 @@ futures03 = { package = "futures", version = "0.3", features = ["compat", "io-co
 tokio = { version = "1.14", features = ["full"] }
 tokio-util = { version = "0.6.9", features = ["codec", "compat"] }
 dbus = "0.5"
-input = "0.2.1"
+input = "0.7.0"
 prost = "0.9"
 clientpipe-proto = { path = "../../guest-agent/clientpipe-proto" }
 common = { path = "../common" }
