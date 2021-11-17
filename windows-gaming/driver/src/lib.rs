@@ -72,11 +72,11 @@ pub async fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
     debug!("Started Monitor");
 
     let clientpipe_socket_file = tmp.join("clientpipe.sock");
-    let clientpipe_socket = StdUnixListener::bind(&clientpipe_socket_file)
+    let clientpipe_socket = UnixListener::bind(&clientpipe_socket_file)
         .expect("Failed to create clientpipe socket");
     debug!("Started Clientpipe");
 
-    let control_socket = StdUnixListener::bind(&control_socket_file)
+    let control_socket = UnixListener::bind(&control_socket_file)
         .expect("Failed to create control socket");
     fs::set_permissions(control_socket_file, Permissions::from_mode(0o777))
         .expect("Failed to set permissions on control socket");
@@ -92,7 +92,7 @@ pub async fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
     let (monitor_stream, _) = monitor_socket.accept().await.expect("Failed to get monitor");
     drop(monitor_socket);
 
-    let (clientpipe_stream, _) = clientpipe_socket.accept().expect("Failed to get clientpipe");
+    let (clientpipe_stream, _) = clientpipe_socket.accept().await.expect("Failed to get clientpipe");
     drop(clientpipe_socket);
 
     sd_notify::notify_systemd(false, "Booting ...");

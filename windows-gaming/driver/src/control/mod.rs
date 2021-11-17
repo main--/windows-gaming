@@ -2,7 +2,6 @@ mod codec;
 
 pub use self::codec::{ControlCmdOut, ControlCmdIn};
 
-use std::os::unix::net::{UnixListener as StdUnixListener};
 use std::io::Error;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -20,9 +19,7 @@ use self::codec::Codec;
 
 type Handler<'a> = Box<dyn Future<Item=(), Error=Error> + 'a>;
 
-pub fn create<'a>(socket: StdUnixListener, controller: Rc<RefCell<Controller>>) -> Handler<'a> {
-    socket.set_nonblocking(true).unwrap();
-    let socket = UnixListener::from_std(socket).unwrap();
+pub fn create<'a>(socket: UnixListener, controller: Rc<RefCell<Controller>>) -> Handler<'a> {
     let handler = UnixListenerStream::new(socket).compat().for_each(move |socket| {
         let (writer, reader) = Codec.framed(socket).split();
         let (sender, recv) = mpsc::unbounded();

@@ -2,7 +2,6 @@ mod codec;
 
 pub use self::codec::{GaCmdOut, ClipboardMessage, ClipboardType, ClipboardTypes, RegisterHotKey, Point};
 
-use std::os::unix::net::{UnixStream as StdUnixStream};
 use std::io::{Error, ErrorKind};
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -34,9 +33,7 @@ pub struct Clientpipe {
 }
 
 impl Clientpipe {
-    pub fn new(stream: StdUnixStream) -> Clientpipe {
-        stream.set_nonblocking(true).unwrap();
-        let stream = UnixStream::from_std(stream).unwrap();
+    pub fn new(stream: UnixStream) -> Clientpipe {
         let (write, read) = Codec.framed(stream).split();
         let (send, recv) = mpsc::unbounded();
         let recv = recv.map_err(|()| Error::new(ErrorKind::Other, "Failed to write to clientpipe"));
