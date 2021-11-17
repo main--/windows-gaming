@@ -1,12 +1,15 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::ffi::OsStr;
+use std::io::Cursor;
 use std::os::windows::prelude::OsStrExt;
 use std::os::windows::io::AsRawHandle;
 use std::{mem, ptr};
 use std::sync::{Arc, Mutex};
 
+use clientpipe_proto::{ClipboardType, ClipboardTypes};
 use futures_util::StreamExt;
+use image::DynamicImage;
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
@@ -49,21 +52,28 @@ async fn main() -> anyhow::Result<()> {
     let tx2 = tx.clone();
     tokio::spawn(async move {
         while let Ok(()) = clip_watch.changed().await {
-            let grab = match clip_watch.borrow_and_update().as_ref() {
-                Some(offer) if offer.owner() != wel_hwnd => true,
-                _ => false,
+            let types = match clip_watch.borrow_and_update().as_ref() {
+                Some(offer) if offer.owner() != wel_hwnd => {
+                    let mut types = ClipboardTypes::default();
+                    if offer.has_string() {
+                        types.push_types(ClipboardType::Text);
+                    }
+                    if offer.has_image() {
+                        types.push_types(ClipboardType::Image);
+                    }
+                    types
+                }
+                _ => continue,
             };
 
-            if grab {
-                tx2.send(clientpipe_codec::ClipboardMessage::GrabClipboard(()).into()).await.unwrap();
-            }
+            tx2.send(clientpipe_codec::ClipboardMessage::GrabClipboard(types).into()).await.unwrap();
         }
     });
 
     tx.send(clientpipe_codec::GaCmdIn::ReportBoot(())).await.unwrap();
 
 
-    let outstanding_clipboard_request = Arc::new(Mutex::<Option<oneshot::Sender<String>>>::new(None));
+    let outstanding_clipboard_request = Arc::new(Mutex::<Option<oneshot::Sender<Vec<u8>>>>::new(None));
     let hkm = Arc::new(HotKeyManager::new(Box::new(wel)).await);
     let a = incoming.for_each(move |msg| {
         let tx = tx.clone();
@@ -100,32 +110,80 @@ async fn main() -> anyhow::Result<()> {
                 clientpipe_codec::GaCmdOut::Clipboard(c) => {
                     log::trace!("handling clipboard {:?}", c);
                     match c.message {
-                        Some(clientpipe_codec::ClipboardMessage::GrabClipboard(())) => {
-                            let (ttx, rx) = oneshot::channel();
-                            clipboard.send(ClipboardContents(vec![ClipboardFormatContent::DelayRendered(DelayRenderedClipboardData::Text(ttx))])).unwrap();
-                            tokio::spawn(async move {
-                                if let Ok(s) = rx.await {
-                                    *outstanding_clipboard_request.lock().unwrap() = Some(s);
-                                    tx.send(clientpipe_codec::ClipboardMessage::RequestClipboardContents(clientpipe_codec::ClipboardType::Text.into()).into()).await.unwrap();
-                                }
-                            });
-                        }
-                        Some(clientpipe_codec::ClipboardMessage::RequestClipboardContents(types)) => {
-                            if types == clientpipe_codec::ClipboardType::None.into() {
-                                tx.send(clientpipe_codec::ClipboardMessage::ContentTypes(clientpipe_codec::ClipboardTypes { types: vec![clientpipe_codec::ClipboardType::Text.into()] }).into()).await.unwrap();
-                            } else {
-                                let s = match clipboard.current() {
-                                    Some(offer) if offer.has_string() => offer.receive_string().unwrap(),
-                                    _ => "failed".to_owned(),
+                        Some(clientpipe_codec::ClipboardMessage::GrabClipboard(types)) => {
+                            let spawn_delay_renderer_for_type = |t: ClipboardType| {
+                                let (ttx, rx) = oneshot::channel();
+                                let outstanding_clipboard_request = outstanding_clipboard_request.clone();
+                                let tx = tx.clone();
+                                tokio::spawn(async move {
+                                    if let Ok(s) = rx.await {
+                                        *outstanding_clipboard_request.lock().unwrap() = Some(s);
+                                        tx.send(clientpipe_codec::ClipboardMessage::RequestClipboardContents(t.into()).into()).await.unwrap();
+                                    }
+                                });
+
+
+
+                                let drcd = match t {
+                                    ClipboardType::Invalid => unreachable!(),
+                                    ClipboardType::Text => {
+                                        let (tx2, rx2) = oneshot::channel::<oneshot::Sender<String>>();
+                                        tokio::spawn(async move {
+                                            if let Ok(s) = rx2.await {
+                                                let (a, b) = oneshot::channel();
+                                                ttx.send(a).unwrap();
+
+                                                let bytes = b.await.unwrap_or(Vec::new());
+                                                let _ = s.send(String::from_utf8_lossy(&bytes).into_owned());
+                                            }
+                                        });
+                                        DelayRenderedClipboardData::Text(tx2)
+                                    }
+                                    ClipboardType::Image => {
+                                        let (tx2, rx2) = oneshot::channel::<oneshot::Sender<DynamicImage>>();
+                                        tokio::spawn(async move {
+                                            if let Ok(s) = rx2.await {
+                                                let (a, b) = oneshot::channel();
+                                                ttx.send(a).unwrap();
+
+                                                let bytes = b.await.unwrap_or(Vec::new());
+                                                let img = image::io::Reader::with_format(Cursor::new(bytes), image::ImageFormat::Png).decode().unwrap_or_else(|e| {
+                                                    log::warn!("making an empty image for pasting because the image failed to decode: {:?}", e);
+                                                    let empty_img = image::GrayImage::new(0, 0);
+                                                    DynamicImage::ImageLuma8(empty_img)
+                                                });
+                                                let _ = s.send(img);
+                                            }
+                                        });
+                                        DelayRenderedClipboardData::Image(tx2)
+                                    }
                                 };
-                                tx.send(clientpipe_codec::ClipboardMessage::ClipboardContents(s.into_bytes()).into()).await.unwrap();
-                            }
+                                ClipboardFormatContent::DelayRendered(drcd)
+                            };
+
+                            clipboard.send(ClipboardContents(types.types().map(spawn_delay_renderer_for_type).collect())).unwrap();
                         }
-                        Some(clientpipe_codec::ClipboardMessage::ContentTypes(_types)) => (), // ignored, we assume string only
+                        Some(clientpipe_codec::ClipboardMessage::RequestClipboardContents(typ)) => {
+                            let data = match clipboard.current() {
+                                None => None,
+                                Some(offer) => match ClipboardType::from_i32(typ).unwrap() {
+                                    ClipboardType::Invalid => None,
+                                    ClipboardType::Text => offer.receive_string().ok().map(String::into_bytes),
+                                    ClipboardType::Image => {
+                                        offer.receive_image().ok().and_then(|i| {
+                                            let mut bytes = Vec::new();
+                                            i.write_to(&mut bytes, image::ImageOutputFormat::Png).ok().map(|_| bytes)
+                                        })
+                                    }
+                                },
+                            };
+
+                            tx.send(clientpipe_codec::ClipboardMessage::ClipboardContents(data.unwrap_or(Vec::new())).into()).await.unwrap();
+                        }
                         Some(clientpipe_codec::ClipboardMessage::ClipboardContents(m)) => {
                             let mut ocr = outstanding_clipboard_request.lock().unwrap();
                             if let Some(s) = ocr.take() {
-                                s.send(String::from_utf8(m).unwrap()).unwrap();
+                                s.send(m).unwrap();
                             }
                         }
                         None => unreachable!(),

@@ -82,12 +82,11 @@ impl Clientpipe {
                 GaCmdIn::HotKey(id) => controller.ga_hotkey(id),
                 GaCmdIn::HotKeyBindingFailed(s) => warn!("HotKeyBinding failed: {}", s),
                 GaCmdIn::Clipboard(c) => match c.message {
-                    Some(ClipboardMessage::GrabClipboard(())) => controller.grab_x11_clipboard(),
+                    Some(ClipboardMessage::GrabClipboard(types)) => controller.grab_x11_clipboard(types),
                     Some(ClipboardMessage::RequestClipboardContents(kind)) => match ClipboardType::from_i32(kind) {
                         Some(kind) => controller.read_x11_clipboard(kind),
                         None => error!("Windows requested an invalid clipboard type??"),
                     },
-                    Some(ClipboardMessage::ContentTypes(types)) => controller.respond_x11_types(types.types().collect()),
                     Some(ClipboardMessage::ClipboardContents(buf)) => controller.respond_x11_clipboard(buf),
                     None => error!("Windows sent an empty clipboard message??"),
                 },

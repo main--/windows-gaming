@@ -4,6 +4,7 @@ use std::ffi::OsStr;
 use std::cell::RefCell;
 use std::borrow::Cow;
 
+use clientpipe_proto::ClipboardTypes;
 use itertools::Itertools;
 use libudev::{Result as UdevResult, Context, Enumerator};
 use futures::unsync::mpsc::UnboundedSender;
@@ -61,7 +62,7 @@ pub struct Controller {
     input: Rc<RefCell<Input>>,
 
     x11_clipboard: UnboundedSender<ClipboardRequestResponse>,
-    x11_clipboard_grabber: UnboundedSender<()>,
+    x11_clipboard_grabber: UnboundedSender<ClipboardTypes>,
     x11_clipboard_reader: UnboundedSender<ClipboardType>,
     win_clipboard_request: Option<ClipboardRequestEvent>,
 
@@ -81,7 +82,7 @@ impl Controller {
                clientpipe: UnboundedSender<GaCmdOut>,
                input: Rc<RefCell<Input>>,
                x11_clipboard: UnboundedSender<ClipboardRequestResponse>,
-               x11_clipboard_grabber: UnboundedSender<()>,
+               x11_clipboard_grabber: UnboundedSender<ClipboardTypes>,
                x11_clipboard_reader: UnboundedSender<ClipboardType>) -> Controller {
         Controller {
             machine_config,
@@ -368,21 +369,14 @@ impl Controller {
         }
     }
 
-    /// Windows told us to grab the keyboard
-    pub fn grab_x11_clipboard(&mut self) {
-        (&self.x11_clipboard_grabber).unbounded_send(()).unwrap();
+    /// Windows told us to grab the keyboard with the given types
+    pub fn grab_x11_clipboard(&mut self, types: ClipboardTypes) {
+        (&self.x11_clipboard_grabber).unbounded_send(types).unwrap();
     }
 
     /// Paste on Windows, so we have to request contents
     pub fn read_x11_clipboard(&mut self, kind: ClipboardType) {
         (&self.x11_clipboard_reader).unbounded_send(kind).unwrap();
-    }
-
-    /// Windows asked what kind of data our clipboard has, X11 responded
-    pub fn respond_x11_types(&mut self, types: Vec<ClipboardType>) {
-        if let Some(event) = self.win_clipboard_request.take() {
-            (&self.x11_clipboard).unbounded_send(event.reply_types(types)).unwrap();
-        }
     }
 
     /// Pasting on Linux, Windows responded with contents
@@ -393,8 +387,8 @@ impl Controller {
     }
 
     /// We lost the X11 clipboard, so we grab the Windows keyboard
-    pub fn grab_win_clipboard(&mut self) {
-        self.write_ga(ClipboardMessage::GrabClipboard(()));
+    pub fn grab_win_clipboard(&mut self, types: ClipboardTypes) {
+        self.write_ga(ClipboardMessage::GrabClipboard(types));
     }
 
     /// Paste on Linux, so we have to request contents

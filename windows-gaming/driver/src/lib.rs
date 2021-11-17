@@ -27,7 +27,7 @@ mod release_all_keys;
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::os::unix::net::{UnixListener as StdUnixListener, UnixStream};
+use std::os::unix::net::UnixStream;
 use std::fs::{self, Permissions};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
@@ -119,8 +119,8 @@ pub async fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
     let clipboard = X11Clipboard::open().compat().await.expect("Failed to open X11 clipboard!");
     let clipboard_listener = clipboard.run(controller.clone(), resp_recv);
 
-    let clipboard_grabber = clipgrab_recv.for_each(|()| {
-        clipboard.grab_clipboard();
+    let clipboard_grabber = clipgrab_recv.for_each(|types| {
+        clipboard.grab_clipboard(types);
         Ok(())
     }).then(|_| Ok(()));
 

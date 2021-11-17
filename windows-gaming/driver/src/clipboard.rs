@@ -1,21 +1,21 @@
 use std::io::Cursor;
-use std::iter::once;
 
 use std::rc::Rc;
 use std::cell::RefCell;
 
 
-use futures::{Stream, Future};
+use clientpipe_proto::ClipboardTypes;
+use futures::Future;
 use futures::unsync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 use futures03::compat::Stream01CompatExt;
-use futures03::{FutureExt, TryFutureExt, TryStreamExt, StreamExt};
+use futures03::{FutureExt, TryFutureExt, StreamExt};
 
 use crate::controller::Controller;
 use crate::clientpipe::ClipboardType;
-use tokio_stream::wrappers::{UnboundedReceiverStream, WatchStream};
+use tokio_stream::wrappers::WatchStream;
 
-use zerocost_clipboard;
+use zerocost_clipboard::{self, PLAINTEXT_MIME_TYPES};
 
 static OUR_MIME_MARKER: &'static str = "application/from-windows";
 
@@ -28,7 +28,7 @@ pub struct X11Clipboard {
 
 #[derive(Debug)]
 enum Cmd {
-    Grab,
+    Grab(ClipboardTypes),
     Read(ClipboardType),
 }
 
@@ -45,8 +45,8 @@ impl X11Clipboard {
         }))
     }
 
-    pub fn grab_clipboard(&self) {
-        self.cmd_tx.unbounded_send(Cmd::Grab).unwrap();
+    pub fn grab_clipboard(&self, types: ClipboardTypes) {
+        self.cmd_tx.unbounded_send(Cmd::Grab(types)).unwrap();
     }
 
     pub fn read_clipboard(&self, kind: ClipboardType) {
@@ -69,7 +69,16 @@ impl X11Clipboard {
                     if !offer.mime_types().contains(OUR_MIME_MARKER) {
                         debug!("it is foreign, so we grab the clipboard");
                         // only react if it's not from us
-                        controller.borrow_mut().grab_win_clipboard();
+
+                        let mut types = ClipboardTypes::default();
+                        if offer.mime_types().contains("text/plain;charset=utf-8") {
+                            types.push_types(ClipboardType::Text);
+                        }
+                        if offer.mime_types().contains("image/png") {
+                            types.push_types(ClipboardType::Image);
+                        }
+
+                        controller.borrow_mut().grab_win_clipboard(types);
                     } else {
                         debug!("but we reject it because it's ours");
                     }
@@ -80,9 +89,6 @@ impl X11Clipboard {
         let responder = async {
             while let Some(Ok(response)) = resp_recv.next().await {
                 match response.response {
-                    ClipboardResponse::Types(_kinds) => {
-                        todo!();
-                    }
                     ClipboardResponse::Data(buf) => {
                         debug!("responding to wayland with clipboard data");
                         let mut target = response.event.req.into_target();
@@ -100,9 +106,17 @@ impl X11Clipboard {
         let cmd_handler = async {
             while let Some(Ok(r)) = cmd_rx.next().await {
                 match r {
-                    Cmd::Grab => {
-                        debug!("windows is grabbing the clipboard");
-                        let mut claim = clipboard.claim(zerocost_clipboard::PLAINTEXT_MIME_TYPES.iter().chain(once(&OUR_MIME_MARKER)).map(|&s| s.to_owned())).await;
+                    Cmd::Grab(types) => {
+                        debug!("windows is grabbing the clipboard: {:?}", types);
+                        let mut mime_types = vec![OUR_MIME_MARKER.to_owned()];
+                        for t in types.types() {
+                            match t {
+                                ClipboardType::Invalid => (),
+                                ClipboardType::Text => mime_types.extend(PLAINTEXT_MIME_TYPES.iter().map(|&s| s.to_owned())),
+                                ClipboardType::Image => mime_types.push(CLIPBOARD_MIME_PNG.to_owned()),
+                            }
+                        }
+                        let mut claim = clipboard.claim(mime_types).await;
                         debug!("have a claim, sending it");
                         let controller = controller.clone();
                         tokio::task::spawn_local(async move {
@@ -111,15 +125,19 @@ impl X11Clipboard {
                             }
                         });
                     }
-                    Cmd::Read(_) => {
-                        debug!("windows is reading the clipboard (i.e. pasting)");
-                        let contents = clipboard.get().await;
-                        let s = match contents {
-                            Some(c) => c.receive_string().await.unwrap(),
-                            None => "".to_owned(),
+                    Cmd::Read(typ) => {
+                        debug!("windows is reading the clipboard (i.e. pasting): {:?}", typ);
+                        let contents = match clipboard.get().await {
+                            Some(offer) => {
+                                match typ {
+                                    ClipboardType::Invalid => None,
+                                    ClipboardType::Text => offer.receive_string().await.ok().map(|s| s.into_bytes()),
+                                    ClipboardType::Image => offer.receive_bytes(CLIPBOARD_MIME_PNG).await.ok(),
+                                }
+                            }
+                            _ => None,
                         };
-                        let contents = s.into_bytes();
-                        controller.borrow_mut().respond_win_clipboard(contents);
+                        controller.borrow_mut().respond_win_clipboard(contents.unwrap_or(Vec::new()));
                     }
                 }
             }
@@ -134,6 +152,7 @@ pub struct ClipboardRequestEvent {
     req: zerocost_clipboard::ClipboardRequest,
 }
 
+const CLIPBOARD_MIME_PNG: &str = "image/png";
 impl ClipboardRequestEvent {
     pub fn reply_data(self, response: Vec<u8>) -> ClipboardRequestResponse {
         ClipboardRequestResponse {
@@ -142,21 +161,19 @@ impl ClipboardRequestEvent {
         }
     }
 
-    pub fn reply_types(self, types: Vec<ClipboardType>) -> ClipboardRequestResponse {
-        ClipboardRequestResponse {
-            event: self,
-            response: ClipboardResponse::Types(types),
-        }
-    }
-
     pub fn desired_type(&self) -> ClipboardType {
-        ClipboardType::Text
-        //self.desired_type
+        if PLAINTEXT_MIME_TYPES.iter().any(|&m| m == self.req.mime_type()) {
+            ClipboardType::Text
+        } else if self.req.mime_type() == CLIPBOARD_MIME_PNG {
+            ClipboardType::Image
+        } else {
+            // wayland protocol violation, but instead of crashing let's just give them text and see what happens
+            ClipboardType::Text
+        }
     }
 }
 
 enum ClipboardResponse {
-    Types(Vec<ClipboardType>),
     Data(Vec<u8>),
 }
 

@@ -5,16 +5,15 @@ package clientpipe_protocol;
 import "google/protobuf/empty.proto";
 
 enum ClipboardType {
-  None = 0;
+  Invalid = 0;
   Text = 1;
   Image = 2;
 }
 
 message ClipboardMessage {
   oneof message {
-    google.protobuf.Empty grab_clipboard = 1;
+    ClipboardTypes grab_clipboard = 1;
     ClipboardType request_clipboard_contents = 2;
-    ClipboardTypes content_types = 3;
     bytes clipboard_contents = 4;
   }
 }
