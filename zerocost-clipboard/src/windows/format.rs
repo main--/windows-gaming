@@ -234,7 +234,7 @@ pub use windows::Win32::System::SystemServices::{
 /// and returns it.
 ///
 /// See also: <https://docs.microsoft.com/en-us/windows/win32/dataxchg/clipboard-formats#private-clipboard-formats>
-pub /*const*/ fn private(format: u32) -> CLIPBOARD_FORMATS {
+pub const fn private(format: u32) -> CLIPBOARD_FORMATS {
     assert!(format >= CF_PRIVATEFIRST.0 && format <= CF_PRIVATELAST.0);
     CLIPBOARD_FORMATS(format)
 }
@@ -243,7 +243,7 @@ pub /*const*/ fn private(format: u32) -> CLIPBOARD_FORMATS {
 /// clipboard format, and returns it.
 ///
 /// See also: <https://docs.microsoft.com/en-us/windows/win32/dataxchg/clipboard-formats#private-clipboard-formats>
-pub /*const*/ fn gdi(format: u32) -> CLIPBOARD_FORMATS {
+pub const fn gdi(format: u32) -> CLIPBOARD_FORMATS {
     assert!(format >= CF_GDIOBJFIRST.0 && format <= CF_GDIOBJLAST.0);
     CLIPBOARD_FORMATS(format)
 }
