@@ -16,6 +16,7 @@ pub use self::codec::{
     InputButton,
 };
 
+use std::collections::HashSet;
 use std::io::Error;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -82,6 +83,7 @@ impl Monitor {
         };
         let mut commands = self.recv.take().unwrap().compat();
         let command_handler = async move {
+            let mut held_keys = HashSet::new();
             while let Some(Ok(cmd)) = commands.next().await {
                 let res = match cmd {
                     QmpCommand::DeviceAdd { driver, id, bus, port, hostbus, hostaddr } =>
@@ -93,8 +95,22 @@ impl Monitor {
                     QmpCommand::DeviceDel { id } => qapi.execute(&qmp::device_del { id }).await,
                     QmpCommand::SystemPowerdown => qapi.execute(&qmp::system_powerdown {}).await,
                     QmpCommand::SystemWakeup => qapi.execute(&qmp::system_wakeup {}).await,
-                    QmpCommand::InputSendEvent { events } =>
-                        qapi.execute(&qmp::input_send_event { device: None, head: None, events: events.into_iter().map(|i| i.clone().into()).collect() }).await,
+                    QmpCommand::InputSendEvent { events } => {
+                        for e in events.as_ref() {
+                            match e {
+                                &InputEvent::Key { key, down: true } => { held_keys.insert(key); }
+                                &InputEvent::Key { key, down: false } => { held_keys.remove(&key); }
+                                _ => (),
+                            }
+                        }
+                        let input_send_event = qmp::input_send_event { device: None, head: None, events: events.into_iter().map(|i| i.clone().into()).collect() };
+                        qapi.execute(&input_send_event).await
+                    }
+                    QmpCommand::ReleaseAllKeys => {
+                        let events = held_keys.drain().map(|key| InputEvent::Key { key, down: false });
+                        let input_send_event = qmp::input_send_event { device: None, head: None, events: events.into_iter().map(|i| i.clone().into()).collect() };
+                        qapi.execute(&input_send_event).await
+                    }
                 };
 
                 if let Err(e) = res {

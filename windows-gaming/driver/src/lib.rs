@@ -23,7 +23,6 @@ mod dbus;
 mod sleep_inhibitor;
 mod libinput;
 mod clipboard;
-mod release_all_keys;
 
 use std::cell::RefCell;
 use std::rc::Rc;

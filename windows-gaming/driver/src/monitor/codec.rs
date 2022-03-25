@@ -24,6 +24,9 @@ pub enum QmpCommand {
     InputSendEvent {
         events: Cow<'static, [InputEvent]>,
     },
+
+    // synthetic:
+    ReleaseAllKeys,
 }
 
 #[derive(Serialize, Clone)]
@@ -54,7 +57,7 @@ impl Into<qmp::InputEvent> for InputEvent {
     }
 }
 
-#[derive(Serialize, Clone, Copy)]
+#[derive(Serialize, Clone, Copy, PartialEq, Eq, Hash)]
 #[serde(tag = "type", content = "data", rename_all = "snake_case")]
 pub enum KeyValue {
     // Number(u32),

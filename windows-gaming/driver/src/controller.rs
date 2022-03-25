@@ -2,7 +2,6 @@ use std::mem;
 use std::rc::Rc;
 use std::ffi::OsStr;
 use std::cell::RefCell;
-use std::borrow::Cow;
 
 use clientpipe_proto::ClipboardTypes;
 use itertools::Itertools;
@@ -17,11 +16,10 @@ use common::util;
 use tokio::process::Command;
 use crate::clientpipe::{GaCmdOut, ClipboardMessage, ClipboardType, RegisterHotKey, Point};
 use crate::control::ControlCmdOut;
-use crate::monitor::QmpCommand;
+use crate::monitor::{QmpCommand};
 use crate::sd_notify;
 use crate::libinput::Input;
 use crate::clipboard::{ClipboardRequestEvent, ClipboardRequestResponse};
-use crate::release_all_keys::EVENTS as RELEASE_ALL_KEYS;
 
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -274,7 +272,11 @@ impl Controller {
         // release light entry first so we don't mess things up
         match self.io_state {
             IoState::Detached => (),
-            IoState::AwaitingUpgrade | IoState::LightEntry => self.input.borrow_mut().suspend(),
+            IoState::AwaitingUpgrade | IoState::LightEntry => {
+                debug!("from light entry, so releasing keys now");
+                self.input.borrow_mut().suspend();
+                (&self.monitor).unbounded_send(QmpCommand::ReleaseAllKeys).unwrap();
+            }
             IoState::TemporaryLightEntry(ref mut sender) => {
                 self.input.borrow_mut().suspend();
                 sender.unbounded_send(ControlCmdOut::TemporaryLightDetached).unwrap();
@@ -344,9 +346,7 @@ impl Controller {
             IoState::AwaitingUpgrade | IoState::LightEntry | IoState::TemporaryLightEntry(_) => {
                 debug!("detaching light entry");
                 self.input.borrow_mut().suspend();
-                (&self.monitor).unbounded_send(QmpCommand::InputSendEvent {
-                    events: Cow::from(RELEASE_ALL_KEYS),
-                }).unwrap();
+                (&self.monitor).unbounded_send(QmpCommand::ReleaseAllKeys).unwrap();
             },
             IoState::FullEntry => {
                 debug!("detaching full entry");
