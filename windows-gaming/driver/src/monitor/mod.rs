@@ -42,11 +42,43 @@ pub struct Monitor {
     qapi: Option<QapiStream<QmpStreamTokio<ReadHalf<UnixStream>>, QmpStreamTokio<WriteHalf<UnixStream>>>>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct QueryCpusFast {}
+impl qapi::Command for QueryCpusFast {
+	const NAME: &'static str = "query-cpus-fast";
+	const ALLOW_OOB: bool = false;
+
+	type Ok = Vec<CpuInfoFast>;
+}
+impl qapi::qmp::QmpCommand for QueryCpusFast {}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "target")]
+pub enum CpuInfoFast {
+    #[serde(rename = "x86_64")]
+    X86_64 {
+        #[serde(flatten)]
+        base: qapi::qmp::CpuInfoFastBase,
+    },
+}
+
 impl Monitor {
     pub async fn new(stream: UnixStream) -> Monitor {
         let (r, w) = tokio::io::split(stream);
         let nego = QmpStreamTokio::open_split(r, w).await.unwrap();
-        let qapi = nego.negotiate().await.unwrap();
+        let mut qapi = nego.negotiate().await.unwrap();
+
+        let resp = qapi.execute(QueryCpusFast {}).await.unwrap();
+        for c in resp {
+            let (cpu, tid) = match c {
+                CpuInfoFast::X86_64 { base } => (base.cpu_index, base.thread_id),
+            };
+            unsafe {
+                let mut cpuset: libc::cpu_set_t = std::mem::zeroed();
+                libc::CPU_ZERO(&mut cpuset);
+                libc::CPU_SET(cpu as usize, &mut cpuset);
+                libc::sched_setaffinity(tid as i32, std::mem::size_of_val(&cpuset), &cpuset);
+            }
+        }
 
         let (send, recv) = mpsc::unbounded();
 
