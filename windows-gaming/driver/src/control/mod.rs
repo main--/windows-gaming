@@ -71,6 +71,8 @@ pub fn create<'a>(socket: UnixListener, controller: Rc<RefCell<Controller>>) -> 
                             Ok::<(), ()>(())
                         }).compat());
                 }
+                ControlCmdIn::EnterBackupMode => controller.enter_backup_mode(send_ack_when_ready(sender.clone())),
+                ControlCmdIn::LeaveBackupMode => controller.leave_backup_mode(send_ack_when_ready(sender.clone())),
             }
             Box::new(future::ok(()))
         }).then(|_| Ok(()));
@@ -79,4 +81,13 @@ pub fn create<'a>(socket: UnixListener, controller: Rc<RefCell<Controller>>) -> 
         Ok(())
     });
     Box::new(handler)
+}
+fn send_ack_when_ready(sender: Rc<RefCell<futures::unsync::mpsc::UnboundedSender<ControlCmdOut>>>) -> tokio::sync::oneshot::Sender<()> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    tokio::task::spawn_local(async move {
+        if rx.await.is_ok() {
+            let _ = sender.borrow().unbounded_send(ControlCmdOut::Ack);
+        }
+    });
+    tx
 }

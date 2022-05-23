@@ -211,12 +211,16 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
     }
 
     for (idx, drive) in machine.storage.iter().enumerate() {
+        let (path, format) = match &drive.snapshot_file {
+            Some(snap) if Path::new(snap).exists() => {
+                debug!("Using disk snapshot: {snap}");
+                (snap, "qcow2")
+            }
+            _ => (&drive.path, drive.format.as_str()),
+        };
         qemu.args(&["-drive",
                     &format!("file={},id=disk{},format={},if=none,cache={},aio=io_uring,discard=unmap",
-                             drive.path,
-                             idx,
-                             drive.format,
-                             drive.cache),
+                             path, idx, format, drive.cache),
                     "-device",
                     &format!("scsi-hd,drive=disk{}", idx)]);
         debug!("Passed through {}", drive.path);

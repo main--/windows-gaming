@@ -6,8 +6,6 @@ use qapi::{Enum, qmp};
 use tokio_util::codec::{Encoder, Decoder};
 use serde_json;
 
-#[derive(Serialize)]
-#[serde(tag = "execute", content = "arguments", rename_all = "snake_case")]
 pub enum QmpCommand {
     DeviceAdd {
         driver: &'static str,
@@ -20,13 +18,17 @@ pub enum QmpCommand {
     DeviceDel { id: String },
     SystemPowerdown,
     SystemWakeup,
-    #[serde(rename = "input-send-event")]
     InputSendEvent {
         events: Cow<'static, [InputEvent]>,
     },
+    TakeSnapshot { disk_id: usize, snap_file: String, ack: tokio::sync::oneshot::Sender<()> },
+    CommitSnapshot { disk_id: usize, snap_file: String, ack: tokio::sync::oneshot::Sender<()> },
 
     // synthetic:
     ReleaseAllKeys,
+
+    // hack:
+    JobReady(String),
 }
 
 #[derive(Serialize, Clone)]
@@ -195,14 +197,6 @@ impl Decoder for Codec {
     }
 }
 
-impl Encoder<QmpCommand> for Codec {
-    type Error = io::Error;
-
-    fn encode(&mut self, cmd: QmpCommand, buf: &mut BytesMut) -> io::Result<()> {
-        buf.extend(serde_json::to_string(&cmd).unwrap().bytes());
-        Ok(())
-    }
-}
 
 #[cfg(test)]
 mod test {

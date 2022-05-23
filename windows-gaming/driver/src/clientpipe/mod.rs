@@ -39,6 +39,8 @@ impl Clientpipe {
         let recv = recv.map_err(|()| Error::new(ErrorKind::Other, "Failed to write to clientpipe"));
         let sender = recv.forward(write.compat()).map(|_| ());
 
+        let read = read.map_err(|_e| Error::new(ErrorKind::Other, "Failed to read from clientpipe"));
+
         Clientpipe {
             send: Some(send),
             sender: Some(Box::new(sender)),

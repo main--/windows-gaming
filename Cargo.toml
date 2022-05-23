@@ -1,2 +1,3 @@
 [workspace]
 members = ["guest-agent", "windows-gaming"]
+default-members = ["windows-gaming"]

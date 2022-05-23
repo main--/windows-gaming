@@ -11,6 +11,7 @@ pub enum ControlCmdOut {
     },
     TemporaryLightAttached,
     TemporaryLightDetached,
+    Ack,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -26,6 +27,8 @@ pub enum ControlCmdIn {
         x: i32,
         y: i32,
     },
+    EnterBackupMode,
+    LeaveBackupMode,
 }
 
 pub struct Codec;
@@ -53,6 +56,8 @@ impl Decoder for Codec {
                 size += 8;
                 ControlCmdIn::TemporaryLightEntry { x, y }
             }
+            Some(9) => ControlCmdIn::EnterBackupMode,
+            Some(10) => ControlCmdIn::LeaveBackupMode,
             Some(x) => {
                 warn!("control sent invalid request {}", x);
                 // no idea how to proceed as the request might have payload
@@ -80,6 +85,7 @@ impl Encoder<ControlCmdOut> for Codec {
             }
             ControlCmdOut::TemporaryLightAttached => buf.put_u8(2),
             ControlCmdOut::TemporaryLightDetached => buf.put_u8(3),
+            ControlCmdOut::Ack => buf.put_u8(4),
         }
         Ok(())
     }

@@ -7,9 +7,11 @@ extern crate time;
 extern crate common;
 extern crate driver;
 
+use std::fs;
 use std::path::Path;
 use std::os::unix::net::UnixStream;
-use std::io::{self, Write};
+use std::io::{self, Write, Read, ErrorKind};
+use std::process::Command;
 
 use clap::{Arg, App, SubCommand, AppSettings, ArgGroup, Shell};
 use nix::unistd;
@@ -52,6 +54,10 @@ fn main() {
                 .takes_value(false))
         ).subcommand(SubCommand::with_name("wizard")
             .about("Runs the wizard")
+        ).subcommand(SubCommand::with_name("backup")
+            .about("Support functionality for performing block-level backups of your Windows VM")
+            .subcommand(SubCommand::with_name("start").about("Enter backup mode. Redirect disks to snapshot files where configured."))
+            .subcommand(SubCommand::with_name("stop").about("Leave backup mode. Commit and then remove all active snapshot files."))
         ).subcommand(SubCommand::with_name("control")
             .about("Commands to interact with the driver")
             .subcommand(SubCommand::with_name("attach")
@@ -154,6 +160,45 @@ fn main() {
                 _ => unreachable!()
             }
         }
+        ("backup", cmd) => {
+            match cmd.unwrap().subcommand() {
+                ("start", _) => {
+                    if !control_send_fallible(ControlCmdIn::EnterBackupMode, &control_socket) {
+                        // qemu is down, so invoke qemu-img to do it
+                        let todos = cfg.as_ref().unwrap().machine.storage.iter()
+                            .filter_map(|d| d.snapshot_file.as_ref().map(|s| (s, &d.path, &d.format)))
+                            .filter(|(s, _, _)| !Path::new(s).exists());
+                        for (snap, path, format) in todos {
+                            // qemu-img create -f qcow2 -b /dev/tank/windows -F raw qemu-snaps/windows.qcow2
+                            let status = Command::new("qemu-img")
+                                .args(&["create", "-f", "qcow2", "-b", path, "-F", format, snap])
+                                .status().expect("Failed to call qemu-img");
+                            if !status.success() {
+                                panic!("qemu-img reported an error");
+                            }
+                        }
+                    }
+                }
+                ("stop", _) => {
+                    if !control_send_fallible(ControlCmdIn::LeaveBackupMode, &control_socket) {
+                        // qemu is down, so invoke qemu-img to do it
+                        let todos = cfg.as_ref().unwrap().machine.storage.iter()
+                            .filter_map(|d| d.snapshot_file.as_ref())
+                            .filter(|s| Path::new(s).exists());
+                        for snap in todos {
+                            let status = Command::new("qemu-img")
+                                .args(&["commit", "-d", snap])
+                                .status().expect("Failed to call qemu-img");
+                            if !status.success() {
+                                panic!("qemu-img reported an error");
+                            }
+                            fs::remove_file(snap).expect("Failed to delete old snapshot file");
+                        }
+                    }
+                }
+                _ => unreachable!()
+            }
+        }
         _ => match cfg {
             Some(ref cfg) if cfg.setup.is_none() => driver::run(cfg, &workdir_path, &data_folder, false),
             _cfg => unimplemented!("wizard"),
@@ -162,7 +207,15 @@ fn main() {
 }
 
 fn control_send<P: AsRef<Path>>(cmd: ControlCmdIn, socket_path: P) {
-    let mut writer = UnixStream::connect(socket_path).unwrap();
+    if !control_send_fallible(cmd, socket_path) {
+        panic!("Windows is down");
+    }
+}
+fn control_send_fallible<P: AsRef<Path>>(cmd: ControlCmdIn, socket_path: P) -> bool {
+    let mut writer = match UnixStream::connect(socket_path) {
+        Err(e) if e.kind() == ErrorKind::ConnectionRefused => return false,
+        x => x,
+    }.unwrap();
     writer.write(&[match cmd {
         ControlCmdIn::IoEntry => 1,
         ControlCmdIn::TryIoEntry => 6,
@@ -171,7 +224,22 @@ fn control_send<P: AsRef<Path>>(cmd: ControlCmdIn, socket_path: P) {
         ControlCmdIn::ForceIoEntry => 3,
         ControlCmdIn::IoExit => 4,
         ControlCmdIn::Suspend => 5,
-        ControlCmdIn::TemporaryLightEntry { .. } => unimplemented!()
+        ControlCmdIn::TemporaryLightEntry { .. } => unimplemented!(),
+        ControlCmdIn::EnterBackupMode => 9,
+        ControlCmdIn::LeaveBackupMode => 10,
     }]).unwrap();
     writer.flush().unwrap();
+
+    match cmd {
+        ControlCmdIn::EnterBackupMode | ControlCmdIn::LeaveBackupMode => {
+            // wait for ack
+            let mut v = [0];
+            writer.read_exact(&mut v).unwrap();
+            let [v] = v;
+            assert_eq!(v, 4); // ack command
+        }
+        _ => (),
+    }
+
+    true
 }

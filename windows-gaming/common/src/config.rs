@@ -261,6 +261,7 @@ pub struct StorageDevice {
     pub path: String,
     pub cache: String,
     pub format: String,
+    pub snapshot_file: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

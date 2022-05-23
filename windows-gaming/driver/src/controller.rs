@@ -1,4 +1,5 @@
 use std::mem;
+use std::path::Path;
 use std::rc::Rc;
 use std::ffi::OsStr;
 use std::cell::RefCell;
@@ -417,6 +418,53 @@ impl Controller {
         if let IoState::TemporaryLightEntry(ref mut sender) = self.io_state {
             sender.unbounded_send(ControlCmdOut::MouseEdged { x, y }).unwrap();
         }
+    }
+
+    pub fn enter_backup_mode(&mut self, ack: tokio::sync::oneshot::Sender<()>) {
+        // send a qemu snapshot command for all disks where we have a snapshot path configured and it doesn't exist yet
+        let acks: Vec<_> = self.machine_config.storage.iter()
+            .enumerate()
+            .filter_map(|(i, d)| d.snapshot_file.as_ref().map(|s| (i, s)))
+            .filter(|(_, s)| !Path::new(s).exists())
+            .map(|(i, s)| {
+                let (tx, rx) = tokio::sync::oneshot::channel();
+                self.monitor.unbounded_send(QmpCommand::TakeSnapshot { disk_id: i, snap_file: s.clone(), ack: tx }).unwrap();
+                rx
+            })
+            .collect();
+
+        // wait for the qemu jobs to return success and then return the ack downstream
+        tokio::task::spawn_local(async move {
+            for a in acks {
+                if a.await.is_err() {
+                    return;
+                }
+            }
+            let _ = ack.send(());
+        });
+    }
+    pub fn leave_backup_mode(&mut self, ack: tokio::sync::oneshot::Sender<()>) {
+        // send a qemu snapshot command for all disks where we have a snapshot path configured and it exists (i.e. is active)
+        let acks: Vec<_> = self.machine_config.storage.iter()
+            .enumerate()
+            .filter_map(|(i, d)| d.snapshot_file.as_ref().map(|s| (i, s)))
+            .filter(|(_, s)| Path::new(s).exists())
+            .map(|(i, s)| {
+                let (tx, rx) = tokio::sync::oneshot::channel();
+                self.monitor.unbounded_send(QmpCommand::CommitSnapshot { disk_id: i, snap_file: s.clone(), ack: tx }).unwrap();
+                rx
+            })
+            .collect();
+
+        // wait for the qemu jobs to return success and then return the ack downstream
+        tokio::task::spawn_local(async move {
+            for a in acks {
+                if a.await.is_err() {
+                    return;
+                }
+            }
+            let _ = ack.send(());
+        });
     }
 }
 
