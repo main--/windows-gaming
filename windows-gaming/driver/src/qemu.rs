@@ -117,7 +117,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
         qemu.args(&["-netdev",
                     &format!("bridge,id=bridge{},br={}", idx, bridge),
                     "-device",
-                    &format!("e1000,netdev=bridge{}", idx)]);
+                    &format!("virtio-net,netdev=bridge{}", idx)]);
     }
     trace!("setup usernet");
     qemu.args(&["-netdev", &usernet, "-device", "e1000,netdev=unet"]);
