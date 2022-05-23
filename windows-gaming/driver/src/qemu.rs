@@ -71,8 +71,9 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
                          data.join("ovmf-code.fd").display()),
                 "-drive",
                 &format!("if=pflash,format=raw,file={}", efivars_file.display()),
-                "-object", "iothread,id=ioth0",
-                "-device", "virtio-scsi-pci,id=scsi,iothread=ioth0",
+                //"-object", "iothread,id=ioth0",
+                "-device", "virtio-scsi-pci,id=scsi",
+                //"-device", "virtio-scsi-pci,id=scsi,iothread=ioth0",
                 "-drive", &format!("if=none,id=iso,media=cdrom,file={}", ga_iso.display()),
                 "-device", "scsi-cd,id=cdrom,drive=iso",
     ]);
