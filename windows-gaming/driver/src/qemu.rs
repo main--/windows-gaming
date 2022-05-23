@@ -212,7 +212,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
 
     for (idx, drive) in machine.storage.iter().enumerate() {
         qemu.args(&["-drive",
-                    &format!("file={},id=disk{},format={},if=none,cache={},aio=native",
+                    &format!("file={},id=disk{},format={},if=none,cache={},aio=native,discard=unmap",
                              drive.path,
                              idx,
                              drive.format,
