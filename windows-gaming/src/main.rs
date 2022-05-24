@@ -213,7 +213,7 @@ fn control_send<P: AsRef<Path>>(cmd: ControlCmdIn, socket_path: P) {
 }
 fn control_send_fallible<P: AsRef<Path>>(cmd: ControlCmdIn, socket_path: P) -> bool {
     let mut writer = match UnixStream::connect(socket_path) {
-        Err(e) if e.kind() == ErrorKind::ConnectionRefused => return false,
+        Err(e) if e.kind() == ErrorKind::ConnectionRefused || e.kind() == ErrorKind::NotFound => return false,
         x => x,
     }.unwrap();
     writer.write(&[match cmd {
