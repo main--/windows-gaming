@@ -37,7 +37,7 @@ enum State {
     /// Windows is suspended
     Suspended,
     /// Windows is currently waking up from suspend
-    Resuming,
+    Resuming(bool), // true = full, false = light
 }
 
 #[derive(Clone)]
@@ -164,8 +164,12 @@ impl Controller {
         match ga {
             State::Pinging | State::Up => false,
             State::Down | State::Suspended => true,
-            State::Resuming => {
-                self.io_attach();
+            State::Resuming(full) => {
+                if full {
+                    self.io_force_attach();
+                } else {
+                    self.light_attach();
+                }
                 true
             }
             State::Suspending => false, // wtf though
@@ -208,12 +212,12 @@ impl Controller {
     /// Attaches all configured devices if GA is up and wakes the host up if it's suspended
     pub fn io_attach(&mut self) {
         match self.ga {
-            State::Resuming | State::Suspending => (),
+            State::Resuming(_) | State::Suspending => (),
             State::Suspended => {
                 // make them wake up
                 (&self.monitor).unbounded_send(QmpCommand::SystemWakeup).unwrap();
                 // can't enter now - gotta wait for GA to get ready
-                self.ga = State::Resuming;
+                self.ga = State::Resuming(true);
             },
             State::Down => {
                 self.light_attach();
@@ -254,6 +258,18 @@ impl Controller {
 
     pub fn light_attach(&mut self) {
         debug!("light entry");
+
+        match self.ga {
+            State::Suspending => return, // this doesn't make sense to do
+            State::Suspended => {
+                // make them wake up
+                (&self.monitor).unbounded_send(QmpCommand::SystemWakeup).unwrap();
+                // can't enter now - gotta wait for GA to get ready
+                self.ga = State::Resuming(false);
+                return;
+            }
+            _ => (),
+        }
 
         match self.io_state {
             IoState::Detached => {
