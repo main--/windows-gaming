@@ -109,8 +109,6 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
                 &format!("cores={},threads={}",
                          machine.cores,
                          machine.threads.unwrap_or(1))]);
-    trace!("use hda sound hardware");
-    qemu.args(&["-device", "intel-hda", "-device", "hda-duplex"]);
 
     for (idx, bridge) in machine.network.iter().flat_map(|x| x.bridges.iter()).enumerate() {
         trace!("setup bridge {}", bridge);
@@ -158,7 +156,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
 
             if typ == UsbBus::Xhci {
                 // account for lighthouse usb-mouse and usb-kbd
-                count += 2;
+                count += 3;
             }
 
             let usable_ports = util::usable_ports(typ);
@@ -207,6 +205,10 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
             qemu.args(&["-device", &format!("usb-kbd,bus=xhci{}.0,port={}",
                                             port / usable_ports, (port % usable_ports) + 1)]);
             debug!("usb-kbd at xhci{}.0p{}", port / usable_ports, (port % usable_ports) + 1);
+
+            // add USB audio
+            let port = i + 2;
+            qemu.args(&["-audiodev", "jack,id=jackaudio", "-device", &format!("usb-audio,audiodev=jackaudio,bus=xhci{}.0,port={}", port / usable_ports, (port % usable_ports) + 1)]);
         }
     }
 
