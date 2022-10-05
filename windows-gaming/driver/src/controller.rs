@@ -355,8 +355,8 @@ impl Controller {
 
     /// Detaches all configured devices
     pub fn io_detach(&mut self) {
-        assert!(self.ga != State::Suspending, "trying to exit from a suspending vm?");
-        assert!(self.ga != State::Suspended, "trying to exit from a suspended vm?");
+        //assert!(self.ga != State::Suspending, "trying to exit from a suspending vm?");
+        //assert!(self.ga != State::Suspended, "trying to exit from a suspended vm?");
 
         match self.io_state {
             IoState::Detached => (),
