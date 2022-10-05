@@ -255,6 +255,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
         debug!("Passed through {}", drive.path);
     }
 
+/*
     {
         trace!("Applying sound config");
         let sound = &cfg.sound;
@@ -325,6 +326,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
             }
         }
     }
+*/
 
     if let Some(ref cmd) = cfg.additional_qemu_cmdline {
         qemu.args(cmd.split(' '));
