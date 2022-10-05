@@ -244,9 +244,14 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
         };
         qemu.args(&["-drive",
                     &format!("file={},id=disk{},format={},if=none,cache={},aio=io_uring,discard=unmap",
+//                    &format!("file={},id=disk{},format={},if=none,cache={},aio=io_uring,discard=unmap,file.locking=off",
                              path, idx, format, drive.cache),
-                    "-device",
-                    &format!("scsi-hd,drive=disk{}", idx)]);
+                    //"-device", &format!("ahci,id=ahci{idx}"),
+                    "-device", &format!("scsi-hd,drive=disk{},id=myscsi{idx}", idx),
+                    "-set", &format!("device.myscsi{idx}.discard_granularity=0"),
+                    "-set", &format!("device.myscsi{idx}.rotation_rate=1"),
+                    ]);
+                    //&format!("ide-hd,drive=disk{},bus=ahci{idx}.0", idx)]);
         debug!("Passed through {}", drive.path);
     }
 
