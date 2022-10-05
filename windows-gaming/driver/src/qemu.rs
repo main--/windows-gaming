@@ -67,14 +67,19 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
     qemu.args(&[//"-S", // do not actually boot until we are ready :)
                 "-enable-kvm",
                 "-machine",
-                "pc-q35-6.1,smm=on",
+                "pc-q35-7.1,smm=on",
                 "-cpu",
-                "host,kvm=off,hv_time,hv_relaxed,hv_vapic,hv_spinlocks=0x1fff,\
-                 hv_vendor_id=NvidiaFuckU",
+                // Note: Do NOT add hv_tlbflush as it (currently) causes a bug where windows
+                // crashes with random memory corruption when waking up from suspend
+                // https://gitlab.com/qemu-project/qemu/-/issues/1152
+                "host,hv_time,hv_relaxed,hv_vapic,hv_spinlocks=0x1fff,\
+                 hv_vpindex,hv_runtime,hv_synic,hv_stimer,\
+                 hv_frequencies,hv_apicv,hv_xmm_input",
                 "-overcommit", "mem-lock=on", // don't swap out windows; let windows do its own swapping
                 "-rtc",
                 "base=localtime",
                 "-nodefaults",
+
                 "-net",
                 "none",
                 "-display", "none", "-vga", "none",
