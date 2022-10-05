@@ -32,9 +32,22 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
     trace!("qemu::run");
     let machine = &cfg.machine;
 
-    let efivars_file = tmp.join("efivars.fd");
-    fs::copy(data.join("ovmf-vars.fd"), &efivars_file).expect("Failed to copy efivars image");
-    trace!("copied efivars file");
+    let efivars_file = match cfg.tpm_state_folder.as_ref() {
+        None => {
+            let efivars_file = tmp.join("efivars.fd");
+            fs::copy("/usr/share/edk2-ovmf/x64/OVMF_VARS.fd", &efivars_file).expect("Failed to copy efivars image");
+            efivars_file
+        }
+        Some(tpm_folder) => {
+            // also use it to store secure boot state
+            let efivars_file = Path::new(tpm_folder).join("efivars.fd");
+            if !efivars_file.exists() {
+                fs::copy("/usr/share/edk2-ovmf/x64/OVMF_VARS.fd", &efivars_file).expect("Failed to copy efivars image");
+            }
+            efivars_file
+        }
+    };
+    trace!("efivars at {}", efivars_file.display());
 
     let mut usernet = format!("user,id=unet,restrict=on,guestfwd=tcp:10.0.2.1:31337-unix:{}",
                               clientpipe_path.display());
@@ -54,7 +67,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
     qemu.args(&[//"-S", // do not actually boot until we are ready :)
                 "-enable-kvm",
                 "-machine",
-                "pc-q35-6.1",
+                "pc-q35-6.1,smm=on",
                 "-cpu",
                 "host,kvm=off,hv_time,hv_relaxed,hv_vapic,hv_spinlocks=0x1fff,\
                  hv_vendor_id=NvidiaFuckU",
@@ -67,17 +80,25 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
                 "-qmp",
                 &format!("unix:{}", monitor_path.display()),
                 "-drive",
-                &format!("if=pflash,format=raw,readonly=on,file={}",
-                         data.join("ovmf-code.fd").display()),
+                &format!("if=pflash,format=raw,unit=0,readonly=on,file={}",
+                    "/usr/share/edk2-ovmf/x64/OVMF_CODE.secboot.fd"),
                 "-drive",
-                &format!("if=pflash,format=raw,file={}", efivars_file.display()),
-                //"-object", "iothread,id=ioth0",
+                &format!("if=pflash,format=raw,unit=1,file={}", efivars_file.display()),
+
                 "-device", "virtio-scsi-pci,id=scsi",
+
+                //"-object", "iothread,id=ioth0",
                 //"-device", "virtio-scsi-pci,id=scsi,iothread=ioth0",
+
                 "-drive", &format!("if=none,id=iso,media=cdrom,file={}", ga_iso.display()),
                 "-device", "scsi-cd,id=cdrom,drive=iso",
     ]);
-    // TODO: make root ports in the VM for PCIe devices to ensure it's all natural to the guest OS and drivers
+
+    if let Some(tpm_folder) = cfg.tpm_state_folder.as_ref() {
+        let tpm_socket = tmp.join("tpm.socket");
+        qemu.args(&["-chardev", &format!("socket,id=chrtpm,path={}", tpm_socket.display()), "-tpmdev", "emulator,id=tpm0,chardev=chrtpm", "-device", "tpm-tis,tpmdev=tpm0"]);
+        Command::new("swtpm").args(&["socket", "--tpmstate", &format!("dir={tpm_folder}"), "--ctrl", &format!("type=unixio,path={}", tpm_socket.display()), "--tpm2"]).spawn().unwrap();
+    }
 
     if enable_gui {
         qemu.args(&["-display", "gtk", "-vga", "qxl"]);

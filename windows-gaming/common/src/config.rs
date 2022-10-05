@@ -102,6 +102,7 @@ pub struct Config {
     pub additional_qemu_cmdline: Option<String>,
     pub runtime_directory_override: Option<String>,
     pub data_directory_override: Option<String>,
+    pub tpm_state_folder: Option<String>,
     pub hooks: HooksConfig,
 }
 
