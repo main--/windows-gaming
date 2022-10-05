@@ -71,6 +71,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
                 "-cpu",
                 "host,kvm=off,hv_time,hv_relaxed,hv_vapic,hv_spinlocks=0x1fff,\
                  hv_vendor_id=NvidiaFuckU",
+                "-overcommit", "mem-lock=on", // don't swap out windows; let windows do its own swapping
                 "-rtc",
                 "base=localtime",
                 "-nodefaults",
