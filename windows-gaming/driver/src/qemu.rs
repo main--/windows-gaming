@@ -1,6 +1,7 @@
 use std::collections::HashMap;
+use std::os::unix::prelude::{AsRawFd, MetadataExt};
 use std::process::{Stdio};
-use std::path::{Path};
+use std::path::{Path, PathBuf};
 use std::iter::Iterator;
 use std::fs;
 use std::io;
@@ -247,12 +248,44 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
             }
             _ => (&drive.path, drive.format.as_str()),
         };
+
+        let mut hd_params = String::new();
+
+        if format == "raw" {
+            match std::fs::File::open(path) {
+                Err(e) => warn!("Failed to check raw disk block size for {path}: {e}"),
+                Ok(f) => {
+                    let metadata = f.metadata().unwrap();
+                    let devnum = if metadata.rdev() == 0 {
+                        metadata.dev()
+                    } else {
+                        metadata.rdev()
+                    };
+                    let major = devnum >> 8;
+                    let minor = devnum & 0xFF;
+                    debug!("Resolved {path} as {major},{minor}");
+
+                    let queue = PathBuf::from(format!("/sys/dev/block/{major}:{minor}/queue/"));
+
+                    for param in ["logical_block_size", "physical_block_size"] {
+                        match fs::read_to_string(queue.join(param)) {
+                            Err(e) => warn!("Failed to read {param} for {path}: {e}"),
+                            Ok(s) => {
+                                use std::fmt::Write;
+                                write!(hd_params, "{}={},", param, s.trim()).unwrap();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         qemu.args(&["-drive",
                     &format!("file={},id=disk{},format={},if=none,cache={},aio=io_uring,discard=unmap",
 //                    &format!("file={},id=disk{},format={},if=none,cache={},aio=io_uring,discard=unmap,file.locking=off",
                              path, idx, format, drive.cache),
                     //"-device", &format!("ahci,id=ahci{idx}"),
-                    "-device", &format!("scsi-hd,drive=disk{},id=myscsi{idx}", idx),
+                    "-device", &format!("scsi-hd,{hd_params}drive=disk{},id=myscsi{idx}", idx),
                     "-set", &format!("device.myscsi{idx}.discard_granularity=0"),
                     "-set", &format!("device.myscsi{idx}.rotation_rate=1"),
                     ]);
