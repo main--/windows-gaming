@@ -249,30 +249,52 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
             _ => (&drive.path, drive.format.as_str()),
         };
 
+        let drive_name_prefix = "disk";
         let mut hd_params = String::new();
 
+        let mut file_driver = "file";
         if format == "raw" {
             match std::fs::File::open(path) {
-                Err(e) => warn!("Failed to check raw disk block size for {path}: {e}"),
+                Err(e) => warn!("Failed to check metadata for {path}: {e}"),
                 Ok(f) => {
                     let metadata = f.metadata().unwrap();
+
                     let devnum = if metadata.rdev() == 0 {
                         metadata.dev()
                     } else {
+                        file_driver = "host_device";
                         metadata.rdev()
                     };
+
                     let major = devnum >> 8;
                     let minor = devnum & 0xFF;
                     debug!("Resolved {path} as {major},{minor}");
 
                     let queue = PathBuf::from(format!("/sys/dev/block/{major}:{minor}/queue/"));
 
-                    for param in ["logical_block_size", "physical_block_size"] {
-                        match fs::read_to_string(queue.join(param)) {
-                            Err(e) => warn!("Failed to read {param} for {path}: {e}"),
+                    // discard_granularity can not be set here because qemu wants it to be a multiple
+                    // of logical block size always, which it isn't (I have 512 but 4096 sectors)
+                    let same_name = [/*"discard_granularity",*/ "logical_block_size", "physical_block_size",];
+                    let different_name = [("minimum_io_size", "min_io_size"), ("optimal_io_size", "opt_io_size")];
+                    for (linux_name, qemu_name) in same_name.into_iter().map(|x| (x, x)).chain(different_name) {
+                        match fs::read_to_string(queue.join(linux_name)) {
+                            Err(e) => warn!("Failed to read {linux_name} for {path}: {e}"),
                             Ok(s) => {
                                 use std::fmt::Write;
-                                write!(hd_params, "{}={},", param, s.trim()).unwrap();
+                                let s = s.trim();
+                                write!(hd_params, "{qemu_name}={s},").unwrap();
+
+                                /*
+                                // Turns out this isn't needed due to https://github.com/qemu/qemu/blob/cdcb7dcb401757b5853ca99c1967a6d66e1deea5/block/file-posix.c#L401
+                                // Which is interesting because it seems that this codepath only triggers since we switched from -drive to -blockdev
+
+                                if linux_name == "minimum_io_size" && s.parse::<i32>().unwrap() != 512 {
+                                    // additionally add blkdebug driver to set IO alignment to deal with LUKS issues
+                                    info!("Redirecting {path} to blkdebug due to minimum IO size of {s}");
+                                    qemu.args(&["-blockdev", &format!("driver=blkdebug,node-name=blkdebug{idx},image=disk{idx},align={s}")]);
+                                    drive_name_prefix = "blkdebug";
+                                }
+                                */
                             }
                         }
                     }
@@ -280,14 +302,11 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
             }
         }
 
-        qemu.args(&["-drive",
-                    &format!("file={},id=disk{},format={},if=none,cache={},aio=io_uring,discard=unmap",
-//                    &format!("file={},id=disk{},format={},if=none,cache={},aio=io_uring,discard=unmap,file.locking=off",
-                             path, idx, format, drive.cache),
-                    //"-device", &format!("ahci,id=ahci{idx}"),
-                    "-device", &format!("scsi-hd,{hd_params}drive=disk{},id=myscsi{idx}", idx),
-                    "-set", &format!("device.myscsi{idx}.discard_granularity=0"),
-                    "-set", &format!("device.myscsi{idx}.rotation_rate=1"),
+        // TODO: configure cache
+        qemu.args(&["-blockdev", &format!("file.filename={},file.driver={file_driver},node-name=disk{},driver={},discard=unmap,file.aio=io_uring,cache.direct=on", path, idx, format)]);
+
+        qemu.args(&[//"-device", &format!("ahci,id=ahci{idx}"),
+                    "-device", &format!("scsi-hd,{hd_params}drive={drive_name_prefix}{},id=myscsi{idx},rotation_rate=1,discard_granularity=0", idx),
                     ]);
                     //&format!("ide-hd,drive=disk{},bus=ahci{idx}.0", idx)]);
         debug!("Passed through {}", drive.path);
