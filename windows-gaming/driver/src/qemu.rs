@@ -252,6 +252,8 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
         let drive_name_prefix = "disk";
         let mut hd_params = String::new();
 
+        let mut may_use_direct_io = true;
+
         let mut file_driver = "file";
         if format == "raw" {
             match std::fs::File::open(path) {
@@ -284,6 +286,10 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
                                 let s = s.trim();
                                 write!(hd_params, "{qemu_name}={s},").unwrap();
 
+                                if linux_name == "minimum_io_size" && s.parse::<i32>().unwrap() != 512 {
+                                    warn!("Disabling direct IO on {path} due to qemu bug: https://gitlab.com/qemu-project/qemu/-/issues/1290");
+                                    may_use_direct_io = false;
+                                }
                                 /*
                                 // Turns out this isn't needed due to https://github.com/qemu/qemu/blob/cdcb7dcb401757b5853ca99c1967a6d66e1deea5/block/file-posix.c#L401
                                 // Which is interesting because it seems that this codepath only triggers since we switched from -drive to -blockdev
@@ -302,8 +308,13 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
             }
         }
 
+        let aio_params = match may_use_direct_io {
+            false => "",
+            true => ",file.aio=io_uring,cache.direct=on",
+        };
+
         // TODO: configure cache
-        qemu.args(&["-blockdev", &format!("file.filename={},file.driver={file_driver},node-name=disk{},driver={},discard=unmap,file.aio=io_uring,cache.direct=on", path, idx, format)]);
+        qemu.args(&["-blockdev", &format!("file.filename={},file.driver={file_driver},node-name=disk{},driver={},discard=unmap{aio_params}", path, idx, format)]);
 
         qemu.args(&[//"-device", &format!("ahci,id=ahci{idx}"),
                     "-device", &format!("scsi-hd,{hd_params}drive={drive_name_prefix}{},id=myscsi{idx},rotation_rate=1,discard_granularity=0", idx),
