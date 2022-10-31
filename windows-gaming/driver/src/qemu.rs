@@ -241,15 +241,8 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
     }
 
     for (idx, drive) in machine.storage.iter().enumerate() {
-        let (path, format) = match &drive.snapshot_file {
-            Some(snap) if Path::new(snap).exists() => {
-                debug!("Using disk snapshot: {snap}");
-                (snap, "qcow2")
-            }
-            _ => (&drive.path, drive.format.as_str()),
-        };
-
-        let drive_name_prefix = "disk";
+        let path = &drive.path;
+        let format = &drive.format;
         let mut hd_params = String::new();
 
         let mut may_use_direct_io = true;
@@ -316,8 +309,17 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
         // TODO: configure cache
         qemu.args(&["-blockdev", &format!("file.filename={},file.driver={file_driver},node-name=disk{},driver={},discard=unmap{aio_params}", path, idx, format)]);
 
+        let blockdev_name = match &drive.snapshot_file {
+            Some(snap) if Path::new(snap).exists() => {
+                debug!("Using disk snapshot: {snap}");
+                qemu.arg("-blockdev").arg(format!("file.filename={snap},file.driver=file,driver=qcow2,node-name=disk{idx}_snap,backing=disk{idx},discard=unmap,file.aio=io_uring,cache.direct=on"));
+                format!("disk{idx}_snap")
+            }
+            _ => format!("disk{idx}"),
+        };
+
         qemu.args(&[//"-device", &format!("ahci,id=ahci{idx}"),
-                    "-device", &format!("scsi-hd,{hd_params}drive={drive_name_prefix}{},id=myscsi{idx},rotation_rate=1,discard_granularity=0", idx),
+                    "-device", &format!("scsi-hd,{hd_params}drive={blockdev_name},id=myscsi{idx},rotation_rate=1,discard_granularity=0"),
                     ]);
                     //&format!("ide-hd,drive=disk{},bus=ahci{idx}.0", idx)]);
         debug!("Passed through {}", drive.path);

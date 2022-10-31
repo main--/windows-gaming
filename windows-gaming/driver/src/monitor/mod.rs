@@ -153,10 +153,10 @@ impl Monitor {
                     }
                     QmpCommand::TakeSnapshot { disk_id, snap_file, ack } => {
                         let res = qapi.execute(qmp::blockdev_snapshot_sync(qmp::BlockdevSnapshotSync {
-                            node_name: None,
+                            node_name: Some(format!("disk{disk_id}")),
                             snapshot_file: snap_file,
-                            snapshot_node_name: None,
-                            device: Some(format!("disk{disk_id}")),
+                            snapshot_node_name: Some(format!("disk{disk_id}_snap")),
+                            device: None,
                             format: Some("qcow2".to_owned()),
                             mode: None,
                         })).await;
@@ -171,7 +171,7 @@ impl Monitor {
                         #[allow(deprecated)]
                         qapi.execute(qmp::block_commit {
                             job_id: Some(jobid),
-                            device: format!("disk{disk_id}"),
+                            device: format!("disk{disk_id}_snap"),
                             base_node: None,
 
                             base: None,
@@ -188,8 +188,13 @@ impl Monitor {
                     QmpCommand::JobReady(device) => {
                         debug!("committing block job {device}");
                         let (snap_file, ack) = pending_disk_commits.borrow_mut().remove(&device).unwrap();
-                        let res = qapi.execute(&qmp::block_job_complete { device }).await;
+                        let res = qapi.execute(&qmp::block_job_complete { device: device.clone() }).await;
                         if res.is_ok() {
+                            // if the snapshot was created in the same session, qemu will (for some reason I don't fully understand)
+                            // automatically remove the blockdev node, causing this to fail
+                            // so we just ignore the result and that's it
+                            let _ = qapi.execute(&qmp::blockdev_del { node_name: format!("{device}_snap") }).await;
+
                             tokio::fs::remove_file(snap_file).await.expect("failed to remove snapshot file after applying, please fix manually");
                             let _ = ack.send(());
                         }
