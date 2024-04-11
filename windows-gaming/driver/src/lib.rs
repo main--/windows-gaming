@@ -162,6 +162,11 @@ pub async fn run(cfg: &Config, tmp: &Path, data: &Path, enable_gui: bool) {
         Box::new(clipboard_reader),
     ]).map(|_| ());
 
+    // in case of errors on our end, give qemu one second to wind down so we don't erroneously think that we crashed
+    let joined = joined.or_else(|e| {
+        tokio::time::sleep(std::time::Duration::from_secs(1)).boxed_local().map(move |()| Err(e)).compat()
+    });
+
     let ls = LocalSet::new();
     let main_loop_legacy = qemu.select2(joined).then(|x| -> Box<dyn Future<Item=(), Error=std::io::Error>> {
         match x {
