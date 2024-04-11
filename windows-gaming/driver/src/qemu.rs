@@ -278,22 +278,6 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
                                 use std::fmt::Write;
                                 let s = s.trim();
                                 write!(hd_params, "{qemu_name}={s},").unwrap();
-
-                                if linux_name == "minimum_io_size" && s.parse::<i32>().unwrap() != 512 {
-                                    warn!("Disabling direct IO on {path} due to qemu bug: https://gitlab.com/qemu-project/qemu/-/issues/1290");
-                                    may_use_direct_io = false;
-                                }
-                                /*
-                                // Turns out this isn't needed due to https://github.com/qemu/qemu/blob/cdcb7dcb401757b5853ca99c1967a6d66e1deea5/block/file-posix.c#L401
-                                // Which is interesting because it seems that this codepath only triggers since we switched from -drive to -blockdev
-
-                                if linux_name == "minimum_io_size" && s.parse::<i32>().unwrap() != 512 {
-                                    // additionally add blkdebug driver to set IO alignment to deal with LUKS issues
-                                    info!("Redirecting {path} to blkdebug due to minimum IO size of {s}");
-                                    qemu.args(&["-blockdev", &format!("driver=blkdebug,node-name=blkdebug{idx},image=disk{idx},align={s}")]);
-                                    drive_name_prefix = "blkdebug";
-                                }
-                                */
                             }
                         }
                     }
