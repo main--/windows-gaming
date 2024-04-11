@@ -235,8 +235,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
             debug!("usb-kbd at xhci{}.0p{}", port / usable_ports, (port % usable_ports) + 1);
 
             // add USB audio
-            let port = i + 2;
-            qemu.args(&["-audiodev", "jack,id=jackaudio", "-device", &format!("usb-audio,audiodev=jackaudio,bus=xhci{}.0,port={}", port / usable_ports, (port % usable_ports) + 1)]);
+            qemu.args(&["-audiodev", "pipewire,id=pwaudio,out.mixing-engine=off,in.mixing-engine=off,in.latency=100000000,in.buffer-length=100000000", "-device", "ich9-intel-hda", "-device", "hda-micro,audiodev=pwaudio"]);
         }
     }
 
