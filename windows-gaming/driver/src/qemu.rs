@@ -286,7 +286,8 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
 
         let aio_params = match may_use_direct_io {
             false => "",
-            true => ",file.aio=io_uring,cache.direct=on",
+            true => ",file.aio=native,cache.direct=on",
+            //true => ",file.aio=io_uring,cache.direct=on",
         };
 
         // TODO: configure cache
