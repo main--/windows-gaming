@@ -152,7 +152,6 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
     // TODO: Check if the configured device is in the configured slot
 
     // FIXME: parsing device addresses is messy, should rework this at some point
-    let mut root_ports = HashMap::new();
 
     for device in cfg.machine.pci_devices.iter() {
         if device.resettable {
@@ -167,14 +166,8 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
         }
 
         let (slot_no_fn, only_fn) = device.slot.split_once('.').expect("malformed pcie device address");
-        let new_root_port_id = root_ports.len();
-        let root_port_id = *root_ports.entry(slot_no_fn).or_insert_with(|| {
-            qemu.arg("-device").arg(format!("pcie-root-port,id=root_port_{},bus=pcie.0", new_root_port_id));
-            new_root_port_id
-        });
-
-
-        qemu.args(&["-device", &format!("vfio-pci,host={},multifunction=on,bus=root_port_{},addr=0x00.{}", device.slot, root_port_id, only_fn)]);
+        qemu.args(&["-device", &format!("vfio-pci,host={},multifunction=on", device.slot)]);
+        // qemu.args(&["-device", &format!("vfio-pci,host={},multifunction=on,bus=root_port_{},addr=0x00.{}", device.slot, root_port_id, only_fn)]);
         debug!("Passed through {}", device.slot);
     }
 
