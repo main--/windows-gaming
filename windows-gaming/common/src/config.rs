@@ -226,6 +226,7 @@ pub struct SetupConfig {
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 pub struct MachineConfig {
+    pub cpu: Option<String>,
     pub memory: String,
     pub hugepages: Option<bool>,
 

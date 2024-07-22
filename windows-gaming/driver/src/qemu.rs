@@ -32,6 +32,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
            enable_gui: bool) -> Child {
     trace!("qemu::run");
     let machine = &cfg.machine;
+    let cpu = &machine.cpu.clone().unwrap_or("host".to_owned());
 
     let efivars_file = match cfg.tpm_state_folder.as_ref() {
         None => {
@@ -73,9 +74,9 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
                 // Note: Do NOT add hv_tlbflush as it (currently) causes a bug where windows
                 // crashes with random memory corruption when waking up from suspend
                 // https://gitlab.com/qemu-project/qemu/-/issues/1152
-                "host,hv_time,hv_relaxed,hv_vapic,hv_spinlocks=0x1fff,\
+                &format!("{},hv_time,hv_relaxed,hv_vapic,hv_spinlocks=0x1fff,\
                  hv_vpindex,hv_runtime,hv_synic,hv_stimer,\
-                 hv_frequencies,hv_apicv,hv_xmm_input",
+                 hv_frequencies,hv_apicv,hv_xmm_input", cpu),
                 "-overcommit", "mem-lock=on", // don't swap out windows; let windows do its own swapping
                 "-rtc",
                 "base=localtime",
