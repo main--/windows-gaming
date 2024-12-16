@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::{self, format, Debug};
 use std::os::unix::prelude::{AsRawFd, MetadataExt};
 use std::process::{Stdio};
 use std::path::{Path, PathBuf};
@@ -37,14 +38,14 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
     let efivars_file = match cfg.tpm_state_folder.as_ref() {
         None => {
             let efivars_file = tmp.join("efivars.fd");
-            fs::copy("/usr/share/edk2-ovmf/x64/OVMF_VARS.fd", &efivars_file).expect("Failed to copy efivars image");
+            fs::copy("/usr/share/edk2-ovmf/x64/OVMF_VARS.4m.fd", &efivars_file).expect("Failed to copy efivars image");
             efivars_file
         }
         Some(tpm_folder) => {
             // also use it to store secure boot state
             let efivars_file = Path::new(tpm_folder).join("efivars.fd");
             if !efivars_file.exists() {
-                fs::copy("/usr/share/edk2-ovmf/x64/OVMF_VARS.fd", &efivars_file).expect("Failed to copy efivars image");
+                fs::copy("/usr/share/edk2-ovmf/x64/OVMF_VARS.4m.fd", &efivars_file).expect("Failed to copy efivars image");
             }
             efivars_file
         }
@@ -89,7 +90,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
                 &format!("unix:{}", monitor_path.display()),
                 "-drive",
                 &format!("if=pflash,format=raw,unit=0,readonly=on,file={}",
-                    "/usr/share/edk2-ovmf/x64/OVMF_CODE.secboot.fd"),
+                    "/usr/share/edk2-ovmf/x64/OVMF_CODE.secboot.4m.fd"),
                 "-drive",
                 &format!("if=pflash,format=raw,unit=1,file={}", efivars_file.display()),
 
@@ -102,12 +103,12 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
                 "-device", "scsi-cd,id=cdrom,drive=iso",
     ]);
 
+
     if let Some(tpm_folder) = cfg.tpm_state_folder.as_ref() {
         let tpm_socket = tmp.join("tpm.socket");
         qemu.args(&["-chardev", &format!("socket,id=chrtpm,path={}", tpm_socket.display()), "-tpmdev", "emulator,id=tpm0,chardev=chrtpm", "-device", "tpm-tis,tpmdev=tpm0"]);
         Command::new("swtpm").args(&["socket", "--tpmstate", &format!("dir={tpm_folder}"), "--ctrl", &format!("type=unixio,path={}", tpm_socket.display()), "--tpm2"]).spawn().unwrap();
     }
-
     if enable_gui {
         qemu.args(&["-display", "gtk", "-vga", "qxl"]);
         debug!("Applied gtk to qemu");
