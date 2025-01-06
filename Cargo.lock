@@ -275,7 +275,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-stream",
- "tokio-util",
+ "tokio-util 0.6.9",
  "zerocost-clipboard",
 ]
 
@@ -459,7 +459,7 @@ dependencies = [
  "prost",
  "tokio",
  "tokio-stream",
- "tokio-util",
+ "tokio-util 0.6.9",
  "windows",
  "windows-eventloop",
  "windows-keybinds",
@@ -981,9 +981,9 @@ dependencies = [
 
 [[package]]
 name = "qapi"
-version = "0.8.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37a6fe62413c9eec316d34ed057e19e2a47bfa5a6094ccaf6de81ceeefee74a0"
+checksum = "7b047adab56acc4948d4b9b58693c1f33fd13efef2d6bb5f0f66a47436ceada8"
 dependencies = [
  "bytes 1.1.0",
  "futures 0.3.17",
@@ -994,23 +994,23 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
- "tokio-util",
+ "tokio-util 0.7.13",
 ]
 
 [[package]]
 name = "qapi-codegen"
-version = "0.6.0"
+version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "060c83952f4db54e1b6c9e7713dd8b6cec1d14283c91aae89fd8dfeb8d46a960"
+checksum = "fb959fed63a69baa2e3ae57224d885e686bc3f56c9bb3b03406969980ea57a44"
 dependencies = [
  "qapi-parser",
 ]
 
 [[package]]
 name = "qapi-parser"
-version = "0.6.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92495a78224a474b73d218f3e945d919cbf6e869219101d584aede89976994e4"
+checksum = "7b37f643cfdf67a409a9323334138a11636a5db5d56cedcc780d7a82a7fb7659"
 dependencies = [
  "serde",
  "serde_json",
@@ -1018,9 +1018,9 @@ dependencies = [
 
 [[package]]
 name = "qapi-qmp"
-version = "0.8.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df6a8fad0de1fe3d8b2bf2fb617579cb1e9d60a470760ed28c93839072cc7084"
+checksum = "45303cac879d89361cad0287ae15f9ae1e7799b904b474152414aeece39b9875"
 dependencies = [
  "qapi-codegen",
  "qapi-spec",
@@ -1404,7 +1404,7 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
- "tokio-util",
+ "tokio-util 0.6.9",
 ]
 
 [[package]]
@@ -1418,6 +1418,19 @@ dependencies = [
  "futures-io",
  "futures-sink",
  "log",
+ "pin-project-lite",
+ "tokio",
+]
+
+[[package]]
+name = "tokio-util"
+version = "0.7.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7fcaa8d55a2bdd6b83ace262b016eca0d79ee02818c5c1bcdf0305114081078"
+dependencies = [
+ "bytes 1.1.0",
+ "futures-core",
+ "futures-sink",
  "pin-project-lite",
  "tokio",
 ]
@@ -1862,7 +1875,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-pipe",
- "tokio-util",
+ "tokio-util 0.6.9",
  "wayland-client",
  "wayland-protocols",
  "windows",

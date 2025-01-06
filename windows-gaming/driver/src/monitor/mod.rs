@@ -128,7 +128,7 @@ impl Monitor {
                 let res = match cmd {
                     QmpCommand::DeviceAdd { driver, id, bus, port, hostbus, hostaddr } =>
                         qapi.execute(&qmp::device_add { id: Some(id), bus: Some(bus), driver: driver.to_owned(), arguments: vec![
-                            ("port".to_owned(), port.into()),
+                            ("port".to_owned(), port.to_string().into()),
                             ("hostbus".to_owned(), hostbus.into()),
                             ("hostaddr".to_owned(), hostaddr.into()),
                         ].into_iter().collect() }).await,
@@ -183,6 +183,7 @@ impl Monitor {
                             filter_node_name: None,
                             auto_finalize: None,
                             auto_dismiss: None,
+                            backing_mask_protocol: None,
                         }).await
                     }
                     QmpCommand::JobReady(device) => {

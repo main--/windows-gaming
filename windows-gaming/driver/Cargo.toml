@@ -27,4 +27,4 @@ sd-notify = "0.3.0"
 zerocost-clipboard = { path = "../../zerocost-clipboard" }
 anyhow = "1.0.45"
 tokio-stream = { version = "0.1.8", features = ["sync", "signal", "time", "net"] }
-qapi = { version = "0.8", features = ["qmp", "async-tokio-all"] }
+qapi = { version = "0.15", features = ["qmp", "async-tokio-all"] }
