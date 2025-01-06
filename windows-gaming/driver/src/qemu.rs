@@ -73,9 +73,13 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
                 // Note: Do NOT add hv_tlbflush as it (currently) causes a bug where windows
                 // crashes with random memory corruption when waking up from suspend
                 // https://gitlab.com/qemu-project/qemu/-/issues/1152
-                "host,hv_time,hv_relaxed,hv_vapic,hv_spinlocks=0x1fff,\
+                // qemu docs recommend NOT disabling spinlocks (since windows spins for a reason) unless the host is over committed
+                // trying this as of dec 24
+                //"host,hv_time,hv_relaxed,hv_vapic,hv_spinlocks=0x1fff,\
+                "host,hv_time,hv_relaxed,hv_vapic,\
                  hv_vpindex,hv_runtime,hv_synic,hv_stimer,\
-                 hv_frequencies,hv_apicv,hv_xmm_input",
+                 hv_frequencies,hv_apicv,hv_xmm_input,\
+                 hv_tlbflush,hv-tlbflush-ext,hv_ipi,hv_stimer_direct", // new experimental stuff
                 "-overcommit", "mem-lock=on", // don't swap out windows; let windows do its own swapping
                 "-rtc",
                 "base=localtime",
