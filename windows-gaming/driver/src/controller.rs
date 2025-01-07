@@ -486,7 +486,18 @@ impl Controller {
 
 /// Resolves a `UsbBinding` to a (bus, addr) tuple.
 pub fn udev_resolve_binding(udev: &Context, binding: &UsbBinding)
-                        -> UdevResult<Option<(String, String)>> {
+                        -> UdevResult<Option<(u64, u64)>> {
+    fn parse_int(s: &str) -> std::result::Result<u64, std::num::ParseIntError> {
+        if let Some(s) = s.strip_prefix("0x") {
+            u64::from_str_radix(s, 16)
+        } else if let Some(s) = s.strip_prefix("0o") {
+            u64::from_str_radix(s, 8)
+        } else if let Some(s) = s.strip_prefix("0b") {
+            u64::from_str_radix(s, 2)
+        } else {
+            u64::from_str_radix(s, 10)
+        }
+    }
     let mut iter = Enumerator::new(udev).unwrap();
 
     iter.match_subsystem("usb")?;
@@ -512,9 +523,9 @@ pub fn udev_resolve_binding(udev: &Context, binding: &UsbBinding)
             for attr in dev.attributes() {
                 if let Some(val) = attr.value().and_then(OsStr::to_str) {
                     if attr.name() == "busnum" {
-                        bus = Some(val.to_owned());
+                        bus = Some(parse_int(val).unwrap());
                     } else if attr.name() == "devnum" {
-                        addr = Some(val.to_owned());
+                        addr = Some(parse_int(val).unwrap());
                     }
                 }
             }
@@ -536,7 +547,7 @@ pub fn udev_resolve_binding(udev: &Context, binding: &UsbBinding)
 /// Resolves a `UsbBinding` to a (bus, addr) tuple.
 ///
 /// This is just a wrapper around `udev_resolve_binding` creating a new udev context.
-pub fn resolve_binding(binding: &UsbBinding) -> UdevResult<Option<(String, String)>> {
+pub fn resolve_binding(binding: &UsbBinding) -> UdevResult<Option<(u64, u64)>> {
     let udev = Context::new().expect("Failed to create udev context");
     udev_resolve_binding(&udev, binding)
 }

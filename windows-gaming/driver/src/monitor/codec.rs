@@ -12,8 +12,8 @@ pub enum QmpCommand {
         id: String,
         bus: String,
         port: usize,
-        hostbus: String,
-        hostaddr: String,
+        hostbus: u64,
+        hostaddr: u64,
     },
     DeviceDel { id: String },
     SystemPowerdown,
@@ -50,11 +50,11 @@ pub enum InputEvent {
 impl Into<qmp::InputEvent> for InputEvent {
     fn into(self) -> qmp::InputEvent {
         match self {
-            InputEvent::Rel { axis, value } => qmp::InputEvent::rel { data: qmp::InputMoveEvent { value: value as isize, axis: qmp::InputAxis::from_name(axis).unwrap() }  },
-            InputEvent::Btn { button, down } => qmp::InputEvent::btn { data: qmp::InputBtnEvent { down, button: button.into() } },
-            InputEvent::Key { key, down } => qmp::InputEvent::key { data: qmp::InputKeyEvent { down, key: match key {
-                KeyValue::Qcode(s) => qmp::KeyValue::qcode { data: qmp::QKeyCode::from_name(s).unwrap() },
-            } }},
+            InputEvent::Rel { axis, value } => qmp::InputEvent::rel(qmp::InputMoveEventWrapper { data: qmp::InputMoveEvent { value: value, axis: qmp::InputAxis::from_name(axis).unwrap() }  }),
+            InputEvent::Btn { button, down } => qmp::InputEvent::btn(qmp::InputBtnEventWrapper { data: qmp::InputBtnEvent { down, button: button.into() } }),
+            InputEvent::Key { key, down } => qmp::InputEvent::key(qmp::InputKeyEventWrapper { data: qmp::InputKeyEvent { down, key: match key {
+                KeyValue::Qcode(s) => qmp::KeyValue::qcode(qmp::QKeyCodeWrapper { data: qmp::QKeyCode::from_name(s).unwrap() }),
+            } }}),
         }
     }
 }
