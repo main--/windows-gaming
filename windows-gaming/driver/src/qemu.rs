@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::{self, format, Debug};
 use std::os::unix::prelude::{AsRawFd, MetadataExt};
 use std::process::{Stdio};
 use std::path::{Path, PathBuf};
@@ -32,18 +33,19 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
            enable_gui: bool) -> Child {
     trace!("qemu::run");
     let machine = &cfg.machine;
+    let cpu = &machine.cpu.clone().unwrap_or("host".to_owned());
 
     let efivars_file = match cfg.tpm_state_folder.as_ref() {
         None => {
             let efivars_file = tmp.join("efivars.fd");
-            fs::copy("/usr/share/edk2-ovmf/x64/OVMF_VARS.fd", &efivars_file).expect("Failed to copy efivars image");
+            fs::copy("/usr/share/edk2-ovmf/x64/OVMF_VARS.4m.fd", &efivars_file).expect("Failed to copy efivars image");
             efivars_file
         }
         Some(tpm_folder) => {
             // also use it to store secure boot state
             let efivars_file = Path::new(tpm_folder).join("efivars.fd");
             if !efivars_file.exists() {
-                fs::copy("/usr/share/edk2-ovmf/x64/OVMF_VARS.fd", &efivars_file).expect("Failed to copy efivars image");
+                fs::copy("/usr/share/edk2-ovmf/x64/OVMF_VARS.4m.fd", &efivars_file).expect("Failed to copy efivars image");
             }
             efivars_file
         }
@@ -76,10 +78,10 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
                 // qemu docs recommend NOT disabling spinlocks (since windows spins for a reason) unless the host is over committed
                 // trying this as of dec 24
                 //"host,hv_time,hv_relaxed,hv_vapic,hv_spinlocks=0x1fff,\
-                "host,hv_time,hv_relaxed,hv_vapic,\
+                &format!("{},,hv_time,hv_relaxed,hv_vapic,\
                  hv_vpindex,hv_runtime,hv_synic,hv_stimer,\
                  hv_frequencies,hv_apicv,hv_xmm_input,\
-                 hv_tlbflush,hv-tlbflush-ext,hv_ipi,hv_stimer_direct", // new experimental stuff
+                 hv_tlbflush,hv-tlbflush-ext,hv_ipi,hv_stimer_direct", cpu), // new experimental stuff
                 "-overcommit", "mem-lock=on", // don't swap out windows; let windows do its own swapping
                 "-rtc",
                 "base=localtime",
@@ -92,7 +94,7 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
                 &format!("unix:{}", monitor_path.display()),
                 "-drive",
                 &format!("if=pflash,format=raw,unit=0,readonly=on,file={}",
-                    "/usr/share/edk2-ovmf/x64/OVMF_CODE.secboot.fd"),
+                    "/usr/share/edk2-ovmf/x64/OVMF_CODE.secboot.4m.fd"),
                 "-drive",
                 &format!("if=pflash,format=raw,unit=1,file={}", efivars_file.display()),
 
@@ -105,12 +107,12 @@ pub fn run(cfg: &Config, tmp: &Path, data: &Path, clientpipe_path: &Path, monito
                 "-device", "scsi-cd,id=cdrom,drive=iso",
     ]);
 
+
     if let Some(tpm_folder) = cfg.tpm_state_folder.as_ref() {
         let tpm_socket = tmp.join("tpm.socket");
         qemu.args(&["-chardev", &format!("socket,id=chrtpm,path={}", tpm_socket.display()), "-tpmdev", "emulator,id=tpm0,chardev=chrtpm", "-device", "tpm-tis,tpmdev=tpm0"]);
         Command::new("swtpm").args(&["socket", "--tpmstate", &format!("dir={tpm_folder}"), "--ctrl", &format!("type=unixio,path={}", tpm_socket.display()), "--tpm2"]).spawn().unwrap();
     }
-
     if enable_gui {
         qemu.args(&["-display", "gtk", "-vga", "qxl"]);
         debug!("Applied gtk to qemu");
